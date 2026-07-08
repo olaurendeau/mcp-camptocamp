@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { searchRoutes, getRoute, searchWaypoints, getWaypoint } from "../../src/api/camptocamp.js";
+import {
+  searchRoutes,
+  getRoute,
+  searchWaypoints,
+  getWaypoint,
+  searchUserOutings,
+  getOuting,
+} from "../../src/api/camptocamp.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -153,5 +160,90 @@ describe("getWaypoint", () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 404));
 
     await expect(getWaypoint(999)).rejects.toThrow("Camptocamp API error: 404");
+  });
+});
+
+describe("searchUserOutings", () => {
+  it("calls the correct URL and returns parsed response", async () => {
+    const mockData = {
+      documents: [
+        {
+          document_id: 1915495,
+          locales: [{ lang: "fr", title: "Valle dell'Orco - Sergent : Nautilus" }],
+          activities: ["rock_climbing"],
+          date_start: "2026-06-14",
+          date_end: "2026-06-14",
+          global_rating: "TD",
+          author: { name: "o.laurendeau", user_id: 430052 },
+        },
+      ],
+      total: 42,
+    };
+
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await searchUserOutings(430052);
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain("/outings");
+    expect(url).toContain("u=430052");
+    expect(url).toContain("lang=fr");
+
+    expect(result.total).toBe(42);
+    expect(result.documents[0].document_id).toBe(1915495);
+    expect(result.documents[0].author?.name).toBe("o.laurendeau");
+  });
+
+  it("respects custom limit and lang", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchUserOutings(430052, 5, "en");
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain("limit=5");
+    expect(url).toContain("lang=en");
+  });
+
+  it("throws on non-OK response", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
+
+    await expect(searchUserOutings(430052)).rejects.toThrow("Camptocamp API error: 500");
+  });
+});
+
+describe("getOuting", () => {
+  it("fetches outing by ID", async () => {
+    const mockData = {
+      document_id: 1915495,
+      locales: [
+        {
+          lang: "fr",
+          title: "Valle dell'Orco - Sergent : Nautilus",
+          description: "Belle sortie.",
+          weather: "Beau",
+        },
+      ],
+      activities: ["rock_climbing"],
+      date_start: "2026-06-14",
+      global_rating: "TD",
+      author: { name: "o.laurendeau", user_id: 430052 },
+    };
+
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getOuting(1915495);
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain("/outings/1915495");
+
+    expect(result.document_id).toBe(1915495);
+    expect(result.global_rating).toBe("TD");
+    expect(result.locales[0].weather).toBe("Beau");
+  });
+
+  it("throws on non-OK response", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}, 404));
+
+    await expect(getOuting(999)).rejects.toThrow("Camptocamp API error: 404");
   });
 });
