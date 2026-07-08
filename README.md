@@ -72,21 +72,16 @@ Puis utiliser l'image locale `mcp-camptocamp-mcp` à la place de `ghcr.io/olaure
 
 Prérequis : [Docker](https://docs.docker.com/get-docker/) et [Docker Compose](https://docs.docker.com/compose/)
 
+Toutes les commandes npm passent par Docker via le `Makefile` :
+
 ```bash
-# Installer les dépendances
-docker compose run --rm dev npm install
-
-# Lancer les tests
-docker compose run --rm dev npm test
-
-# Vérification des types
-docker compose run --rm dev npm run lint
-
-# Tests en mode watch
-docker compose run --rm dev npm run test:watch
-
-# Construire l'image de production
-docker compose build mcp
+make install      # Installer les dépendances
+make test         # Lancer les tests
+make lint         # Vérification des types
+make test-watch   # Tests en mode watch
+make build        # Compiler TypeScript
+make docker-build # Construire l'image de production
+make help         # Liste toutes les commandes
 ```
 
 ## Publication
@@ -95,26 +90,42 @@ La publication est automatisée via GitHub Actions à chaque tag `v*` (ex. `v1.0
 
 ### Première publication
 
-1. Créer un compte sur [npmjs.com](https://www.npmjs.com/)
-2. Générer un token npm (type « Automation »)
-3. Ajouter le secret `NPM_TOKEN` dans les paramètres GitHub du repo (Settings → Secrets and variables → Actions)
-4. Rendre le package GHCR public (Settings → Packages → mcp-camptocamp → Change visibility) après le premier push
-5. Créer et pousser un tag :
+**Étape 1 — Publier une première fois manuellement** (une seule fois, avec ta 2FA) :
+
+```bash
+make login          # authentification interactive avec 2FA
+make publish        # ci + tests + build + npm publish
+```
+
+Les identifiants npm sont stockés localement dans `.npm/` (ignoré par git).
+
+**Étape 2 — Configurer Trusted Publishing sur npm** (remplace le token CI/CD) :
+
+1. Va sur [npmjs.com](https://www.npmjs.com/) → ton package `@olaurendeau/mcp-camptocamp` → **Settings**
+2. Section **Trusted Publisher** → choisis **GitHub Actions**
+3. Renseigne exactement :
+   - **Organization or user** : `olaurendeau`
+   - **Repository** : `mcp-camptocamp`
+   - **Workflow filename** : `publish.yml`
+4. (Recommandé) Dans **Publishing access**, active **Require two-factor authentication and disallow tokens**
+
+**Étape 3 — Publier via GitHub Actions** :
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-Le workflow publie automatiquement sur npm, GHCR et le [registre MCP officiel](https://modelcontextprotocol.io/registry).
+Le workflow publie automatiquement sur npm (via OIDC, sans token), GHCR et le [registre MCP officiel](https://modelcontextprotocol.io/registry).
+
+Après le premier push Docker, rendre le package GHCR public : Settings → Packages → mcp-camptocamp → Change visibility.
 
 ### Publication manuelle
 
 ```bash
-npm ci && npm test && npm run build
-npm publish --access public
+make publish
 
-# Registre MCP
+# Registre MCP (nécessite mcp-publisher installé sur l'hôte)
 curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 ./mcp-publisher login github
 ./mcp-publisher publish
