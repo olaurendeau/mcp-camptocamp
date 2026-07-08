@@ -14,6 +14,8 @@ RUN npm run build
 # Stage 2: Runtime
 FROM node:22-alpine AS runtime
 
+LABEL io.modelcontextprotocol.server.name="io.github.olaurendeau/mcp-camptocamp"
+
 WORKDIR /app
 
 COPY package*.json ./

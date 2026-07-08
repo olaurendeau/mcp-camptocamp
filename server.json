@@ -1,0 +1,28 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.olaurendeau/mcp-camptocamp",
+  "title": "Camptocamp",
+  "description": "Interroge l'API Camptocamp.org pour des données fiables sur les itinéraires alpins, sommets et points de passage.",
+  "repository": {
+    "url": "https://github.com/olaurendeau/mcp-camptocamp",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@olaurendeau/mcp-camptocamp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    },
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/olaurendeau/mcp-camptocamp:1.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
