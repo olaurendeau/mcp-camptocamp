@@ -1,0 +1,22 @@
+services:
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: mcp-camptocamp-mcp
+    stdin_open: true
+    tty: false
+
+  dev:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    command: npx tsx src/index.ts
+    stdin_open: true
+    tty: false
+
+volumes:
+  node_modules:
