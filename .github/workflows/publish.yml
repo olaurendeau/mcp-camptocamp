@@ -47,7 +47,12 @@ jobs:
         run: npm run build
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: |
+          if npm view "@olaurendeau/mcp-camptocamp@${{ env.VERSION }}" version >/dev/null 2>&1; then
+            echo "Version ${{ env.VERSION }} already on npm, skipping publish"
+          else
+            npm publish --access public
+          fi
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
