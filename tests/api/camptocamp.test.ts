@@ -29,7 +29,7 @@ describe("searchRoutes", () => {
     const mockData = {
       documents: [
         {
-          id: 123,
+          document_id: 123,
           locales: [{ lang: "fr", title: "Voie normale Mont Blanc" }],
           activities: ["skitouring"],
           elevation_max: 4808,
@@ -50,7 +50,7 @@ describe("searchRoutes", () => {
     expect(url).toContain("lang=fr");
 
     expect(result.total).toBe(1);
-    expect(result.documents[0].id).toBe(123);
+    expect(result.documents[0].document_id).toBe(123);
     expect(result.documents[0].locales[0].title).toBe("Voie normale Mont Blanc");
   });
 
@@ -74,7 +74,7 @@ describe("searchRoutes", () => {
 describe("getRoute", () => {
   it("fetches route by ID", async () => {
     const mockData = {
-      id: 456,
+      document_id: 456,
       locales: [{ lang: "fr", title: "Arête des Cosmiques", description: "Belle arête." }],
       activities: ["rock_climbing"],
       elevation_max: 3842,
@@ -89,7 +89,7 @@ describe("getRoute", () => {
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain("/routes/456");
 
-    expect(result.id).toBe(456);
+    expect(result.document_id).toBe(456);
     expect(result.global_rating).toBe("TD");
   });
 
@@ -105,7 +105,7 @@ describe("searchWaypoints", () => {
     const mockData = {
       documents: [
         {
-          id: 789,
+          document_id: 789,
           locales: [{ lang: "fr", title: "Mont Blanc" }],
           waypoint_type: "summit",
           elevation: 4808,
@@ -136,12 +136,11 @@ describe("searchWaypoints", () => {
 describe("getWaypoint", () => {
   it("fetches waypoint by ID", async () => {
     const mockData = {
-      id: 321,
+      document_id: 321,
       locales: [{ lang: "fr", title: "Refuge du Goûter", description: "Refuge gardé." }],
       waypoint_type: "hut",
       elevation: 3835,
-      lat: 45.844,
-      lng: 6.842,
+      geometry: { geom: '{"type": "Point", "coordinates": [761655.0, 5751022.0]}' },
     };
 
     mockFetch.mockResolvedValueOnce(makeResponse(mockData));
@@ -151,9 +150,9 @@ describe("getWaypoint", () => {
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain("/waypoints/321");
 
-    expect(result.id).toBe(321);
+    expect(result.document_id).toBe(321);
     expect(result.elevation).toBe(3835);
-    expect(result.lat).toBe(45.844);
+    expect(result.geometry?.geom).toContain("Point");
   });
 
   it("throws on non-OK response", async () => {

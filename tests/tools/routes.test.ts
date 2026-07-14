@@ -13,18 +13,24 @@ beforeEach(() => {
 
 describe("handleSearchRoutes", () => {
   it("formats results correctly", async () => {
+    // Fixture mirrors the real API v6 shape: documents carry document_id, not id
     mockSearchRoutes.mockResolvedValueOnce({
       total: 2,
       documents: [
         {
-          id: 1,
-          locales: [{ lang: "fr", title: "Voie normale" }],
-          activities: ["skitouring"],
-          elevation_max: 4808,
-          global_rating: "F",
+          document_id: 57842,
+          locales: [
+            { lang: "es", title: "via gamma", title_prefix: "Barre des Écrins" },
+            { lang: "fr", title: "Voie Gamma", title_prefix: "Barre des Écrins" },
+          ],
+          activities: ["mountain_climbing"],
+          elevation_max: 4102,
+          height_diff_difficulties: 1100,
+          global_rating: "ED",
+          rock_free_rating: "6b+",
         },
         {
-          id: 2,
+          document_id: 53914,
           locales: [{ lang: "fr", title: "Arête des Cosmiques" }],
           activities: ["rock_climbing"],
           elevation_max: 3842,
@@ -32,13 +38,14 @@ describe("handleSearchRoutes", () => {
       ],
     });
 
-    const result = await handleSearchRoutes({ query: "Mont Blanc", limit: 10 });
+    const result = await handleSearchRoutes({ query: "Barre des Écrins", limit: 10 });
 
     expect(result).toContain("Found 2 route(s)");
-    expect(result).toContain("[1] Voie normale");
-    expect(result).toContain("4808m");
-    expect(result).toContain("Rating: F");
-    expect(result).toContain("[2] Arête des Cosmiques");
+    expect(result).toContain("[57842] Voie Gamma");
+    expect(result).toContain("4102m");
+    expect(result).toContain("Rating: ED");
+    expect(result).toContain("[53914] Arête des Cosmiques");
+    expect(result).not.toContain("undefined");
   });
 
   it("returns empty message when no results", async () => {
@@ -54,7 +61,7 @@ describe("handleSearchRoutes", () => {
       total: 1,
       documents: [
         {
-          id: 10,
+          document_id: 10,
           locales: [{ lang: "en", title: "English Title" }],
           activities: ["hiking"],
         },
@@ -70,7 +77,7 @@ describe("handleSearchRoutes", () => {
 describe("handleGetRoute", () => {
   it("formats route detail correctly", async () => {
     mockGetRoute.mockResolvedValueOnce({
-      id: 42,
+      document_id: 42,
       locales: [
         {
           lang: "fr",
@@ -92,6 +99,7 @@ describe("handleGetRoute", () => {
 
     expect(result).toContain("Arête des Cosmiques");
     expect(result).toContain("ID: 42");
+    expect(result).not.toContain("undefined");
     expect(result).toContain("TD");
     expect(result).toContain("5c");
     expect(result).toContain("3842m");
@@ -101,7 +109,7 @@ describe("handleGetRoute", () => {
 
   it("handles route with minimal data", async () => {
     mockGetRoute.mockResolvedValueOnce({
-      id: 99,
+      document_id: 99,
       locales: [{ lang: "fr", title: "Simple route" }],
       activities: ["hiking"],
     });
@@ -109,7 +117,9 @@ describe("handleGetRoute", () => {
     const result = await handleGetRoute({ id: 99 });
 
     expect(result).toContain("Simple route");
+    expect(result).toContain("ID: 99");
     expect(result).toContain("hiking");
+    expect(result).not.toContain("undefined");
   });
 
   it("propagates API errors", async () => {

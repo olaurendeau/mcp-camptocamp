@@ -26,23 +26,40 @@ function formatWaypointSearchResult(response: WaypointSearchResponse): string {
     const title = locale?.title ?? "Untitled";
     const elevation = wp.elevation ? ` | ${wp.elevation}m` : "";
 
-    lines.push(`- [${wp.id}] ${title} (${wp.waypoint_type})${elevation}`);
+    lines.push(`- [${wp.document_id}] ${title} (${wp.waypoint_type})${elevation}`);
   }
 
   return lines.join("\n");
+}
+
+// geometry.geom is a GeoJSON Point serialized as a string, in Web Mercator (EPSG:3857)
+function parseCoordinates(geom?: string): { lat: number; lng: number } | undefined {
+  if (!geom) return undefined;
+  try {
+    const parsed = JSON.parse(geom) as { coordinates?: [number, number] };
+    if (!Array.isArray(parsed.coordinates)) return undefined;
+    const [x, y] = parsed.coordinates;
+    const R = 6378137;
+    const lng = (x / R) * (180 / Math.PI);
+    const lat = (2 * Math.atan(Math.exp(y / R)) - Math.PI / 2) * (180 / Math.PI);
+    return { lat, lng };
+  } catch {
+    return undefined;
+  }
 }
 
 function formatWaypointDetail(waypoint: WaypointDetail): string {
   const locale = waypoint.locales.find((l) => l.lang === "fr") ?? waypoint.locales[0];
   const lines: string[] = [];
 
-  lines.push(`# ${locale?.title ?? "Untitled"} (ID: ${waypoint.id})`);
+  lines.push(`# ${locale?.title ?? "Untitled"} (ID: ${waypoint.document_id})`);
   lines.push(`\n**Type**: ${waypoint.waypoint_type}`);
 
   if (waypoint.elevation) lines.push(`**Elevation**: ${waypoint.elevation}m`);
 
-  if (waypoint.lat && waypoint.lng) {
-    lines.push(`**Coordinates**: ${waypoint.lat}, ${waypoint.lng}`);
+  const coords = parseCoordinates(waypoint.geometry?.geom);
+  if (coords) {
+    lines.push(`**Coordinates**: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`);
   }
 
   if (locale?.description) {

@@ -7,19 +7,19 @@
     "url": "https://github.com/olaurendeau/mcp-camptocamp",
     "source": "github"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@olaurendeau/mcp-camptocamp",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "transport": {
         "type": "stdio"
       }
     },
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/olaurendeau/mcp-camptocamp:1.0.0",
+      "identifier": "ghcr.io/olaurendeau/mcp-camptocamp:1.0.1",
       "transport": {
         "type": "stdio"
       }

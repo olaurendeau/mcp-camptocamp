@@ -3,12 +3,11 @@ const DEFAULT_LANG = "fr";
 const DEFAULT_LIMIT = 10;
 
 export interface RouteSearchResult {
-  id: number;
-  locales: Array<{ lang: string; title: string }>;
-  main_waypoint_id?: number;
+  document_id: number;
+  locales: Array<{ lang: string; title: string; title_prefix?: string }>;
   activities: string[];
   elevation_max?: number;
-  difficulties_height?: number;
+  height_diff_difficulties?: number;
   rock_free_rating?: string;
   global_rating?: string;
 }
@@ -19,7 +18,7 @@ export interface RouteSearchResponse {
 }
 
 export interface RouteDetail {
-  id: number;
+  document_id: number;
   locales: Array<{
     lang: string;
     title: string;
@@ -38,7 +37,7 @@ export interface RouteDetail {
   global_rating?: string;
   engagement_rating?: string;
   equipment_rating?: string;
-  duration?: number[];
+  durations?: string[];
   main_waypoint_id?: number;
   geometry?: {
     geom_detail?: string;
@@ -46,7 +45,7 @@ export interface RouteDetail {
 }
 
 export interface WaypointSearchResult {
-  id: number;
+  document_id: number;
   locales: Array<{ lang: string; title: string }>;
   waypoint_type: string;
   elevation?: number;
@@ -58,7 +57,7 @@ export interface WaypointSearchResponse {
 }
 
 export interface WaypointDetail {
-  id: number;
+  document_id: number;
   locales: Array<{
     lang: string;
     title: string;
@@ -67,8 +66,6 @@ export interface WaypointDetail {
   }>;
   waypoint_type: string;
   elevation?: number;
-  lng?: number;
-  lat?: number;
   geometry?: {
     geom?: string;
   };

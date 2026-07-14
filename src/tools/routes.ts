@@ -28,7 +28,7 @@ function formatRouteSearchResult(response: RouteSearchResponse): string {
     const elevation = route.elevation_max ? ` | Max elevation: ${route.elevation_max}m` : "";
     const rating = route.global_rating ? ` | Rating: ${route.global_rating}` : "";
 
-    lines.push(`- [${route.id}] ${title} (${activities})${elevation}${rating}`);
+    lines.push(`- [${route.document_id}] ${title} (${activities})${elevation}${rating}`);
   }
 
   return lines.join("\n");
@@ -38,7 +38,7 @@ function formatRouteDetail(route: RouteDetail): string {
   const locale = route.locales.find((l) => l.lang === "fr") ?? route.locales[0];
   const lines: string[] = [];
 
-  lines.push(`# ${locale?.title ?? "Untitled"} (ID: ${route.id})`);
+  lines.push(`# ${locale?.title ?? "Untitled"} (ID: ${route.document_id})`);
   lines.push(`\n**Activities**: ${route.activities.join(", ")}`);
 
   if (route.global_rating) lines.push(`**Global rating**: ${route.global_rating}`);

@@ -1,6 +1,6 @@
 {
   "name": "@olaurendeau/mcp-camptocamp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server exposing Camptocamp.org API to LLMs",
   "mcpName": "io.github.olaurendeau/mcp-camptocamp",
   "type": "module",

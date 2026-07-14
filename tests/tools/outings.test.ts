@@ -45,6 +45,7 @@ describe("handleSearchUserOutings", () => {
     expect(result).toContain("Rating: PD");
     expect(result).toContain("[2] Escalade aux Calanques");
     expect(result).toContain("2026-06-10 → 2026-06-12");
+    expect(result).not.toContain("undefined");
   });
 
   it("returns empty message when no results", async () => {
