@@ -42,11 +42,12 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
 
 7. **Report back** to the coordinator:
    ```
-   Status: done
+   Status: done | blocked
    Deliverables: verdict (success | failure), reviewed SHA, comment URL
    Blocking findings: <file:line — one sentence>, or "none"
    Suggestions: <file:line — one sentence>, or "none"
    ```
+   Report `blocked`, with the error, when the checks cannot run for an environment reason (Docker, network, GitHub outage); in that case set no status, since the code was not judged.
 
 ## Checklist
 

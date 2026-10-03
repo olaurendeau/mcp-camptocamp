@@ -39,7 +39,7 @@ Dans ce repo, la session Claude Code est le **coordinateur** ([`coordinator`](.c
 | Développeur      | [`developer`](.claude/agents/developer.md)               | une PR par tâche, test-first, dans un worktree isolé                |
 | Reviewer         | [`pr-reviewer`](.claude/agents/pr-reviewer.md)           | revue + status `agent-review`                                       |
 
-Chaque agent termine par un rapport `Status` / `Deliverables` / `Decisions needed`. Le coordinateur tranche lui-même, sauf pour quatre catégories qu'il remonte toujours à l'humain (label `needs-human` pendant l'attente) :
+Chaque agent termine par un rapport `Status` / `Deliverables`, complété par `Decisions needed` (designer, architecte, développeur) ou par les points bloquants et suggestions (reviewer). Le coordinateur tranche lui-même, sauf pour quatre catégories qu'il remonte toujours à l'humain (label `needs-human` pendant l'attente) :
 
 - **Périmètre / produit** : ajout, retrait ou renommage d'un outil MCP, changement visible par l'utilisateur, écart avec la demande ;
 - **Dépendances** : nouvelle dépendance runtime, montée de version majeure ;

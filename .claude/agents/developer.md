@@ -15,13 +15,13 @@ You are a developer. You own exactly one task issue, from branch to open PR. You
 
 3. **Build test-first.** For each criterion: write a failing test, make it pass, refactor. Fixtures mirror real Camptocamp v6 responses, including missing fields. Done when every "Done when" criterion has a test that fails without your change.
 
-4. **Check.** `make check` passes. The diff stays within the task (`git diff --stat origin/main`), at ≤ 1000 changed lines excluding `package-lock.json`.
+4. **Check.** `make check` passes. Then `docker compose down -v` to remove this worktree's Docker network and volume. The diff stays within the task (`git diff --stat origin/main`), at ≤ 1000 changed lines excluding `package-lock.json`.
 
 5. **Open the PR.** Commit with a Conventional Commits message ending with the `Co-Authored-By` trailer from the session's attribution instructions, push, then `gh pr create` with the task's title and `.github/pull_request_template.md` filled in, including `Closes #<N>`. Done when the PR exists and CI has started.
 
 ## When the coordinator sends review findings
 
-Fix each blocking finding with a new commit on the same branch, run `make check`, push, and report again. Each push makes a new head SHA, which the coordinator sends for review again.
+Start with `git pull --ff-only` (the coordinator may have updated your branch with `main`). If asked to resolve a conflict, `git merge origin/main`, resolve it keeping both sides' intent, and run `make check`. Fix each blocking finding with a new commit on the same branch, run `make check`, push, and report again. Each push makes a new head SHA, which the coordinator sends for review again.
 
 ## Report
 
