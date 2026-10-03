@@ -388,3 +388,70 @@ export async function getBook(id: number, lang = DEFAULT_LANG): Promise<BookDeta
   }
   return response.json() as Promise<BookDetail>;
 }
+
+export interface ArticleSearchResult {
+  document_id: number;
+  locales: Array<{ lang: string; title: string; summary?: string | null }>;
+  article_type?: string | null; // "collab" | "personal", printed verbatim
+  categories?: string[] | null;
+  activities?: string[] | null;
+  quality?: string | null;
+}
+
+export interface ArticleSearchResponse {
+  documents: ArticleSearchResult[];
+  total: number;
+}
+
+// images, users and xreports associations are left out on purpose: no tool can follow them.
+export interface ArticleDetail {
+  document_id: number;
+  locales: Array<{
+    lang: string;
+    title: string;
+    summary?: string | null;
+    description?: string | null;
+  }>;
+  article_type?: string | null;
+  categories?: string[] | null;
+  activities?: string[] | null;
+  quality?: string | null;
+  author?: { name: string; user_id: number } | null;
+  associations?: {
+    routes?: Array<{
+      document_id: number;
+      locales: Array<{ lang: string; title: string; title_prefix?: string | null }>;
+    }>;
+    waypoints?: Array<{
+      document_id: number;
+      locales: Array<{ lang: string; title: string }>;
+      waypoint_type: string;
+      elevation?: number | null;
+    }>;
+    articles?: Array<{ document_id: number; locales: Array<{ lang: string; title: string }> }>;
+    outings?: Array<{ document_id: number; locales: Array<{ lang: string; title: string }> }>;
+    books?: Array<{ document_id: number; locales: Array<{ lang: string; title: string }> }>;
+  };
+}
+
+export async function searchArticles(
+  query: string,
+  limit = DEFAULT_LIMIT,
+  lang = DEFAULT_LANG,
+): Promise<ArticleSearchResponse> {
+  const params = new URLSearchParams({ q: query, limit: String(limit), lang });
+  const response = await fetch(`${BASE_URL}/articles?${params}`);
+  if (!response.ok) {
+    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<ArticleSearchResponse>;
+}
+
+export async function getArticle(id: number, lang = DEFAULT_LANG): Promise<ArticleDetail> {
+  const params = new URLSearchParams({ lang });
+  const response = await fetch(`${BASE_URL}/articles/${id}?${params}`);
+  if (!response.ok) {
+    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<ArticleDetail>;
+}
