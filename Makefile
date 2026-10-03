@@ -4,7 +4,7 @@ RUN_IT := $(COMPOSE) run --rm -it dev
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install ci check test test-watch coverage lint typecheck format build pack docker-build login whoami publish-prep publish shell
+.PHONY: help install ci check test test-hooks test-watch coverage lint typecheck format build pack docker-build login whoami publish-prep publish shell
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -21,6 +21,9 @@ ci: ## Installe les dépendances depuis package-lock.json
 test: ci ## Lance les tests
 	$(RUN) npm test
 
+test-hooks: ## Teste le hook guard des agents (sur l'hôte : bash + jq)
+	tests/hooks/guard.test.sh
+
 test-watch: ci ## Lance les tests en mode watch
 	$(RUN) npm run test:watch
 
@@ -36,8 +39,9 @@ typecheck: ci ## Vérifie les types TypeScript
 format: ci ## Formate le code avec Prettier
 	$(RUN) npm run format
 
-check: ci ## Lance le job checks de la CI (format, lint, types, couverture, build)
+check: ci ## Lance le job checks de la CI (format, lint, types, couverture, build, tests du hook)
 	$(RUN) npm run check
+	tests/hooks/guard.test.sh
 
 build: ci ## Compile TypeScript vers dist/
 	$(RUN) npm run build
