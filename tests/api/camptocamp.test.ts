@@ -918,10 +918,8 @@ describe("getBook", () => {
 });
 
 describe("searchArticles", () => {
-  it("calls the exact articles URL and keeps article_type, including null activities and summary", async () => {
-    // The live GET /articles?q=crampons&limit=10&lang=fr response (2026-10-03), complete: 3 documents and
-    // `total`. No crampons match has null activities, so a fourth document, 193302, is copied as returned
-    // by GET /articles?q=Du lointain nous nous rappellons&limit=10&lang=fr on the same day.
+  it("calls the exact articles URL and keeps total, article_type and a null summary", async () => {
+    // The live GET /articles?q=crampons&limit=10&lang=fr response (2026-10-03), complete.
     const mockData = {
       documents: [
         {
@@ -967,18 +965,6 @@ describe("searchArticles", () => {
           protected: false,
           type: "c",
         },
-        {
-          document_id: 193302,
-          version: 1,
-          locales: [{ version: 1, lang: "fr", title: "Du lointain nous nous rappellons", summary: null }],
-          quality: "medium",
-          categories: ["stories"],
-          activities: null,
-          article_type: "personal",
-          available_langs: ["fr"],
-          protected: false,
-          type: "c",
-        },
       ],
       total: 3,
     };
@@ -992,8 +978,39 @@ describe("searchArticles", () => {
     expect(result.documents[0].article_type).toBe("collab");
     expect(result.documents[0].categories).toEqual(["gear"]);
     expect(result.documents[0].locales[0].summary).toBeNull();
+    expect(result.documents).toHaveLength(3);
     expect(result.documents[2].article_type).toBe("personal");
-    expect(result.documents[3].activities).toBeNull();
+  });
+
+  it("keeps null activities", async () => {
+    // The live GET /articles?q=Du lointain nous nous rappellons&limit=10&lang=fr response (2026-10-03),
+    // complete.
+    const mockData = {
+      documents: [
+        {
+          document_id: 193302,
+          version: 1,
+          locales: [{ version: 1, lang: "fr", title: "Du lointain nous nous rappellons", summary: null }],
+          quality: "medium",
+          categories: ["stories"],
+          activities: null,
+          article_type: "personal",
+          available_langs: ["fr"],
+          protected: false,
+          type: "c",
+        },
+      ],
+      total: 1,
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await searchArticles("Du lointain nous nous rappellons", 10);
+
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=Du+lointain+nous+nous+rappellons&limit=10&lang=fr`);
+    expect(result.total).toBe(1);
+    expect(result.documents[0].document_id).toBe(193302);
+    expect(result.documents[0].activities).toBeNull();
+    expect(result.documents[0].categories).toEqual(["stories"]);
   });
 
   it("puts custom limit and lang in the URL", async () => {
