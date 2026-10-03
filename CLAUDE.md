@@ -17,7 +17,8 @@ src/
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
     ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
-    └── areas.ts          # Tools: search_areas, get_area
+    ├── areas.ts          # Tools: search_areas, get_area
+    └── books.ts          # Tools: search_books, get_book
 tests/
 ├── api/
 │   └── camptocamp.test.ts  # Unit tests with mocked fetch
@@ -25,7 +26,8 @@ tests/
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
     ├── outings.test.ts     # Tool handler unit tests
-    └── areas.test.ts       # Tool handler unit tests
+    ├── areas.test.ts       # Tool handler unit tests
+    └── books.test.ts       # Tool handler unit tests
 ```
 
 The tool handlers in `src/tools/` are pure functions (no SDK coupling) — they take typed inputs and return formatted strings, making them easy to test in isolation.
@@ -86,6 +88,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `search_outings`      | Search outings by keyword, area, activity, date range, route or waypoint, most recent first |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                          |
+| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable  |
+| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes and waypoints)  |
 
 ## Camptocamp API v6
 
@@ -102,3 +106,5 @@ Base URL: `https://api.camptocamp.org`
 - `GET /outings?sort=-date_end&limit=10&offset=0&lang=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&r={route_id}][&w={waypoint_id}]`
 - `GET /areas?q={query}&limit=10&lang=fr[&atyp={type}]`
 - `GET /areas/{id}?lang=fr`
+- `GET /books?q={query}&limit=10&lang=fr`
+- `GET /books/{id}?lang=fr`
