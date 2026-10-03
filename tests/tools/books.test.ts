@@ -189,7 +189,7 @@ describe("handleSearchBooks", () => {
     mockSearchBooks.mockResolvedValueOnce(FINALE_CLIMBING_SEARCH);
     expect(await handleSearchBooks({ query: "Finale Climbing", limit: 10 })).toContain("- [1049839] Finale Climbing");
 
-    // No live book has empty locales: this is the 1049839 document with `locales` emptied.
+    // No sampled book has empty locales: this is the 1049839 document with `locales` emptied.
     const noLocale = { ...FINALE_CLIMBING_SEARCH.documents[0], locales: [] };
     mockSearchBooks.mockResolvedValueOnce({ documents: [noLocale], total: 1 });
     expect(await handleSearchBooks({ query: "Finale Climbing", limit: 10 })).toContain("- [1049839] Untitled");
@@ -532,8 +532,11 @@ describe("handleGetBook", () => {
     expectNoPlaceholder(result);
   });
 
-  it("keeps only the heading when every nullable field is null", async () => {
-    // Derived from the 14746 fixture: every nullable field set to null and `associations` removed.
+  it("keeps only the heading when every displayed field is null", async () => {
+    // Derived from the 14746 fixture: the fr locale keeps only lang and title, with summary and description
+    // set to null (version and topic_id dropped); author, editor, url, isbn, book_types and langs set to
+    // null (nb_pages, publication_date and activities are already null live); `associations` set to
+    // undefined. available_langs stays ["fr"], since it is never displayed.
     mockGetBook.mockResolvedValueOnce({
       ...BOOK_14746,
       locales: [{ lang: "fr", title: "Hugo et le Mont Blanc", summary: null, description: null }],
@@ -594,6 +597,32 @@ describe("handleGetBook", () => {
     expect(result).not.toContain("- [37586] Aiguille des Glaciers (summit) |");
   });
 
+  it("looks up the fr title of a waypoint whose first locale is another language", async () => {
+    // Derived: waypoint 37355 of the live 209293 response, with only its live it ("Monte Bianco") and fr
+    // ("Mont Blanc") locales, put in it-then-fr order (live order is fr first), and its live elevation.
+    mockGetBook.mockResolvedValueOnce({
+      ...BOOK_209293,
+      associations: {
+        waypoints: [
+          {
+            document_id: 37355,
+            locales: [
+              { lang: "it", title: "Monte Bianco" },
+              { lang: "fr", title: "Mont Blanc" },
+            ],
+            waypoint_type: "summit",
+            elevation: 4805,
+          },
+        ],
+      },
+    });
+
+    const result = await handleGetBook({ id: 209293 });
+
+    expect(result).toContain("- [37355] Mont Blanc (summit) | 4805m");
+    expect(result).not.toContain("Monte Bianco");
+  });
+
   it("lists all 143 routes", async () => {
     const routes = BOOK_194348_ROUTE_IDS.map((document_id) => ({
       document_id,
@@ -614,6 +643,8 @@ describe("handleGetBook", () => {
   });
 
   it("leaves out both association headings when lists are empty or missing", async () => {
+    // The live 14746 associations (all lists empty), then two derived variants: an empty `associations`
+    // object and no `associations` at all.
     for (const associations of [BOOK_14746.associations, {}, undefined]) {
       mockGetBook.mockResolvedValueOnce({ ...BOOK_14746, associations });
 
