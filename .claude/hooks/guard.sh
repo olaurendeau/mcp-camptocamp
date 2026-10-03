@@ -2,7 +2,11 @@
 # PreToolUse guard for Bash calls: each sensitive command stays with the role that owns it.
 # - merging a PR                     → coordinator only
 # - writing the agent-review status  → pr-reviewer only
-# - release commands                 → nobody (the human releases)
+# - version bump (npm version)       → developer only, with --no-git-tag-version
+# - version tags (git tag/push vX.Y) → coordinator only, one named tag at a time
+# - push --tags/--follow-tags, moving or deleting a version tag → nobody
+# - manual publication               → nobody (publish.yml publishes from the tag)
+# The human decides when to release and which version; agents only carry it out.
 # A guardrail for agents, not a security boundary: the human and obfuscated commands bypass it.
 # Fails closed: if the hook itself breaks, exit 2 blocks the command.
 set -euo pipefail
@@ -38,13 +42,20 @@ segments=$(perl -0777 -pe '
   s/&&|\|\||[;|\n]/\n/g;
 ' <<<"$raw")
 
-release='(npm|pnpm|yarn)[[:space:]]+(publish|version)'
-release+='|make[[:space:]]+publish([[:space:]]|$)'
-release+='|mcp-publisher[[:space:]]+publish'
-release+='|gh[[:space:]].*release[[:space:]]+(create|upload|edit|delete)'
-release+='|git[[:space:]]+tag[[:space:]].*v[0-9]'
-release+='|git[[:space:]]+push.*(--tags|--follow-tags|refs/tags/|[[:space:]]["'\'']?v[0-9]+\.[0-9])'
+publish='(npm|pnpm|yarn)[[:space:]]+publish'
+publish+='|make[[:space:]]+publish([[:space:]]|$)'
+publish+='|mcp-publisher[[:space:]]+publish'
+publish+='|gh[[:space:]].*release[[:space:]]+(create|upload|edit|delete)'
+bump='(npm|pnpm|yarn)[[:space:]]+version'
+no_git_tag='[[:space:]]--no-git-tag-version([[:space:]"'\'']|$)'
+git_tag='[[:space:]]--git-tag-version|--no-git-tag-version[[:space:]]+["'\'']?(true|false)(["'\''[:space:]]|$)'
+tag_create='git[[:space:]]+tag[[:space:]].*v[0-9]'
+tag_push='git[[:space:]]+push[[:space:]].*(refs/tags/|[[:space:]:]["'\'']?v[0-9]+\.[0-9])'
 tag_list='git[[:space:]]+tag[[:space:]]+(-l|--list)([[:space:]]|$)'
+tag_bulk='git[[:space:]]+push[[:space:]].*(--tags|--follow-tags)([[:space:]]|$)'
+tag_force='[[:space:]](-[a-zA-Z]*[fd][a-zA-Z]*|--force|--delete)([[:space:]]|$)'
+push_force='[[:space:]](-[a-zA-Z]*[fd][a-zA-Z]*|--force|--force-with-lease|--force-if-includes|--delete)([[:space:]=]|$)'
+push_force+='|[[:space:]]["'\'']?:'
 merge='gh[[:space:]].*pr[[:space:]]+merge'
 api_merge='pulls/[^[:space:]/]+/merge'
 write='[[:space:]](-f|-F|--field|--raw-field|--input)([[:space:]]|=)|(-X|--method)[[:space:]=]*(POST|PUT|PATCH)'
@@ -53,8 +64,29 @@ get='(-X|--method)[[:space:]=]*GET'
 has() { grep -Eq -- "$2" <<<"$1"; }
 
 while IFS= read -r seg; do
-  if has "$seg" "$release" && ! has "$seg" "$tag_list"; then
-    deny "Release commands (version bump, publish, version tags, GitHub releases) are reserved for the human. Report the release as a decision for the coordinator to escalate."
+  if has "$seg" "$publish"; then
+    deny "Manual publication (npm/pnpm/yarn publish, make publish, mcp-publisher publish, gh release create/upload/edit/delete) is blocked for every agent. Publication happens only through publish.yml, triggered by the coordinator pushing tag vX.Y.Z on main."
+  fi
+
+  if has "$seg" "$bump"; then
+    if [ "$agent" != "developer" ]; then
+      deny "Only a developer bumps the version, in a bump PR for a release the human asked for. Ask the coordinator to dispatch a developer."
+    fi
+    if ! has "$seg" "$no_git_tag" || has "$seg" "$git_tag"; then
+      deny "Run npm version with --no-git-tag-version: without it, npm version also creates a git tag, and version tags belong to the coordinator."
+    fi
+  fi
+
+  if has "$seg" "$tag_bulk"; then
+    deny "Push one named tag (git push origin vX.Y.Z), never --tags or --follow-tags: worktrees share tag refs, so a bulk push can publish tags nobody asked for."
+  fi
+
+  if { has "$seg" "$tag_create" && has "$seg" "$tag_force"; } || { has "$seg" "$tag_push" && has "$seg" "$push_force"; }; then
+    deny "No agent moves or deletes a version tag (tag -f/-d, forced push, deletion push): re-pushing a tag republishes an already-released version through publish.yml. Report it to the human."
+  fi
+
+  if [ "$agent" != "coordinator" ] && { has "$seg" "$tag_create" || has "$seg" "$tag_push"; } && ! has "$seg" "$tag_list"; then
+    deny "Only the coordinator creates and pushes version tags, on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
   fi
 
   if [ "$agent" != "coordinator" ] && { has "$seg" "$merge" || { has "$seg" "$api_merge" && has "$seg" '(-X|--method)[[:space:]=]*PUT'; }; }; then

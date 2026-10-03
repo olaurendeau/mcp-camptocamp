@@ -14,6 +14,7 @@ You are a developer. You own exactly one task issue, from branch to open PR. You
 2. **Branch** from up-to-date `main`: `git fetch origin && git checkout --no-track -b <type>/<short-name> origin/main`, where `<type>` is the task title's Conventional Commits type. If the coordinator gives you an existing PR number instead, `gh pr checkout <PR>`, continue from its current state, and at step 5 just push: the PR already exists.
 
 3. **Build test-first.** For each criterion: write a failing test, make it pass, refactor. Fixtures mirror real Camptocamp v6 responses, including missing fields. Done when every "Done when" criterion has a test that fails without your change.
+   A version-bump task has no test to write: run `docker compose run --rm dev npm version X.Y.Z --no-git-tag-version` (it updates `package.json` and `package-lock.json`), then set the three `X.Y.Z` occurrences in `server.json` by hand. Never create or push tags: the coordinator tags `main` after merging.
 
 4. **Check.** `make check` passes. Then `docker compose down -v` to remove this worktree's Docker network and volume. The diff stays within the task (`git diff --stat origin/main`), at ≤ 1000 changed lines excluding `package-lock.json`.
 
