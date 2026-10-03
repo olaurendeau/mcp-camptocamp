@@ -289,7 +289,7 @@ describe("areaToolDefinitions", () => {
     expect(areaToolDefinitions.map((t) => t.name)).toEqual(["search_areas", "get_area"]);
   });
 
-  it("describes area types and the area_id hand-off without naming search_outings", () => {
+  it("describes area types and the area_id hand-off to every search tool", () => {
     const description = areaToolDefinitions.find((t) => t.name === "search_areas")?.description ?? "";
 
     expect(description).toContain("admin_limits");
@@ -298,6 +298,6 @@ describe("areaToolDefinitions", () => {
     expect(description).toContain("area_id");
     expect(description).toContain("search_routes");
     expect(description).toContain("search_waypoints");
-    expect(description).not.toContain("search_outings");
+    expect(description).toContain("search_routes, search_waypoints and search_outings");
   });
 });

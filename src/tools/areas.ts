@@ -74,7 +74,7 @@ export const areaToolDefinitions = [
   {
     name: "search_areas",
     description:
-      "Search Camptocamp.org areas by name (titles match in any language, fuzzily — check the returned titles; towns are not areas, search the range or département instead). area_type: range = mountain range/massif; admin_limits = administrative subdivision such as a French département or Swiss canton; country = country. Returns ID, title and type. Pass the returned ID as area_id to search_routes and search_waypoints.",
+      "Search Camptocamp.org areas by name (titles match in any language, fuzzily — check the returned titles; towns are not areas, search the range or département instead). area_type: range = mountain range/massif; admin_limits = administrative subdivision such as a French département or Swiss canton; country = country. Returns ID, title and type. Pass the returned ID as area_id to search_routes, search_waypoints and search_outings.",
     inputSchema: searchAreasSchema,
     handler: handleSearchAreas,
   },
