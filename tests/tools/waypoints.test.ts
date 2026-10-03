@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { handleSearchWaypoints, handleGetWaypoint, searchWaypointsSchema } from "../../src/tools/waypoints.js";
+import {
+  handleSearchWaypoints,
+  handleGetWaypoint,
+  searchWaypointsSchema,
+  waypointToolDefinitions,
+} from "../../src/tools/waypoints.js";
 import * as api from "../../src/api/camptocamp.js";
 
 vi.mock("../../src/api/camptocamp.js");
@@ -345,5 +350,14 @@ describe("handleGetWaypoint areas", () => {
 
     expect(result).toContain("- [14403] Untitled (range)");
     expect(result).not.toContain("undefined");
+  });
+});
+
+describe("get_waypoint tool definition", () => {
+  it("tells the LLM about the areas section and area_id reuse", () => {
+    const tool = waypointToolDefinitions.find((t) => t.name === "get_waypoint");
+
+    expect(tool?.description).toContain("areas");
+    expect(tool?.description).toContain("area_id");
   });
 });

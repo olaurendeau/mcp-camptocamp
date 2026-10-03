@@ -16,14 +16,16 @@ src/
 └── tools/
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
-    └── outings.ts        # Tools: search_user_outings, get_outing
+    ├── outings.ts        # Tools: search_user_outings, get_outing
+    └── areas.ts          # Tools: search_areas, get_area
 tests/
 ├── api/
 │   └── camptocamp.test.ts  # Unit tests with mocked fetch
 └── tools/
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
-    └── outings.test.ts     # Tool handler unit tests
+    ├── outings.test.ts     # Tool handler unit tests
+    └── areas.test.ts       # Tool handler unit tests
 ```
 
 The tool handlers in `src/tools/` are pure functions (no SDK coupling) — they take typed inputs and return formatted strings, making them easy to test in isolation.
@@ -73,22 +75,28 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 ## MCP Tools
 
-| Tool                  | Description                                                                                   |
-| --------------------- | --------------------------------------------------------------------------------------------- |
-| `search_routes`       | Search mountain routes by keyword, returns list with ID, title, activities, elevation, rating |
-| `get_route`           | Get full route detail by ID (description, ratings, elevation data, gear)                      |
-| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name                                            |
-| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description)                            |
-| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                        |
-| `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes)                |
+| Tool                  | Description                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------- |
+| `search_routes`       | Search routes by keyword and/or `area_id`; returns ID, title, activities, elevation, rating |
+| `get_route`           | Get full route detail by ID (description, ratings, elevation data, gear)                    |
+| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                         |
+| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description)                          |
+| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                      |
+| `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes)              |
+| `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`     |
+| `get_area`            | Get area detail by ID (type, summary, description)                                          |
 
 ## Camptocamp API v6
 
 Base URL: `https://api.camptocamp.org`
 
 - `GET /routes?q={query}&limit=10&lang=fr`
+- `GET /routes?a={area_id}&limit=10&lang=fr` (combinable with `q`)
 - `GET /routes/{id}?lang=fr`
 - `GET /waypoints?q={query}&limit=10&lang=fr`
+- `GET /waypoints?a={area_id}&limit=10&lang=fr` (combinable with `q`)
 - `GET /waypoints/{id}?lang=fr`
 - `GET /outings?u={user_id}&limit=10&lang=fr`
 - `GET /outings/{id}?lang=fr`
+- `GET /areas?q={query}&limit=10&lang=fr[&atyp={type}]`
+- `GET /areas/{id}?lang=fr`
