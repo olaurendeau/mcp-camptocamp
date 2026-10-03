@@ -58,13 +58,13 @@ Le coordinateur la lance après chaque ouverture ou mise à jour de PR. L'agent 
 
 Le hook [`.claude/hooks/guard.sh`](.claude/hooks/guard.sh) (`PreToolUse` sur `Bash`) fait respecter les rôles dans les sessions Claude Code de ce repo :
 
-| Commande                                                                                                                        | Autorisée pour                               |
-| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `gh pr merge`                                                                                                                   | `coordinator` uniquement                     |
-| écriture du status `agent-review`                                                                                               | `pr-reviewer` uniquement                     |
-| release : `npm publish`, `make publish`, tag `v*`, push de tag, `gh release create/upload/edit/delete`, `mcp-publisher publish` | personne : la release est faite par l'humain |
+| Commande                                                                                                                                       | Autorisée pour                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| merge de PR (`gh pr merge`, ou `PUT …/pulls/N/merge` via l'API)                                                                                | `coordinator` uniquement                     |
+| écriture du status `agent-review`                                                                                                              | `pr-reviewer` uniquement                     |
+| release : `npm publish`, `npm version`, `make publish`, tag `v*`, push de tag, `gh release create/upload/edit/delete`, `mcp-publisher publish` | personne : la release est faite par l'humain |
 
-Pour les règles de merge et de release, le hook ignore le texte : arguments de message, de titre ou de corps (`-m`, `--body`, `--title`…), arguments d'`echo`/`printf`, et corps de heredoc qui ne sont pas passés à un shell. Un commentaire de PR ou un message de commit peut donc citer ces commandes, alors que `sh -c "…"`, `bash -c '…'` et `$(…)` restent contrôlés. La règle `agent-review` regarde aussi dans les chaînes et les heredocs, où se trouve souvent le contexte du status. Le hook a besoin de `jq` et `perl` sur l'hôte ; s'il lui en manque un ou s'il plante, il bloque la commande. C'est un garde-fou pour les agents, pas une frontière de sécurité : l'humain n'est pas concerné, et une commande volontairement obfusquée passerait. Tests : `make test-hooks`, lancés aussi par `make check` et en CI.
+Le hook contrôle chaque commande d'une chaîne (`&&`, `||`, `;`, `|`) séparément. Pour les règles de merge et de release, il ignore le texte : arguments de message, de titre ou de corps (`-m`, `--body`, `--title`…), arguments d'`echo`/`printf`/`grep`, et corps de heredoc qui ne sont pas passés à un shell. Un commentaire de PR ou un message de commit peut donc citer ces commandes, alors que `sh -c "…"`, `bash -c '…'` et `$(…)` restent contrôlés. La règle `agent-review` regarde aussi dans les chaînes et les heredocs, où se trouve souvent le contexte du status. Le hook a besoin de `jq` et `perl` sur l'hôte ; s'il lui en manque un ou s'il plante, il bloque la commande. C'est un garde-fou pour les agents, pas une frontière de sécurité : l'humain n'est pas concerné, et une commande volontairement obfusquée passerait. Tests : `make test-hooks`, lancés aussi par `make check` et en CI.
 
 ## Protection de `main`
 

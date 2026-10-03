@@ -87,6 +87,19 @@ check deny  developer   "$(lines "cat > /tmp/x <<'EOF'" 'just text' 'EOF' 'gh pr
 check deny  developer   "$(lines 'sh -s <<EOF' 'gh pr merge 7 --squash' 'EOF')"
 check deny  developer   "git commit -m \"don't\" && gh pr merge 5 && echo 'x'"
 check deny  developer   "$(lines 'grep -q x <<<"text"' 'gh pr merge 7')"
+check allow developer   "git commit -m\"docs: note that npm publish is human-only\""
+check allow pr-reviewer "git show \"abc:CONTRIBUTING.md\" | grep -n -E '^\\| (\`gh pr merge\`|release)'"
+check deny  developer   "$(lines 'gh pr \' '  merge 7 --squash')"
+
+# Exemptions apply to their own command only, not to the whole command line
+check allow coordinator "git tag -l 'v*' --sort=-v:refname | head -1"
+check deny  coordinator "git tag -l 'v*' --sort=-v:refname | head -1 && npm version patch && git push --follow-tags"
+check deny  developer   'git tag -l && npm publish --access public'
+check deny  coordinator 'gh api repos/o/r/commits/abc/statuses --method GET; gh api repos/o/r/statuses/abc -f state=success -f context=agent-review'
+check deny  coordinator 'gh api repos/o/r/statuses/abc --field=state=success --field=context=agent-review'
+check deny  coordinator "git push origin 'v1.0.4'"
+check deny  developer   'gh api -X PUT "repos/o/r/pulls/$N/merge"'
+check allow developer   'gh api repos/o/r/pulls/7/merge'
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures of $total guard test(s) failed"
