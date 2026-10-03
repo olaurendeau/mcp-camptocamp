@@ -24,7 +24,7 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
    git worktree remove --force /tmp/review-<N>
    ```
 
-   Done when you have the pass/fail result of `npm run check`.
+   Run the last two cleanup commands whatever the result of `npm run check`. Done when you have its pass/fail result and the worktree is removed.
 
 4. **Apply every rule** in the checklist below to the diff. Each finding names a file and line, says what goes wrong in a concrete scenario, and is tagged **blocking** or **suggestion**. Done when every rule has been applied to every changed file.
 
