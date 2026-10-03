@@ -6,12 +6,14 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 
 ## Outils disponibles
 
-| Outil              | Description                                                                               |
-| ------------------ | ----------------------------------------------------------------------------------------- |
-| `search_routes`    | Recherche des itinéraires par mot-clé (retourne ID, titre, activités, altitude, cotation) |
-| `get_route`        | Détail complet d'un itinéraire par ID (description, cotations, dénivelé, matériel)        |
-| `search_waypoints` | Recherche des points de passage par nom (sommets, refuges, bivouacs…)                     |
-| `get_waypoint`     | Détail d'un point de passage par ID (altitude, coordonnées GPS, description)              |
+| Outil                 | Description                                                                                   |
+| --------------------- | --------------------------------------------------------------------------------------------- |
+| `search_routes`       | Recherche des itinéraires par mot-clé (retourne ID, titre, activités, altitude, cotation)     |
+| `get_route`           | Détail complet d'un itinéraire par ID (description, cotations, dénivelé, matériel)            |
+| `search_waypoints`    | Recherche des points de passage par nom (sommets, refuges, bivouacs…)                         |
+| `get_waypoint`        | Détail d'un point de passage par ID (altitude, coordonnées GPS, description)                  |
+| `search_user_outings` | Liste les sorties (comptes rendus) publiées par un utilisateur Camptocamp, par ID utilisateur |
+| `get_outing`          | Détail d'une sortie par ID (conditions, météo, participants, itinéraires associés)            |
 
 ## Installation
 
