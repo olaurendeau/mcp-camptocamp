@@ -5,7 +5,7 @@ Tout changement arrive sur `main` par une pull request qui passe la CI et une re
 ## Cycle d'une PR
 
 1. **Branche** depuis `main` : `feat/…`, `fix/…`, `chore/…`, `docs/…`.
-2. **Code + tests.** `make check` doit passer en local : c'est exactement ce que lance la CI.
+2. **Code + tests.** `make check` doit passer en local : il lance le job `checks` de la CI (format, lint, types, couverture, build). Les autres checks (`docker`, `audit`, `pr-size`, `pr-title`) ne tournent qu'en CI.
 3. **PR** avec un titre [Conventional Commits](https://www.conventionalcommits.org/) (`feat: add search_outings tool`). Le titre devient le message du commit squashé sur `main`.
 4. **CI** : tous les checks requis passent au vert.
 5. **Revue agent** : un agent _qui n'a pas écrit le code_ relit la PR et pose le status `agent-review` sur le commit de tête (voir plus bas).
@@ -20,7 +20,7 @@ Tout changement arrive sur `main` par une pull request qui passe la CI et une re
 | Titre de PR  | Conventional Commits                               | check `pr-title`            |
 | Formatage    | Prettier                                           | check `checks`              |
 | Lint         | ESLint (`typescript-eslint` strict)                | check `checks`              |
-| Types        | `tsc --noEmit`                                     | check `checks`              |
+| Types        | `tsc` sur `src/`, `tests/` et `vitest.config.ts`   | check `checks`              |
 | Couverture   | ≥ 80 % (lignes, fonctions, statements, branches)   | check `checks`              |
 | Build        | `tsc` + image Docker                               | checks `checks` et `docker` |
 | Dépendances  | aucune vulnérabilité _high_ en production          | check `audit`               |
