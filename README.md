@@ -19,6 +19,8 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | `get_area`            | Détail d'une zone par ID (type, résumé, description)                                          |
 | `search_books`        | Recherche de livres (topos, histoire, romans…) par titre uniquement ; auteur/ISBN peu fiables |
 | `get_book`            | Détail d'un livre par ID (auteur, éditeur, date, ISBN, pages, itinéraires et points couverts) |
+| `search_articles`     | Recherche d'articles par mot-clé (matériel, technique, environnement, récits…) ; collab/perso |
+| `get_article`         | Détail d'un article par ID (texte, auteur, type, itinéraires, points, sorties, livres liés)   |
 
 ## Installation
 

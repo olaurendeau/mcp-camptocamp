@@ -18,7 +18,8 @@ src/
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
     ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
     ├── areas.ts          # Tools: search_areas, get_area
-    └── books.ts          # Tools: search_books, get_book
+    ├── books.ts          # Tools: search_books, get_book
+    └── articles.ts       # Tools: search_articles, get_article
 tests/
 ├── api/
 │   └── camptocamp.test.ts  # Unit tests with mocked fetch
@@ -27,7 +28,8 @@ tests/
     ├── waypoints.test.ts   # Tool handler unit tests
     ├── outings.test.ts     # Tool handler unit tests
     ├── areas.test.ts       # Tool handler unit tests
-    └── books.test.ts       # Tool handler unit tests
+    ├── books.test.ts       # Tool handler unit tests
+    └── articles.test.ts    # Tool handler unit tests
 ```
 
 The tool handlers in `src/tools/` are pure functions (no SDK coupling) — they take typed inputs and return formatted strings, making them easy to test in isolation.
@@ -90,6 +92,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_area`            | Get area detail by ID (type, summary, description)                                          |
 | `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable  |
 | `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes and waypoints)  |
+| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type |
+| `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)  |
 
 ## Camptocamp API v6
 
@@ -108,3 +112,5 @@ Base URL: `https://api.camptocamp.org`
 - `GET /areas/{id}?lang=fr`
 - `GET /books?q={query}&limit=10&lang=fr`
 - `GET /books/{id}?lang=fr`
+- `GET /articles?q={query}&limit=10&lang=fr`
+- `GET /articles/{id}?lang=fr`
