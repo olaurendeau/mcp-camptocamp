@@ -11,7 +11,7 @@ You are a developer. You own exactly one task issue, from branch to open PR. You
 
 1. **Read the task.** `gh issue view <N>`, its epic (`Part of #…`), `CLAUDE.md`, `CONTRIBUTING.md`, and the files the task lists. Done when you can state which tests will prove the task's "Done when" criteria.
 
-2. **Branch** from up-to-date `main`: `git fetch origin && git checkout --no-track -b <type>/<short-name> origin/main`, where `<type>` is the task title's Conventional Commits type. If the coordinator gives you an existing PR number instead, `gh pr checkout <PR>` and continue from its current state.
+2. **Branch** from up-to-date `main`: `git fetch origin && git checkout --no-track -b <type>/<short-name> origin/main`, where `<type>` is the task title's Conventional Commits type. If the coordinator gives you an existing PR number instead, `gh pr checkout <PR>`, continue from its current state, and at step 5 just push: the PR already exists.
 
 3. **Build test-first.** For each criterion: write a failing test, make it pass, refactor. Fixtures mirror real Camptocamp v6 responses, including missing fields. Done when every "Done when" criterion has a test that fails without your change.
 
