@@ -51,6 +51,14 @@ check allow developer   'git push -u origin feat/new-tool'
 check allow developer   'gh release view v1.0.3'
 check allow developer   'npm view @olaurendeau/mcp-camptocamp version'
 
+# Text that only mentions a command: quoted arguments and heredoc bodies
+check allow developer   'echo "simulated: gh pr merge 999"'
+check allow developer   "git commit -m 'docs: explain that npm publish is human-only'"
+check allow pr-reviewer "$(printf '%s\n' "gh pr comment 7 --body-file - <<'EOF'" 'Release: npm publish and gh pr merge stay restricted.' 'EOF')"
+check allow coordinator "$(printf '%s\n' 'cat > /tmp/body.md <<EOF' 'git tag v2.0.0 is for the human' 'EOF' 'gh pr comment 7 --body-file /tmp/body.md')"
+check deny  developer   "$(printf '%s\n' "cat > /tmp/x <<'EOF'" 'just text' 'EOF' 'gh pr merge 7 --squash')"
+check deny  developer   'gh api repos/o/r/statuses/abc -f "context=agent-review" -f "state=success"'
+
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"
   exit 1

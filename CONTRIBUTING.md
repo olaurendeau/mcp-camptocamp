@@ -64,7 +64,7 @@ Le hook [`.claude/hooks/guard.sh`](.claude/hooks/guard.sh) (`PreToolUse` sur `Ba
 | écriture du status `agent-review`                                                                                               | `pr-reviewer` uniquement                     |
 | release : `npm publish`, `make publish`, tag `v*`, push de tag, `gh release create/upload/edit/delete`, `mcp-publisher publish` | personne : la release est faite par l'humain |
 
-C'est un garde-fou pour les agents, pas une frontière de sécurité : l'humain n'est pas concerné, et une commande volontairement obfusquée passerait. Tests : `make test-hooks` (nécessite `bash` et `jq` sur l'hôte), lancés aussi en CI.
+Le hook ignore les chaînes entre guillemets et les corps de heredoc : un commentaire de PR ou un message de commit peut citer ces commandes. C'est un garde-fou pour les agents, pas une frontière de sécurité : l'humain n'est pas concerné, et une commande volontairement obfusquée passerait. Tests : `make test-hooks` (nécessite `bash` et `jq` sur l'hôte), lancés aussi en CI.
 
 ## Protection de `main`
 
