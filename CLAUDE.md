@@ -91,7 +91,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                          |
 | `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable  |
-| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes and waypoints)  |
+| `get_book`            | Get book detail by ID (author, editor, date, ISBN, languages, routes, waypoints, articles)  |
 | `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)  |
 

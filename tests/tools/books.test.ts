@@ -553,8 +553,10 @@ const BOOK_14592 = {
   },
 };
 
-// Trimmed from the live GET /books/1303412?lang=fr response (2026-10-03): the fr description removed; the 3
-// routes, 3 waypoints and 2 images removed. The 1 article association (en locale only) is kept as returned.
+// Trimmed from the live GET /books/1303412?lang=fr response (2026-10-03): the fr description removed; the
+// first of 3 routes and the first of 3 waypoints kept, with only document_id, each locale's lang, title
+// (and title_prefix), waypoint_type and elevation; the 2 images removed. The 1 article association (en
+// locale only) is kept as returned.
 const BOOK_1303412 = {
   document_id: 1303412,
   version: 1,
@@ -590,6 +592,24 @@ const BOOK_1303412 = {
   protected: false,
   type: "b",
   associations: {
+    waypoints: [
+      {
+        document_id: 114681,
+        locales: [{ lang: "fr", title: "Gavarnie Village" }],
+        waypoint_type: "access",
+        elevation: 1375,
+      },
+    ],
+    routes: [
+      {
+        document_id: 46071,
+        locales: [
+          { lang: "es", title: "Normal Norte (descenso por Barrancs)", title_prefix: "Aneto" },
+          { lang: "fr", title: "Par le refuge de la Rencluse (Voie Normale)", title_prefix: "Aneto" },
+          { lang: "ca", title: "camí normal pel refugi de la Renclusa", title_prefix: "Aneto" },
+        ],
+      },
+    ],
     articles: [
       {
         document_id: 812610,
@@ -824,7 +844,7 @@ describe("handleGetBook", () => {
     }
   });
 
-  it("lists associated articles after routes and waypoints, with the fr title", async () => {
+  it("lists associated articles after the routes, with the fr title", async () => {
     mockGetBook.mockResolvedValueOnce(BOOK_14592);
 
     const result = await handleGetBook({ id: 14592 });
@@ -836,14 +856,24 @@ describe("handleGetBook", () => {
     expect(result).not.toContain("## Associated waypoints");
   });
 
-  it("shows the title of an article association that has only an en locale", async () => {
+  it("lists articles after routes and waypoints, with the title of an en-only article", async () => {
     mockGetBook.mockResolvedValueOnce(BOOK_1303412);
 
     const result = await handleGetBook({ id: 1303412 });
 
     expect(result).toContain(
-      "\n## Associated articles\n- [812610] Portail Mont Blanc  Climbing, Mountaineering and skiing",
+      [
+        "## Associated routes",
+        "- [46071] Aneto : Par le refuge de la Rencluse (Voie Normale)",
+        "",
+        "## Associated waypoints",
+        "- [114681] Gavarnie Village (access) | 1375m",
+        "",
+        "## Associated articles",
+        "- [812610] Portail Mont Blanc  Climbing, Mountaineering and skiing",
+      ].join("\n"),
     );
+    expect(result.endsWith("- [812610] Portail Mont Blanc  Climbing, Mountaineering and skiing")).toBe(true);
   });
 
   it("shows Untitled for an article association without locales", async () => {
