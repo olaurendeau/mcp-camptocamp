@@ -252,3 +252,70 @@ export async function getArea(id: number, lang = DEFAULT_LANG): Promise<AreaDeta
   }
   return response.json() as Promise<AreaDetail>;
 }
+
+// The API treats `date=X,` as the single day X, so open-ended ranges use these bounds.
+const DATE_MIN = "0001-01-01";
+const DATE_MAX = "9999-12-31";
+
+export interface OutingSearchParams {
+  query?: string;
+  area_id?: number;
+  activity?: string;
+  date_from?: string;
+  date_to?: string;
+  route_id?: number;
+  waypoint_id?: number;
+  limit?: number; // default DEFAULT_LIMIT
+  offset?: number; // default 0
+}
+
+export interface OutingListItem {
+  document_id: number;
+  locales: Array<{ lang: string; title: string }>;
+  activities: string[];
+  date_start?: string | null;
+  date_end?: string | null;
+  condition_rating?: string | null;
+  elevation_max?: number | null;
+  height_diff_up?: number | null;
+  global_rating?: string | null;
+  ski_rating?: string | null;
+  labande_global_rating?: string | null;
+  rock_free_rating?: string | null;
+  ice_rating?: string | null;
+  hiking_rating?: string | null;
+  snowshoe_rating?: string | null;
+  areas?: Array<{
+    document_id: number;
+    area_type?: string | null;
+    locales: Array<{ lang: string; title: string }>;
+  }> | null;
+  author?: { name: string; user_id: number } | null;
+}
+
+export interface OutingListResponse {
+  documents: OutingListItem[];
+  total: number;
+}
+
+export async function searchOutings(params: OutingSearchParams = {}, lang = DEFAULT_LANG): Promise<OutingListResponse> {
+  const search = new URLSearchParams();
+  // `q=` (empty) returns every outing, so only send a non-empty keyword.
+  if (params.query) search.set("q", params.query);
+  if (params.area_id !== undefined) search.set("a", String(params.area_id));
+  if (params.activity !== undefined) search.set("act", params.activity);
+  if (params.date_from !== undefined || params.date_to !== undefined) {
+    search.set("date", `${params.date_from ?? DATE_MIN},${params.date_to ?? DATE_MAX}`);
+  }
+  if (params.route_id !== undefined) search.set("r", String(params.route_id));
+  if (params.waypoint_id !== undefined) search.set("w", String(params.waypoint_id));
+  search.set("sort", "-date_end");
+  search.set("limit", String(params.limit ?? DEFAULT_LIMIT));
+  search.set("offset", String(params.offset ?? 0));
+  search.set("lang", lang);
+  const response = await fetch(`${BASE_URL}/outings?${search}`);
+  if (!response.ok) {
+    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<OutingListResponse>;
+}
