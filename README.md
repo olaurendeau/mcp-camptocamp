@@ -9,9 +9,9 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | Outil                 | Description                                                                                   |
 | --------------------- | --------------------------------------------------------------------------------------------- |
 | `search_routes`       | Recherche des itinéraires par mot-clé et/ou zone `area_id` (ID, titre, activités, cotation)   |
-| `get_route`           | Détail complet d'un itinéraire par ID (description, cotations, dénivelé, matériel)            |
+| `get_route`           | Détail complet d'un itinéraire par ID (description, cotations, dénivelé, matériel, zones)     |
 | `search_waypoints`    | Recherche des points de passage par nom et/ou zone `area_id` (sommets, refuges, bivouacs…)    |
-| `get_waypoint`        | Détail d'un point de passage par ID (altitude, coordonnées GPS, description)                  |
+| `get_waypoint`        | Détail d'un point de passage par ID (altitude, coordonnées GPS, description, zones)           |
 | `search_user_outings` | Liste les sorties (comptes rendus) publiées par un utilisateur Camptocamp, par ID utilisateur |
 | `get_outing`          | Détail d'une sortie par ID (conditions, météo, participants, itinéraires associés)            |
 | `search_areas`        | Recherche des zones (massif, département/canton, pays) par nom ; ID réutilisable en `area_id` |
