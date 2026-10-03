@@ -9,6 +9,8 @@ import {
   searchAreas,
   getArea,
   searchOutings,
+  searchBooks,
+  getBook,
 } from "../../src/api/camptocamp.js";
 
 const mockFetch = vi.fn();
@@ -669,5 +671,246 @@ describe("searchOutings", () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
 
     await expect(searchOutings()).rejects.toThrow("Camptocamp API error: 500 Error");
+  });
+});
+
+describe("searchBooks", () => {
+  it("calls the exact books URL and keeps author, including null author and activities", async () => {
+    // The first two documents and `total` are trimmed from the live GET /books?q=vallot&limit=10&lang=fr
+    // response (2026-10-03, 10 documents). No vallot match has a null author or null activities, so the
+    // last two documents are copied as returned by GET /books?q=SAONE ET LOIRE ESCALADE (1932410, null
+    // author) and GET /books?q=Hugo et le Mont Blanc (14746, null activities) on the same day.
+    const mockData = {
+      documents: [
+        {
+          document_id: 209293,
+          version: 2,
+          locales: [
+            {
+              version: 3,
+              lang: "fr",
+              title: "La chaîne du Mont Blanc, Guide Vallot : I - Mont-Blanc - Trélatête",
+              summary: null,
+            },
+          ],
+          quality: "medium",
+          author: "Lucien Devies, Pierre Henry",
+          activities: ["mountain_climbing", "snow_ice_mixed"],
+          book_types: ["topo"],
+          available_langs: ["fr"],
+          protected: false,
+          type: "b",
+        },
+        {
+          document_id: 14568,
+          version: 3,
+          locales: [
+            { version: 5, lang: "fr", title: "Topo-guide d'escalade du Vallon Sourn", summary: null },
+            { version: 2, lang: "it", title: "topo-guide d'escalade du vallon sourn", summary: null },
+          ],
+          quality: "medium",
+          author: "Philippe Bugada, Patrick Taton",
+          activities: ["rock_climbing"],
+          book_types: ["topo"],
+          available_langs: ["fr", "it"],
+          protected: false,
+          type: "b",
+        },
+        {
+          document_id: 1932410,
+          version: 1,
+          locales: [
+            {
+              version: 1,
+              lang: "fr",
+              title: "SAONE ET LOIRE ESCALADE 2024",
+              summary: "Couvre 16 sites de saone et loire, plus de 1000 lignes au total",
+            },
+          ],
+          quality: "draft",
+          author: null,
+          activities: ["rock_climbing"],
+          book_types: ["topo"],
+          available_langs: ["fr"],
+          protected: false,
+          type: "b",
+        },
+        {
+          document_id: 14746,
+          version: 1,
+          locales: [{ version: 2, lang: "fr", title: "Hugo et le Mont Blanc", summary: null }],
+          quality: "medium",
+          author: "Colette Cosnier",
+          activities: null,
+          book_types: ["novel"],
+          available_langs: ["fr"],
+          protected: false,
+          type: "b",
+        },
+      ],
+      total: 12,
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await searchBooks("vallot");
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books?q=vallot&limit=10&lang=fr`);
+    expect(result.total).toBe(12);
+    expect(result.documents[0].author).toBe("Lucien Devies, Pierre Henry");
+    expect(result.documents[0].locales[0].summary).toBeNull();
+    expect(result.documents[2].author).toBeNull();
+    expect(result.documents[3].activities).toBeNull();
+  });
+
+  it("puts custom limit and lang in the URL", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchBooks("x", 5, "en");
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain("limit=5");
+    expect(url).toContain("lang=en");
+  });
+
+  it("throws on non-OK response", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
+
+    await expect(searchBooks("vallot")).rejects.toThrow("Camptocamp API error: 500 Error");
+  });
+});
+
+describe("getBook", () => {
+  it("calls the exact book URL and keeps langs, a null isbn and route title_prefix", async () => {
+    // Trimmed from the live GET /books/209293?lang=fr response (2026-10-03): 1 of 23 routes (it and fr
+    // locales only; fr summary, areas, geometry and most route fields dropped), 1 of 38 waypoints (areas
+    // and geometry dropped), and the 1 image removed.
+    const mockData = {
+      document_id: 209293,
+      version: 2,
+      locales: [
+        {
+          version: 3,
+          lang: "fr",
+          title: "La chaîne du Mont Blanc, Guide Vallot : I - Mont-Blanc - Trélatête",
+          description:
+            "1<sup>re</sup> édition 1947, 2<sup>e</sup> édition 1951, addendum en 1955, 3<sup>e</sup> édition en 19736, 4<sup>e</sup> et dernière édition 1978",
+          summary: null,
+          topic_id: null,
+        },
+      ],
+      quality: "medium",
+      author: "Lucien Devies, Pierre Henry",
+      editor: "Arthaud",
+      activities: ["mountain_climbing", "snow_ice_mixed"],
+      url: null,
+      isbn: null,
+      book_types: ["topo"],
+      nb_pages: null,
+      publication_date: "1978",
+      langs: ["fr"],
+      available_langs: ["fr"],
+      associations: {
+        routes: [
+          {
+            document_id: 53781,
+            version: 59,
+            locales: [
+              {
+                version: 2,
+                lang: "it",
+                title: "Monte Bianco via Bossesgrat",
+                summary: null,
+                title_prefix: "Monte Bianco",
+              },
+              { version: 45, lang: "fr", title: "Arête des Bosses", title_prefix: "Mont Blanc" },
+            ],
+            quality: "great",
+            activities: ["snow_ice_mixed", "skitouring"],
+            elevation_max: 4810,
+            global_rating: "PD-",
+            type: "r",
+          },
+        ],
+        waypoints: [
+          {
+            document_id: 37295,
+            version: 3,
+            locales: [{ version: 4, lang: "fr", title: "Dômes de Miage - Sommet W", summary: null }],
+            quality: "medium",
+            waypoint_type: "summit",
+            elevation: 3670,
+            available_langs: ["fr"],
+            protected: false,
+            type: "w",
+          },
+        ],
+        articles: [],
+        images: [],
+      },
+      protected: false,
+      type: "b",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getBook(209293);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books/209293?lang=fr`);
+    expect(result.document_id).toBe(209293);
+    expect(result.langs).toEqual(["fr"]);
+    expect(result.isbn).toBeNull();
+    expect(result.url).toBeNull();
+    expect(result.publication_date).toBe("1978");
+    expect(result.associations?.routes?.[0].locales[1].title_prefix).toBe("Mont Blanc");
+    expect(result.associations?.waypoints?.[0].elevation).toBe(3670);
+  });
+
+  it("keeps a free-text isbn and null nb_pages, publication_date and activities", async () => {
+    // The live GET /books/14746?lang=fr response (2026-10-03), complete.
+    const mockData = {
+      document_id: 14746,
+      version: 1,
+      locales: [{ version: 2, lang: "fr", title: "Hugo et le Mont Blanc", summary: null, topic_id: null }],
+      quality: "medium",
+      author: "Colette Cosnier",
+      editor: "Editions Guérin",
+      activities: null,
+      url: "http://www.editionsguerin.com/",
+      isbn: "2 911755  57 X",
+      book_types: ["novel"],
+      nb_pages: null,
+      publication_date: null,
+      langs: ["fr"],
+      available_langs: ["fr"],
+      associations: { waypoints: [], routes: [], images: [], articles: [] },
+      protected: false,
+      type: "b",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getBook(14746);
+
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books/14746?lang=fr`);
+    expect(result.isbn).toBe("2 911755  57 X");
+    expect(result.nb_pages).toBeNull();
+    expect(result.publication_date).toBeNull();
+    expect(result.activities).toBeNull();
+  });
+
+  it("throws on a 404 response", async () => {
+    // Status and body of the live GET /books/999999999?lang=fr response (2026-10-03).
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      json: () =>
+        Promise.resolve({
+          status: "error",
+          errors: [{ location: "body", name: "Not Found", description: "document not found" }],
+        }),
+    });
+
+    await expect(getBook(999999999)).rejects.toThrow("Camptocamp API error: 404 Not Found");
   });
 });
