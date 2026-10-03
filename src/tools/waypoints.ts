@@ -109,7 +109,7 @@ export const waypointToolDefinitions = [
   {
     name: "get_waypoint",
     description:
-      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, description, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes and search_waypoints.",
+      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, description, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings.",
     inputSchema: getWaypointSchema,
     handler: handleGetWaypoint,
   },

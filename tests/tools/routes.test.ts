@@ -364,6 +364,8 @@ describe("get_route tool definition", () => {
     const tool = routeToolDefinitions.find((t) => t.name === "get_route");
 
     expect(tool?.description).toContain("the areas it belongs to");
-    expect(tool?.description).toContain("Area IDs can be passed as area_id to search_routes and search_waypoints");
+    expect(tool?.description).toContain(
+      "Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings.",
+    );
   });
 });

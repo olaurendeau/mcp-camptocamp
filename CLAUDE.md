@@ -16,7 +16,7 @@ src/
 └── tools/
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
-    ├── outings.ts        # Tools: search_user_outings, get_outing
+    ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
     └── areas.ts          # Tools: search_areas, get_area
 tests/
 ├── api/
@@ -83,6 +83,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                   |
 | `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                      |
 | `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes)              |
+| `search_outings`      | Search outings by keyword, area, activity, date range, route or waypoint, most recent first |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                          |
 
@@ -98,5 +99,6 @@ Base URL: `https://api.camptocamp.org`
 - `GET /waypoints/{id}?lang=fr`
 - `GET /outings?u={user_id}&limit=10&lang=fr`
 - `GET /outings/{id}?lang=fr`
+- `GET /outings?q={query}&a={area_id}&act={activity}&date={from},{to}&r={route_id}&w={waypoint_id}&sort=-date_end&limit=10&offset=0&lang=fr`
 - `GET /areas?q={query}&limit=10&lang=fr[&atyp={type}]`
 - `GET /areas/{id}?lang=fr`
