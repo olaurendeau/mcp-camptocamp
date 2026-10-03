@@ -210,6 +210,11 @@ describe("book tool definitions", () => {
     expect(bookToolDefinitions[1].inputSchema).toBe(getBookSchema);
   });
 
+  it("says get_book returns related articles that get_article can follow", () => {
+    expect(bookToolDefinitions[1].description).toContain("related articles");
+    expect(bookToolDefinitions[1].description).toContain("get_article");
+  });
+
   it("says search_books matches titles and warns about author and ISBN searches", () => {
     const description = bookToolDefinitions[0].description;
     expect(description).toContain("TITLES only");
@@ -454,6 +459,191 @@ const BOOK_194348_ROUTE_IDS = [
   1738666, 1765387,
 ];
 
+// Trimmed from the live GET /books/14592?lang=fr response (2026-10-03): each locale's description removed;
+// 1 of 90 routes kept, with only document_id and each locale's lang, title and title_prefix; the 2 images
+// removed. The waypoints list (empty) and the 1 article association are kept as returned.
+const BOOK_14592 = {
+  document_id: 14592,
+  version: 3,
+  locales: [
+    {
+      version: 1,
+      lang: "es",
+      title: "El Macizo del Mont Blanc: Las 100 Mejores Ascensiones",
+      summary: null,
+      topic_id: null,
+    },
+    {
+      version: 42,
+      lang: "fr",
+      title: "Le massif du Mont-Blanc - Les 100 plus belles courses",
+      summary:
+        "Ouvrage de référence pour le Massif du Mont-Blanc. Les descriptions datent un peu, les cotations sont un peu sèches, mais ça donne de bonnes idées de courses.",
+      topic_id: 334425,
+    },
+  ],
+  quality: "medium",
+  author: "Gaston Rébuffat",
+  editor: "Denoël",
+  activities: ["mountain_climbing", "snow_ice_mixed"],
+  url: null,
+  isbn: "9782207220108",
+  book_types: ["topo"],
+  nb_pages: 240,
+  publication_date: "1973",
+  langs: ["fr", "en", "es"],
+  available_langs: ["es", "fr"],
+  protected: false,
+  type: "b",
+  associations: {
+    waypoints: [],
+    routes: [
+      {
+        document_id: 45528,
+        locales: [
+          {
+            lang: "sl",
+            title: "SV pobočje",
+            title_prefix: "Les Courtes",
+          },
+          {
+            lang: "fr",
+            title: "Face NE",
+            title_prefix: "Les Courtes",
+          },
+          {
+            lang: "en",
+            title: "NE Slope",
+            title_prefix: "Les Courtes",
+          },
+          {
+            lang: "de",
+            title: "NE-Wand",
+            title_prefix: "Les Courtes",
+          },
+          {
+            lang: "it",
+            title: "Parete NE",
+            title_prefix: "Les Courtes",
+          },
+        ],
+      },
+    ],
+    articles: [
+      {
+        document_id: 108642,
+        version: 16,
+        locales: [
+          {
+            version: 19,
+            lang: "fr",
+            title: "100 plus belles : la liste des titres et la cote en occasion",
+            summary: null,
+          },
+        ],
+        quality: "medium",
+        categories: ["topoguide_supplements"],
+        activities: ["mountain_climbing", "snow_ice_mixed", "hiking", "skitouring", "rock_climbing", "ice_climbing"],
+        article_type: "collab",
+        available_langs: ["fr"],
+        protected: false,
+        type: "c",
+      },
+    ],
+  },
+};
+
+// Trimmed from the live GET /books/1303412?lang=fr response (2026-10-03): the fr description removed; the
+// first of 3 routes and the first of 3 waypoints kept, with only document_id, each locale's lang, title
+// (and title_prefix), waypoint_type and elevation; the 2 images removed. The 1 article association (en
+// locale only) is kept as returned.
+const BOOK_1303412 = {
+  document_id: 1303412,
+  version: 1,
+  locales: [
+    {
+      version: 5,
+      lang: "fr",
+      title:
+        "Montagnes et tourisme. Essai sur la concurrence des territoires, des Alpes du nord aux Pyrénées centrales",
+      summary: null,
+      topic_id: null,
+    },
+  ],
+  quality: "fine",
+  author: "André Suchet",
+  editor: "Editions universitaires du Sud",
+  activities: [
+    "skitouring",
+    "snow_ice_mixed",
+    "mountain_climbing",
+    "rock_climbing",
+    "ice_climbing",
+    "hiking",
+    "snowshoeing",
+  ],
+  url: "https://www.mollat.com/livres/2521027/andre-suchet-montagnes-et-tourisme-essai-sur-la-concurrence-des-territoires-des-alpes-du-nord-aux-pyrenees-centrales",
+  isbn: "9782722701540",
+  book_types: ["historical", "photos-art", "tourism"],
+  nb_pages: null,
+  publication_date: "2021",
+  langs: ["fr"],
+  available_langs: ["fr"],
+  protected: false,
+  type: "b",
+  associations: {
+    waypoints: [
+      {
+        document_id: 114681,
+        locales: [{ lang: "fr", title: "Gavarnie Village" }],
+        waypoint_type: "access",
+        elevation: 1375,
+      },
+    ],
+    routes: [
+      {
+        document_id: 46071,
+        locales: [
+          { lang: "es", title: "Normal Norte (descenso por Barrancs)", title_prefix: "Aneto" },
+          { lang: "fr", title: "Par le refuge de la Rencluse (Voie Normale)", title_prefix: "Aneto" },
+          { lang: "ca", title: "camí normal pel refugi de la Renclusa", title_prefix: "Aneto" },
+        ],
+      },
+    ],
+    articles: [
+      {
+        document_id: 812610,
+        version: 3,
+        locales: [
+          {
+            version: 19,
+            lang: "en",
+            title: "Portail Mont Blanc  Climbing, Mountaineering and skiing",
+            summary:
+              "Dear english-speaking fellows, here is some useful information for your trip in Mont-Blanc! Do not hesitate to ask on forum if you need any help.",
+          },
+        ],
+        quality: "medium",
+        categories: ["topoguide_supplements"],
+        activities: [
+          "mountain_climbing",
+          "snow_ice_mixed",
+          "hiking",
+          "paragliding",
+          "snowshoeing",
+          "skitouring",
+          "rock_climbing",
+          "ice_climbing",
+        ],
+        article_type: "collab",
+        available_langs: ["en"],
+        protected: false,
+        type: "c",
+      },
+    ],
+  },
+};
+
 describe("handleGetBook", () => {
   it("prints the fr heading and the nine labelled lines with API values", async () => {
     mockGetBook.mockResolvedValueOnce(BOOK_373877);
@@ -642,7 +832,7 @@ describe("handleGetBook", () => {
     expect(routeLines[142]).toBe("- [1765387] Sommet : Route 1765387");
   });
 
-  it("leaves out both association headings when lists are empty or missing", async () => {
+  it("leaves out every association heading when lists are empty or missing", async () => {
     // The live 14746 associations (all lists empty), then two derived variants: an empty `associations`
     // object and no `associations` at all.
     for (const associations of [BOOK_14746.associations, {}, undefined]) {
@@ -651,6 +841,65 @@ describe("handleGetBook", () => {
       const result = await handleGetBook({ id: 14746 });
 
       expect(result).not.toContain("## Associated");
+    }
+  });
+
+  it("lists associated articles after the routes, with the fr title", async () => {
+    mockGetBook.mockResolvedValueOnce(BOOK_14592);
+
+    const result = await handleGetBook({ id: 14592 });
+
+    expect(result).toContain(
+      "\n## Associated routes\n- [45528] Les Courtes : Face NE\n\n## Associated articles\n- [108642] 100 plus belles : la liste des titres et la cote en occasion",
+    );
+    expect(result.endsWith("- [108642] 100 plus belles : la liste des titres et la cote en occasion")).toBe(true);
+    expect(result).not.toContain("## Associated waypoints");
+  });
+
+  it("lists articles after routes and waypoints, with the title of an en-only article", async () => {
+    mockGetBook.mockResolvedValueOnce(BOOK_1303412);
+
+    const result = await handleGetBook({ id: 1303412 });
+
+    expect(result).toContain(
+      [
+        "## Associated routes",
+        "- [46071] Aneto : Par le refuge de la Rencluse (Voie Normale)",
+        "",
+        "## Associated waypoints",
+        "- [114681] Gavarnie Village (access) | 1375m",
+        "",
+        "## Associated articles",
+        "- [812610] Portail Mont Blanc  Climbing, Mountaineering and skiing",
+      ].join("\n"),
+    );
+    expect(result.endsWith("- [812610] Portail Mont Blanc  Climbing, Mountaineering and skiing")).toBe(true);
+  });
+
+  it("shows Untitled for an article association without locales", async () => {
+    // No sampled article association has empty locales: this is the 1303412 fixture with the locales of
+    // article 812610 emptied.
+    const [article] = BOOK_1303412.associations.articles;
+    mockGetBook.mockResolvedValueOnce({ ...BOOK_1303412, associations: { articles: [{ ...article, locales: [] }] } });
+
+    const result = await handleGetBook({ id: 1303412 });
+
+    expect(result).toContain("\n## Associated articles\n- [812610] Untitled");
+    expectNoPlaceholder(result);
+  });
+
+  it("leaves out the articles heading when the list is empty or missing", async () => {
+    // The live 373877 associations (articles: [] next to a route), then the 14592 fixture with its
+    // `articles` key removed (derived).
+    const { waypoints, routes } = BOOK_14592.associations;
+    const withoutArticles = { waypoints, routes };
+    for (const book of [BOOK_373877, { ...BOOK_14592, associations: withoutArticles }]) {
+      mockGetBook.mockResolvedValueOnce(book);
+
+      const result = await handleGetBook({ id: book.document_id });
+
+      expect(result).toContain("## Associated routes");
+      expect(result).not.toContain("## Associated articles");
     }
   });
 

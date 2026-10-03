@@ -95,6 +95,14 @@ function formatBookDetail(book: BookDetail): string {
     }
   }
 
+  const articles = book.associations?.articles;
+  if (articles && articles.length > 0) {
+    lines.push("\n## Associated articles");
+    for (const article of articles) {
+      lines.push(`- [${article.document_id}] ${pickLocale(article.locales)?.title ?? "Untitled"}`);
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -119,7 +127,7 @@ export const bookToolDefinitions = [
   {
     name: "get_book",
     description:
-      "Get full details of a specific book from Camptocamp.org by its ID: author, editor, publication date, ISBN, pages, languages, website, book types, activities, summary, description, and the routes and waypoints it covers (with IDs for get_route and get_waypoint). Values are shown exactly as Camptocamp stores them; missing fields are left out.",
+      "Get full details of a specific book from Camptocamp.org by its ID: author, editor, publication date, ISBN, pages, languages, website, book types, activities, summary, description, the routes and waypoints it covers, and its related articles (with IDs for get_route, get_waypoint and get_article). Values are shown exactly as Camptocamp stores them; missing fields are left out.",
     inputSchema: getBookSchema,
     handler: handleGetBook,
   },
