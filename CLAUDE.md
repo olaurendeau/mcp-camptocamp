@@ -15,13 +15,15 @@ src/
 │   └── camptocamp.ts     # Camptocamp API v6 client (fetch wrapper, typed responses)
 └── tools/
     ├── routes.ts         # Tools: search_routes, get_route
-    └── waypoints.ts      # Tools: search_waypoints, get_waypoint
+    ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
+    └── outings.ts        # Tools: search_user_outings, get_outing
 tests/
 ├── api/
 │   └── camptocamp.test.ts  # Unit tests with mocked fetch
 └── tools/
     ├── routes.test.ts      # Tool handler unit tests
-    └── waypoints.test.ts   # Tool handler unit tests
+    ├── waypoints.test.ts   # Tool handler unit tests
+    └── outings.test.ts     # Tool handler unit tests
 ```
 
 The tool handlers in `src/tools/` are pure functions (no SDK coupling) — they take typed inputs and return formatted strings, making them easy to test in isolation.
@@ -71,12 +73,14 @@ Every change lands through a PR; the rules and thresholds live in [CONTRIBUTING.
 
 ## MCP Tools
 
-| Tool               | Description                                                                                   |
-| ------------------ | --------------------------------------------------------------------------------------------- |
-| `search_routes`    | Search mountain routes by keyword, returns list with ID, title, activities, elevation, rating |
-| `get_route`        | Get full route detail by ID (description, ratings, elevation data, gear)                      |
-| `search_waypoints` | Search waypoints (summits, huts, bivouacs) by name                                            |
-| `get_waypoint`     | Get waypoint detail by ID (altitude, GPS coordinates, description)                            |
+| Tool                  | Description                                                                                   |
+| --------------------- | --------------------------------------------------------------------------------------------- |
+| `search_routes`       | Search mountain routes by keyword, returns list with ID, title, activities, elevation, rating |
+| `get_route`           | Get full route detail by ID (description, ratings, elevation data, gear)                      |
+| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name                                            |
+| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description)                            |
+| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                        |
+| `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes)                |
 
 ## Camptocamp API v6
 
@@ -86,3 +90,5 @@ Base URL: `https://api.camptocamp.org`
 - `GET /routes/{id}?lang=fr`
 - `GET /waypoints?q={query}&limit=10&lang=fr`
 - `GET /waypoints/{id}?lang=fr`
+- `GET /outings?u={user_id}&limit=10&lang=fr`
+- `GET /outings/{id}?lang=fr`
