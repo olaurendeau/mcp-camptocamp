@@ -99,6 +99,6 @@ Base URL: `https://api.camptocamp.org`
 - `GET /waypoints/{id}?lang=fr`
 - `GET /outings?u={user_id}&limit=10&lang=fr`
 - `GET /outings/{id}?lang=fr`
-- `GET /outings?q={query}&a={area_id}&act={activity}&date={from},{to}&r={route_id}&w={waypoint_id}&sort=-date_end&limit=10&offset=0&lang=fr`
+- `GET /outings?sort=-date_end&limit=10&offset=0&lang=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&r={route_id}][&w={waypoint_id}]`
 - `GET /areas?q={query}&limit=10&lang=fr[&atyp={type}]`
 - `GET /areas/{id}?lang=fr`
