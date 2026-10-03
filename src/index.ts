@@ -5,6 +5,7 @@ import { routeToolDefinitions } from "./tools/routes.js";
 import { waypointToolDefinitions } from "./tools/waypoints.js";
 import { outingToolDefinitions } from "./tools/outings.js";
 import { areaToolDefinitions } from "./tools/areas.js";
+import { bookToolDefinitions } from "./tools/books.js";
 
 const server = new McpServer({
   name: "mcp-camptocamp",
@@ -16,6 +17,7 @@ const allTools = [
   ...waypointToolDefinitions,
   ...outingToolDefinitions,
   ...areaToolDefinitions,
+  ...bookToolDefinitions,
 ];
 
 for (const tool of allTools) {
