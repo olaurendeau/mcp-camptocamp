@@ -364,6 +364,7 @@ export interface BookDetail {
       waypoint_type: string;
       elevation?: number | null;
     }>;
+    articles?: Array<{ document_id: number; locales: Array<{ lang: string; title: string }> }>;
   };
 }
 
