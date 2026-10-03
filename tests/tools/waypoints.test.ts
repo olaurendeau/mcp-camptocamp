@@ -244,3 +244,106 @@ describe("handleSearchWaypoints with area_id", () => {
     expect(mockSearchWaypoints).toHaveBeenCalledWith(undefined, 10, undefined, 14403);
   });
 });
+
+// Real `areas` of waypoint 104143 (GET /waypoints/104143?lang=fr): fr is not the first locale for
+// France and Hautes-Alpes, and Écrins has only fr. Untyped version/protected/type fields omitted.
+const areasOf104143: api.AreaSearchResult[] = [
+  {
+    document_id: 14274,
+    locales: [
+      { lang: "zh", title: "法国" },
+      { lang: "sl", title: "Francija" },
+      { lang: "fr", title: "France" },
+      { lang: "ca", title: "França" },
+      { lang: "de", title: "Frankreich" },
+      { lang: "en", title: "France" },
+      { lang: "es", title: "Francia" },
+      { lang: "eu", title: "France" },
+      { lang: "it", title: "Francia" },
+    ],
+    area_type: "country",
+    available_langs: null,
+  },
+  {
+    document_id: 14361,
+    locales: [
+      { lang: "zh", title: "上阿尔卑斯省" },
+      { lang: "ca", title: "Alts Alps" },
+      { lang: "de", title: "Hautes-Alpes" },
+      { lang: "en", title: "Hautes-Alpes" },
+      { lang: "es", title: "Altos Alpes" },
+      { lang: "eu", title: "Alpe Garaiak" },
+      { lang: "fr", title: "Hautes-Alpes" },
+      { lang: "it", title: "Alte Alpi" },
+    ],
+    area_type: "admin_limits",
+    available_langs: null,
+  },
+  {
+    document_id: 14403,
+    locales: [{ lang: "fr", title: "Écrins" }],
+    area_type: "range",
+    available_langs: null,
+  },
+];
+
+const waypoint104143 = {
+  document_id: 104143,
+  locales: [
+    { lang: "en", title: "Glacier Blanc hut" },
+    { lang: "fr", title: "Refuge du Glacier Blanc", description: "Refuge au pied du Glacier Blanc." },
+  ],
+  waypoint_type: "hut",
+  elevation: 2542,
+  geometry: {
+    geom: '{"type": "Point", "coordinates": [713737.1603650594, 5611696.464737642]}',
+  },
+};
+
+describe("handleGetWaypoint areas", () => {
+  it("lists the areas with fr titles, in API order, after the coordinates and before the description", async () => {
+    mockGetWaypoint.mockResolvedValueOnce({ ...waypoint104143, areas: areasOf104143 });
+
+    const result = await handleGetWaypoint({ id: 104143 });
+
+    const lines = result.split("\n");
+    const heading = lines.indexOf("## Areas");
+    const coordinates = lines.findIndex((l) => l.startsWith("**Coordinates**"));
+    expect(coordinates).toBeGreaterThan(-1);
+    expect(heading).toBeGreaterThan(coordinates);
+    expect(lines.slice(heading, heading + 4)).toEqual([
+      "## Areas",
+      "- [14274] France (country)",
+      "- [14361] Hautes-Alpes (admin_limits)",
+      "- [14403] Écrins (range)",
+    ]);
+    expect(heading).toBeLessThan(lines.indexOf("## Description"));
+    expect(result).not.toContain("undefined");
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["empty", []],
+    ["null", null],
+  ])("has no Areas section when areas is %s", async (_label, areas) => {
+    mockGetWaypoint.mockResolvedValueOnce({ ...waypoint104143, areas });
+
+    const result = await handleGetWaypoint({ id: 104143 });
+
+    expect(result).not.toContain("## Areas");
+    expect(result).not.toContain("undefined");
+    expect(result).toContain("## Description");
+  });
+
+  it("shows Untitled for an area with empty locales", async () => {
+    mockGetWaypoint.mockResolvedValueOnce({
+      ...waypoint104143,
+      areas: [{ document_id: 14403, locales: [], area_type: "range", available_langs: null }],
+    });
+
+    const result = await handleGetWaypoint({ id: 104143 });
+
+    expect(result).toContain("- [14403] Untitled (range)");
+    expect(result).not.toContain("undefined");
+  });
+});

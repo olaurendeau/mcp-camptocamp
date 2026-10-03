@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointSearchResponse, WaypointDetail } from "../api/camptocamp.js";
+import { formatAreasSection } from "./areas.js";
 
 export const searchWaypointsSchema = z.object({
   query: z.string().optional().describe("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')"),
@@ -68,6 +69,8 @@ function formatWaypointDetail(waypoint: WaypointDetail): string {
   if (coords) {
     lines.push(`**Coordinates**: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`);
   }
+
+  lines.push(...formatAreasSection(waypoint.areas));
 
   if (locale?.description) {
     lines.push(`\n## Description\n${locale.description}`);

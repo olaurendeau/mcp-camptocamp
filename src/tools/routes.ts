@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteSearchResponse, RouteDetail } from "../api/camptocamp.js";
+import { formatAreasSection } from "./areas.js";
 
 export const searchRoutesSchema = z.object({
   query: z.string().optional().describe("Search query for routes (e.g. 'Mont Blanc voie normale')"),
@@ -57,6 +58,8 @@ function formatRouteDetail(route: RouteDetail): string {
   if (route.elevation_min) lines.push(`**Min elevation**: ${route.elevation_min}m`);
   if (route.height_diff_up) lines.push(`**Elevation gain**: ${route.height_diff_up}m`);
   if (route.height_diff_down) lines.push(`**Elevation loss**: ${route.height_diff_down}m`);
+
+  lines.push(...formatAreasSection(route.areas));
 
   if (locale?.description) {
     lines.push(`\n## Description\n${locale.description}`);

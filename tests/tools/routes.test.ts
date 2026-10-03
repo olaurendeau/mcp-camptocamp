@@ -249,3 +249,105 @@ describe("handleSearchRoutes with area_id", () => {
     expect(mockSearchRoutes).toHaveBeenCalledWith(undefined, 10, undefined, 14403);
   });
 });
+
+// Real `areas` of route 54275 (GET /routes/54275?lang=fr): fr is not the first locale for
+// France and Hautes-Alpes, and Écrins has only fr. Untyped version/protected/type fields omitted.
+const areasOf54275: api.AreaSearchResult[] = [
+  {
+    document_id: 14274,
+    locales: [
+      { lang: "zh", title: "法国" },
+      { lang: "sl", title: "Francija" },
+      { lang: "fr", title: "France" },
+      { lang: "ca", title: "França" },
+      { lang: "de", title: "Frankreich" },
+      { lang: "en", title: "France" },
+      { lang: "es", title: "Francia" },
+      { lang: "eu", title: "France" },
+      { lang: "it", title: "Francia" },
+    ],
+    area_type: "country",
+    available_langs: null,
+  },
+  {
+    document_id: 14361,
+    locales: [
+      { lang: "zh", title: "上阿尔卑斯省" },
+      { lang: "ca", title: "Alts Alps" },
+      { lang: "de", title: "Hautes-Alpes" },
+      { lang: "en", title: "Hautes-Alpes" },
+      { lang: "es", title: "Altos Alpes" },
+      { lang: "eu", title: "Alpe Garaiak" },
+      { lang: "fr", title: "Hautes-Alpes" },
+      { lang: "it", title: "Alte Alpi" },
+    ],
+    area_type: "admin_limits",
+    available_langs: null,
+  },
+  {
+    document_id: 14403,
+    locales: [{ lang: "fr", title: "Écrins" }],
+    area_type: "range",
+    available_langs: null,
+  },
+];
+
+const route54275 = {
+  document_id: 54275,
+  locales: [
+    {
+      lang: "fr",
+      title: "Grand couloir N - Goulotte Allera - Pelatan",
+      description: "Itinéraire de goulotte.",
+    },
+  ],
+  activities: ["mountain_climbing", "snow_ice_mixed"],
+  elevation_max: 3769,
+  global_rating: "TD",
+};
+
+describe("handleGetRoute areas", () => {
+  it("lists the areas with fr titles, in API order, after the elevation and before the description", async () => {
+    mockGetRoute.mockResolvedValueOnce({ ...route54275, areas: areasOf54275 });
+
+    const result = await handleGetRoute({ id: 54275 });
+
+    const lines = result.split("\n");
+    const heading = lines.indexOf("## Areas");
+    expect(heading).toBeGreaterThan(lines.indexOf("**Max elevation**: 3769m"));
+    expect(lines.slice(heading, heading + 4)).toEqual([
+      "## Areas",
+      "- [14274] France (country)",
+      "- [14361] Hautes-Alpes (admin_limits)",
+      "- [14403] Écrins (range)",
+    ]);
+    expect(heading).toBeLessThan(lines.indexOf("## Description"));
+    expect(result).not.toContain("undefined");
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["empty", []],
+    ["null", null],
+  ])("has no Areas section when areas is %s", async (_label, areas) => {
+    mockGetRoute.mockResolvedValueOnce({ ...route54275, areas });
+
+    const result = await handleGetRoute({ id: 54275 });
+
+    expect(result).not.toContain("## Areas");
+    expect(result).not.toContain("undefined");
+    expect(result).toContain("## Description");
+  });
+
+  it("shows Untitled for an area with empty locales", async () => {
+    mockGetRoute.mockResolvedValueOnce({
+      ...route54275,
+      areas: [{ document_id: 14403, locales: [], area_type: "range", available_langs: null }],
+    });
+
+    const result = await handleGetRoute({ id: 54275 });
+
+    expect(result).toContain("- [14403] Untitled (range)");
+    expect(result).not.toContain("undefined");
+  });
+});
