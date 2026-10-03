@@ -36,7 +36,7 @@ All development happens inside Docker — no local Node.js required.
 # Install dependencies (first time or after package.json changes)
 docker compose run --rm dev npm install
 
-# Everything CI runs (format, lint, typecheck, coverage, build)
+# Same as the CI `checks` job (format, lint, typecheck, coverage, build)
 make check
 
 # Run tests
