@@ -9,6 +9,8 @@ import {
   searchAreas,
   getArea,
   searchOutings,
+  searchBooks,
+  getBook,
 } from "../../src/api/camptocamp.js";
 
 const mockFetch = vi.fn();
@@ -669,5 +671,153 @@ describe("searchOutings", () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
 
     await expect(searchOutings()).rejects.toThrow("Camptocamp API error: 500 Error");
+  });
+});
+
+describe("searchBooks", () => {
+  it("calls the exact books URL and keeps author, including a null author", async () => {
+    // Shaped like the real GET /books?q=vallot&limit=10&lang=fr response (2026-10-03).
+    const mockData = {
+      documents: [
+        {
+          document_id: 14592,
+          version: 4,
+          locales: [
+            {
+              version: 6,
+              lang: "fr",
+              title: "Le massif du Mont-Blanc - Les 100 plus belles courses",
+              summary: null,
+            },
+          ],
+          author: "Gaston Rébuffat",
+          activities: ["mountain_climbing", "snow_ice_mixed"],
+          book_types: ["topo"],
+          available_langs: ["fr"],
+          quality: "medium",
+          protected: false,
+          type: "b",
+        },
+        {
+          document_id: 14746,
+          version: 2,
+          locales: [{ version: 3, lang: "fr", title: "Guide Vallot - La chaîne du Mont-Blanc" }],
+          author: null,
+          activities: null,
+          book_types: ["topo"],
+          available_langs: ["fr"],
+          quality: "draft",
+          protected: false,
+          type: "b",
+        },
+      ],
+      total: 79,
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await searchBooks("vallot");
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books?q=vallot&limit=10&lang=fr`);
+    expect(result.total).toBe(79);
+    expect(result.documents[0].author).toBe("Gaston Rébuffat");
+    expect(result.documents[0].locales[0].summary).toBeNull();
+    expect(result.documents[1].author).toBeNull();
+    expect(result.documents[1].activities).toBeNull();
+  });
+
+  it("puts custom limit and lang in the URL", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchBooks("x", 5, "en");
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain("limit=5");
+    expect(url).toContain("lang=en");
+  });
+
+  it("throws on non-OK response", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
+
+    await expect(searchBooks("vallot")).rejects.toThrow("Camptocamp API error: 500 Error");
+  });
+});
+
+describe("getBook", () => {
+  it("calls the exact book URL and keeps langs, isbn and route title_prefix", async () => {
+    // Shaped like the real GET /books/209293?lang=fr response (2026-10-03), trimmed to one association each.
+    const mockData = {
+      document_id: 209293,
+      version: 7,
+      locales: [
+        {
+          version: 9,
+          lang: "fr",
+          title: "Neige, glace et mixte - Tome 1",
+          summary: null,
+          description: "[img=373947 right]Couverture[/img]\nDu bassin d'Argentière au massif des Écrins.",
+        },
+        { version: 2, lang: "en", title: "Snow, ice and mixed - Volume 1", summary: null, description: null },
+      ],
+      author: "François Damilano",
+      editor: "JMEditions",
+      isbn: "2 911755  57 X",
+      url: null,
+      nb_pages: null,
+      publication_date: "Juin 2026",
+      langs: ["fr"],
+      available_langs: ["fr", "en"],
+      activities: ["snow_ice_mixed"],
+      book_types: ["topo"],
+      quality: "medium",
+      associations: {
+        routes: [
+          {
+            document_id: 53781,
+            locales: [{ lang: "fr", title: "Arête des Bosses", title_prefix: "Mont Blanc" }],
+            activities: ["snow_ice_mixed"],
+            type: "r",
+          },
+        ],
+        waypoints: [
+          {
+            document_id: 37295,
+            locales: [{ lang: "fr", title: "Dômes de Miage - Sommet W" }],
+            waypoint_type: "summit",
+            elevation: 3670,
+            type: "w",
+          },
+        ],
+        articles: [],
+        images: [],
+      },
+      protected: false,
+      type: "b",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getBook(209293);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books/209293?lang=fr`);
+    expect(result.document_id).toBe(209293);
+    expect(result.langs).toEqual(["fr"]);
+    expect(result.isbn).toBe("2 911755  57 X");
+    expect(result.url).toBeNull();
+    expect(result.nb_pages).toBeNull();
+    expect(result.associations?.routes?.[0].locales[0].title_prefix).toBe("Mont Blanc");
+    expect(result.associations?.waypoints?.[0].elevation).toBe(3670);
+  });
+
+  it("throws on a 404 response", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      json: () =>
+        Promise.resolve({ status: "error", errors: [{ name: "Not Found", description: "document not found" }] }),
+    });
+
+    await expect(getBook(999999999)).rejects.toThrow("Camptocamp API error: 404 Not Found");
   });
 });

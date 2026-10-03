@@ -319,3 +319,72 @@ export async function searchOutings(params: OutingSearchParams = {}, lang = DEFA
   }
   return response.json() as Promise<OutingListResponse>;
 }
+
+export interface BookSearchResult {
+  document_id: number;
+  locales: Array<{ lang: string; title: string; summary?: string | null }>;
+  author?: string | null;
+  activities?: string[] | null;
+  book_types?: string[] | null;
+  available_langs?: string[] | null;
+  quality?: string;
+}
+
+export interface BookSearchResponse {
+  documents: BookSearchResult[];
+  total: number;
+}
+
+export interface BookDetail {
+  document_id: number;
+  locales: Array<{
+    lang: string;
+    title: string;
+    summary?: string | null;
+    description?: string | null;
+  }>;
+  author?: string | null;
+  editor?: string | null;
+  isbn?: string | null;
+  url?: string | null;
+  nb_pages?: number | null;
+  publication_date?: string | null;
+  langs?: string[] | null; // languages the book is published in
+  available_langs?: string[] | null; // languages of the Camptocamp page; never displayed
+  activities?: string[] | null;
+  book_types?: string[] | null;
+  associations?: {
+    routes?: Array<{
+      document_id: number;
+      locales: Array<{ lang: string; title: string; title_prefix?: string | null }>;
+    }>;
+    waypoints?: Array<{
+      document_id: number;
+      locales: Array<{ lang: string; title: string }>;
+      waypoint_type: string;
+      elevation?: number | null;
+    }>;
+  };
+}
+
+export async function searchBooks(
+  query: string,
+  limit = DEFAULT_LIMIT,
+  lang = DEFAULT_LANG,
+): Promise<BookSearchResponse> {
+  const params = new URLSearchParams({ q: query, limit: String(limit), lang });
+  const response = await fetch(`${BASE_URL}/books?${params}`);
+  if (!response.ok) {
+    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<BookSearchResponse>;
+}
+
+export async function getBook(id: number, lang = DEFAULT_LANG): Promise<BookDetail> {
+  const params = new URLSearchParams({ lang });
+  const response = await fetch(`${BASE_URL}/books/${id}?${params}`);
+  if (!response.ok) {
+    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<BookDetail>;
+}
