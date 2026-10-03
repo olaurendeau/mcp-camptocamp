@@ -182,7 +182,7 @@ describe("handleSearchArticles", () => {
       "- [110093] Valanghe in video | Type: collab",
     );
 
-    // Derived: no live article has empty locales; this is the 110093 document with `locales` emptied.
+    // Derived: no fetched article has empty locales; this is the 110093 document with `locales` emptied.
     const noLocale = { ...VALANGHE_SEARCH.documents[0], locales: [] };
     mockSearchArticles.mockResolvedValueOnce({ documents: [noLocale], total: 1 });
     expect(await handleSearchArticles({ query: "Valanghe in video", limit: 10 })).toContain("- [110093] Untitled |");
@@ -198,7 +198,7 @@ describe("handleSearchArticles", () => {
     );
     expectNoPlaceholder(live);
 
-    // Derived: no live article has empty categories; this is the 193302 document with `categories: []`.
+    // Derived: no fetched article has empty categories; this is the 193302 document with `categories: []`.
     const noCategories = { ...RAPPEL_SEARCH.documents[2], categories: [] };
     mockSearchArticles.mockResolvedValueOnce({ documents: [noCategories], total: 1 });
     const derived = await handleSearchArticles({ query: "rappel", limit: 10 });
@@ -733,20 +733,24 @@ describe("handleGetArticle", () => {
     expect(result).not.toContain("## Associated books");
   });
 
-  it("shows an elevation of 0 and leaves out a null elevation", async () => {
-    // Derived: both fetched waypoints have an elevation; this is the 218311 fixture with the elevation of
-    // 41684 set to 0, then to null.
+  it("shows an elevation of 0, leaves out a null elevation and uses a waypoint's fr title", async () => {
+    // Derived: both fetched waypoints have an elevation and a single fr locale; this is the 218311 fixture with
+    // the elevation of 41684 set to 0, then to null, and a made-up it locale put before its live fr one.
     const [first, second] = ARTICLE_218311.associations.waypoints;
+    const locales = [{ lang: "it", title: "Titolo derivato" }, ...first.locales];
     for (const [elevation, line] of [
       [0, "- [41684] Pierre Qu'Abotse (summit) | 0m\n"],
       [null, "- [41684] Pierre Qu'Abotse (summit)\n"],
     ] as const) {
       mockGetArticle.mockResolvedValueOnce({
         ...ARTICLE_218311,
-        associations: { ...ARTICLE_218311.associations, waypoints: [{ ...first, elevation }, second] },
+        associations: { ...ARTICLE_218311.associations, waypoints: [{ ...first, locales, elevation }, second] },
       });
 
-      expect(await handleGetArticle({ id: 218311 })).toContain(line);
+      const result = await handleGetArticle({ id: 218311 });
+
+      expect(result).toContain(line);
+      expect(result).not.toContain("Titolo derivato");
     }
   });
 
@@ -762,8 +766,9 @@ describe("handleGetArticle", () => {
   });
 
   it("uses the fr locale of a personal article, labels its Author and hides images, users and xreports", async () => {
-    // The 716039 fixture, with its live user and image entries, plus one derived xreports entry: the document_id
-    // and fr title of the live GET /xreports/1953845?lang=fr response (no fetched article links an xreport).
+    // The 716039 fixture, with its trimmed live user and image entries, plus one derived xreports entry: the
+    // document_id and fr title of the live GET /xreports/1953845?lang=fr response (no fetched article links an
+    // xreport).
     const article = {
       ...ARTICLE_716039,
       associations: {
