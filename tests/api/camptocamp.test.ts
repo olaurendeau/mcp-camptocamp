@@ -11,6 +11,8 @@ import {
   searchOutings,
   searchBooks,
   getBook,
+  searchArticles,
+  getArticle,
 } from "../../src/api/camptocamp.js";
 
 const mockFetch = vi.fn();
@@ -912,5 +914,268 @@ describe("getBook", () => {
     });
 
     await expect(getBook(999999999)).rejects.toThrow("Camptocamp API error: 404 Not Found");
+  });
+});
+
+describe("searchArticles", () => {
+  it("calls the exact articles URL and keeps article_type, including null activities and summary", async () => {
+    // The live GET /articles?q=crampons&limit=10&lang=fr response (2026-10-03), complete: 3 documents and
+    // `total`. No crampons match has null activities, so a fourth document, 193302, is copied as returned
+    // by GET /articles?q=Du lointain nous nous rappellons&limit=10&lang=fr on the same day.
+    const mockData = {
+      documents: [
+        {
+          document_id: 226838,
+          version: 4,
+          locales: [{ version: 21, lang: "fr", title: "Les crampons", summary: null }],
+          quality: "great",
+          categories: ["gear"],
+          activities: ["mountain_climbing", "snow_ice_mixed", "hiking", "snowshoeing", "skitouring", "ice_climbing"],
+          article_type: "collab",
+          available_langs: ["fr"],
+          protected: false,
+          type: "c",
+        },
+        {
+          document_id: 314504,
+          version: 1,
+          locales: [
+            {
+              version: 10,
+              lang: "fr",
+              title: "Chaussures avec crampons intégrés (article à completer)",
+              summary: null,
+            },
+          ],
+          quality: "medium",
+          categories: ["gear"],
+          activities: ["rock_climbing", "snow_ice_mixed", "ice_climbing"],
+          article_type: "collab",
+          available_langs: ["fr"],
+          protected: false,
+          type: "c",
+        },
+        {
+          document_id: 665710,
+          version: 3,
+          locales: [{ version: 19, lang: "fr", title: "Affuter et mettre ses vieux crampons à neuf", summary: null }],
+          quality: "fine",
+          categories: ["gear"],
+          activities: ["snow_ice_mixed", "ice_climbing"],
+          article_type: "personal",
+          available_langs: ["fr"],
+          protected: false,
+          type: "c",
+        },
+        {
+          document_id: 193302,
+          version: 1,
+          locales: [{ version: 1, lang: "fr", title: "Du lointain nous nous rappellons", summary: null }],
+          quality: "medium",
+          categories: ["stories"],
+          activities: null,
+          article_type: "personal",
+          available_langs: ["fr"],
+          protected: false,
+          type: "c",
+        },
+      ],
+      total: 3,
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await searchArticles("crampons", 10);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=crampons&limit=10&lang=fr`);
+    expect(result.total).toBe(3);
+    expect(result.documents[0].article_type).toBe("collab");
+    expect(result.documents[0].categories).toEqual(["gear"]);
+    expect(result.documents[0].locales[0].summary).toBeNull();
+    expect(result.documents[2].article_type).toBe("personal");
+    expect(result.documents[3].activities).toBeNull();
+  });
+
+  it("puts custom limit and lang in the URL", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchArticles("x", 5, "en");
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain("limit=5");
+    expect(url).toContain("lang=en");
+  });
+
+  it("throws on non-OK response", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
+
+    await expect(searchArticles("crampons")).rejects.toThrow("Camptocamp API error: 500 Error");
+  });
+});
+
+describe("getArticle", () => {
+  it("calls the exact article URL and keeps the author and associated articles", async () => {
+    // Trimmed from the live GET /articles/226838?lang=fr response (2026-10-03): fr description cut to its
+    // first 3 lines (4,296 characters live), the 5 images removed, and the associated article's
+    // categories and activities dropped.
+    const mockData = {
+      document_id: 226838,
+      version: 4,
+      locales: [
+        {
+          version: 21,
+          lang: "fr",
+          title: "Les crampons",
+          description: "[toc]\n\n## Le nombre de pointes",
+          summary: null,
+          topic_id: null,
+        },
+      ],
+      quality: "great",
+      categories: ["gear"],
+      activities: ["mountain_climbing", "snow_ice_mixed", "hiking", "snowshoeing", "skitouring", "ice_climbing"],
+      article_type: "collab",
+      available_langs: ["fr"],
+      associations: {
+        waypoints: [],
+        routes: [],
+        users: [],
+        articles: [
+          {
+            document_id: 1204346,
+            version: 2,
+            locales: [
+              {
+                version: 2,
+                lang: "fr",
+                title: "Portail Matériel",
+                summary: 'Article "Portail" à compléter et mettre à jour.',
+              },
+            ],
+            quality: "empty",
+            article_type: "collab",
+            available_langs: ["fr"],
+            protected: false,
+            type: "c",
+          },
+        ],
+        outings: [],
+        books: [],
+        xreports: [],
+      },
+      author: { name: "Thomas Ribière", user_id: 4060 },
+      protected: false,
+      type: "c",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getArticle(226838);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles/226838?lang=fr`);
+    expect(result.document_id).toBe(226838);
+    expect(result.author?.user_id).toBe(4060);
+    expect(result.author?.name).toBe("Thomas Ribière");
+    expect(result.locales[0].description).toBe("[toc]\n\n## Le nombre de pointes");
+    expect(result.associations?.articles?.[0].document_id).toBe(1204346);
+    expect(result.associations?.routes).toEqual([]);
+  });
+
+  it("keeps a route association's title_prefix", async () => {
+    // Trimmed from the live GET /articles/302774?lang=fr response (2026-10-03): en description cut to its
+    // first 2 lines, 1 of 146 routes kept (routes[0], 45148, reduced to its locales, quality, activities,
+    // elevation_min/max, global_rating, available_langs, protected and type), and the associated article's
+    // categories and activities dropped. 226838 links no route, so this article supplies the title_prefix.
+    const mockData = {
+      document_id: 302774,
+      version: 1,
+      locales: [
+        {
+          version: 16,
+          lang: "en",
+          title: "Less difficult alpine routes in the Mont Blanc region",
+          description: "\n!! 04 October 2011 - This article is still under construction.",
+          summary: null,
+          topic_id: 258931,
+        },
+      ],
+      quality: "medium",
+      categories: ["topoguide_supplements"],
+      activities: ["mountain_climbing", "snow_ice_mixed"],
+      article_type: "collab",
+      available_langs: ["en"],
+      associations: {
+        waypoints: [],
+        routes: [
+          {
+            document_id: 45148,
+            version: 4,
+            locales: [
+              { version: 7, lang: "en", title: "N face", summary: null, title_prefix: "Le Portalet" },
+              { version: 7, lang: "fr", title: "Face N", summary: null, title_prefix: "Le Portalet" },
+            ],
+            quality: "medium",
+            activities: ["skitouring", "snow_ice_mixed"],
+            elevation_min: 1466,
+            elevation_max: 3344,
+            global_rating: "AD-",
+            available_langs: ["en", "fr"],
+            protected: false,
+            type: "r",
+          },
+        ],
+        users: [],
+        images: [],
+        articles: [
+          {
+            document_id: 306206,
+            version: 1,
+            locales: [
+              {
+                version: 22,
+                lang: "en",
+                title: "HELP: How to translate route descriptions in English?",
+                summary: null,
+              },
+            ],
+            quality: "medium",
+            article_type: "collab",
+            available_langs: ["en"],
+            protected: false,
+            type: "c",
+          },
+        ],
+        outings: [],
+        books: [],
+        xreports: [],
+      },
+      author: { name: "Fabien Quétier", user_id: 12542 },
+      protected: false,
+      type: "c",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getArticle(302774);
+
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles/302774?lang=fr`);
+    expect(result.associations?.routes?.[0].document_id).toBe(45148);
+    expect(result.associations?.routes?.[0].locales[0].title_prefix).toBe("Le Portalet");
+    expect(result.associations?.routes?.[0].locales[1].title).toBe("Face N");
+  });
+
+  it("throws on a 404 response", async () => {
+    // Status and body of the live GET /articles/999999999?lang=fr response (2026-10-03).
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      json: () =>
+        Promise.resolve({
+          status: "error",
+          errors: [{ location: "body", name: "Not Found", description: "document not found" }],
+        }),
+    });
+
+    await expect(getArticle(999999999)).rejects.toThrow("Camptocamp API error: 404 Not Found");
   });
 });
