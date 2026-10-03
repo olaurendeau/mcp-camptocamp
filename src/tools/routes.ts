@@ -102,7 +102,7 @@ export const routeToolDefinitions = [
   {
     name: "get_route",
     description:
-      "Get full details of a specific route from Camptocamp.org by its ID, including description, ratings, elevation data, and gear requirements.",
+      "Get full details of a specific route from Camptocamp.org by its ID, including description, ratings, elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes and search_waypoints.",
     inputSchema: getRouteSchema,
     handler: handleGetRoute,
   },
