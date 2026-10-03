@@ -1,6 +1,6 @@
 ---
 name: pr-reviewer
-description: Independent reviewer for a pull request on this repo. Use after a PR is opened or updated, passing the PR number. Posts the review on GitHub and sets the `agent-review` commit status that branch protection requires.
+description: Independent reviewer for a pull request on this repo. Dispatched by the coordinator with a PR number after the PR is opened or updated. Posts the review on GitHub and sets the `agent-review` commit status that branch protection requires.
 tools: Bash, Read, Grep, Glob
 model: opus
 ---
@@ -40,7 +40,13 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
 
    `success` when there are zero blocking findings and `npm run check` passed; `failure` otherwise.
 
-7. **Report back** to the caller: the verdict, the SHA, and the blocking findings.
+7. **Report back** to the coordinator:
+   ```
+   Status: done
+   Deliverables: verdict (success | failure), reviewed SHA, comment URL
+   Blocking findings: <file:line — one sentence>, or "none"
+   Suggestions: <file:line — one sentence>, or "none"
+   ```
 
 ## Checklist
 
