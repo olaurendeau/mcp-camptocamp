@@ -117,11 +117,18 @@ describe("handleGetOuting", () => {
 
     expect(result).toContain("Traversée des Drus");
     expect(result).toContain("ID: 42");
-    expect(result).toContain("o.laurendeau");
-    expect(result).toContain("3754m");
-    expect(result).toContain("Belle journée en montagne");
-    expect(result).toContain("Neige dure le matin");
-    expect(result).toContain("Alice, Bob");
+    expect(result).toContain("**Author**: o.laurendeau (user ID: 430052)");
+    expect(result).toContain("**Date**: 2026-07-06\n");
+    expect(result).toContain("**Participants**: 2");
+    expect(result).toContain("**Global rating**: D");
+    expect(result).toContain("**Engagement**: IV");
+    expect(result).toContain("**Max elevation**: 3754m");
+    expect(result).toContain("## Description\nBelle journée en montagne.");
+    expect(result).toContain("## Route description\nVoie normale puis arête");
+    expect(result).toContain("## Conditions\nNeige dure le matin");
+    expect(result).toContain("## Weather\nBeau");
+    expect(result).toContain("## Timing\n8h");
+    expect(result).toContain("## Participants\nAlice, Bob");
     expect(result).toContain("[100] Traversée des Drus");
   });
 
@@ -174,7 +181,17 @@ describe("handleGetOuting", () => {
     expect(result).toContain("[102] Untitled");
     expect(result).not.toContain("**Author**");
     expect(result).not.toContain("**Date**");
-    expect(result).not.toContain("## Description");
+    for (const absent of [
+      "**Participants**",
+      "## Description",
+      "## Route description",
+      "## Conditions",
+      "## Weather",
+      "## Timing",
+      "## Participants",
+    ]) {
+      expect(result).not.toContain(absent);
+    }
     expect(result).not.toContain("undefined");
   });
 
