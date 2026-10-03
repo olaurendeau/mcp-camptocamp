@@ -20,7 +20,7 @@ Tout changement arrive sur `main` par une pull request qui passe la CI et une re
 | Titre de PR  | Conventional Commits                                    | check `pr-title`            |
 | Formatage    | Prettier                                                | check `checks`              |
 | Lint         | ESLint (`typescript-eslint` strict)                     | check `checks`              |
-| Types        | `tsc --noEmit`                                          | check `checks`              |
+| Types        | `tsc` sur `src/`, `tests/` et `vitest.config.ts`        | check `checks`              |
 | Couverture   | lignes / fonctions / statements ≥ 80 %, branches ≥ 70 % | check `checks`              |
 | Build        | `tsc` + image Docker                                    | checks `checks` et `docker` |
 | Dépendances  | aucune vulnérabilité _high_ en production               | check `audit`               |
