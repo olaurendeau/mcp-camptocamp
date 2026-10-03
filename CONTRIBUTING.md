@@ -56,7 +56,15 @@ L'agent qui code ne relit jamais son propre travail. La revue est faite par le s
 
 Le coordinateur la lance après chaque ouverture ou mise à jour de PR. L'agent poste sa revue en commentaire de la PR, puis pose le commit status `agent-review` (`success` ou `failure`) sur le SHA qu'il a relu. La protection de `main` exige ce status : sans revue, ou après un nouveau push, le merge reste bloqué.
 
-> Limite connue : le status est posé avec ton token GitHub, donc rien n'empêche techniquement un autre agent de le poser. La règle « seul `pr-reviewer` pose `agent-review` » est une convention, inscrite dans `CLAUDE.md`.
+Le hook [`.claude/hooks/guard.sh`](.claude/hooks/guard.sh) (`PreToolUse` sur `Bash`) fait respecter les rôles dans les sessions Claude Code de ce repo :
+
+| Commande                                                                                                                        | Autorisée pour                               |
+| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `gh pr merge`                                                                                                                   | `coordinator` uniquement                     |
+| écriture du status `agent-review`                                                                                               | `pr-reviewer` uniquement                     |
+| release : `npm publish`, `make publish`, tag `v*`, push de tag, `gh release create/upload/edit/delete`, `mcp-publisher publish` | personne : la release est faite par l'humain |
+
+C'est un garde-fou pour les agents, pas une frontière de sécurité : l'humain n'est pas concerné, et une commande volontairement obfusquée passerait. Tests : `make test-hooks` (nécessite `bash` et `jq` sur l'hôte), lancés aussi en CI.
 
 ## Protection de `main`
 

@@ -31,6 +31,8 @@ jobs:
         run: npm run typecheck
       - name: Tests with coverage
         run: npm run test:coverage
+      - name: Agent guard hook tests
+        run: tests/hooks/guard.test.sh
       - name: Build
         run: npm run build
 
