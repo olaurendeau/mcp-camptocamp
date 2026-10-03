@@ -8,6 +8,7 @@ import {
   getOuting,
   searchAreas,
   getArea,
+  searchOutings,
 } from "../../src/api/camptocamp.js";
 
 const mockFetch = vi.fn();
@@ -489,5 +490,184 @@ describe("areas on route details", () => {
     expect(result.areas?.[0].document_id).toBe(14274);
     expect(result.areas?.map((a) => a.area_type)).toEqual(["country", "admin_limits", "range"]);
     expect(result.areas?.[1].locales[6]).toMatchObject({ lang: "fr", title: "Hautes-Alpes" });
+  });
+});
+
+describe("searchOutings", () => {
+  // Trimmed from the real GET /outings?r=53884&date=2026-06-01,2026-09-30&sort=-date_end
+  // response (2026-10-03): a mountaineering outing has no ski_rating / labande_global_rating.
+  const OUTING_COSMIQUES = {
+    document_id: 1938453,
+    version: 1,
+    locales: [{ version: 1, lang: "fr", title: "Aiguille du Midi : Arête des Cosmiques", summary: null }],
+    quality: "fine",
+    activities: ["mountain_climbing", "snow_ice_mixed"],
+    condition_rating: "average",
+    date_end: "2026-08-10",
+    date_start: "2026-08-10",
+    elevation_max: 3842,
+    height_diff_up: 300,
+    public_transport: false,
+    global_rating: "AD",
+    height_diff_difficulties: 240,
+    engagement_rating: "II",
+    available_langs: ["fr"],
+    areas: [
+      {
+        document_id: 14274,
+        version: 12,
+        locales: [{ version: 6, lang: "fr", title: "France" }],
+        area_type: "country",
+        available_langs: null,
+        protected: false,
+        type: "a",
+      },
+      {
+        document_id: 14410,
+        version: 19,
+        locales: [
+          { version: 7, lang: "sl", title: "Mont-Blanc" },
+          { version: 44, lang: "fr", title: "Mont-Blanc" },
+          { version: 3, lang: "it", title: "Monte Bianco" },
+        ],
+        area_type: "range",
+        available_langs: null,
+        protected: false,
+        type: "a",
+      },
+      {
+        document_id: 14366,
+        version: 3,
+        locales: [{ version: 3, lang: "fr", title: "Haute-Savoie" }],
+        area_type: "admin_limits",
+        available_langs: null,
+        protected: false,
+        type: "a",
+      },
+    ],
+    author: { name: "Keagan B.", user_id: 1910408 },
+    protected: false,
+    type: "o",
+    img_count: 6,
+  };
+
+  // Trimmed from the real GET /outings?act=skitouring&date=2026-01-01,2026-03-31 response
+  // (2026-10-03): a ski touring outing has ski and Labande ratings but no global_rating.
+  const OUTING_SKITOURING = {
+    document_id: 1891688,
+    version: 5,
+    locales: [
+      {
+        version: 8,
+        lang: "fr",
+        title: "Une semaine de ski entre Saas Fe et Tash Hutte",
+        summary: null,
+      },
+    ],
+    quality: "fine",
+    activities: ["skitouring"],
+    condition_rating: "good",
+    date_end: "2026-04-04",
+    date_start: "2026-03-29",
+    elevation_max: 4206,
+    height_diff_up: 8615,
+    public_transport: false,
+    ski_rating: "3.1",
+    labande_global_rating: "PD+",
+    available_langs: ["fr"],
+    areas: [{ document_id: 14436, locales: [{ lang: "fr", title: "Valais E" }], area_type: "range" }],
+    author: { name: "agnes H", user_id: 1142226 },
+    protected: false,
+    type: "o",
+    img_count: 52,
+  };
+
+  function calledUrl(): URL {
+    return new URL(mockFetch.mock.calls[0][0] as string);
+  }
+
+  it("sends only sort, limit, offset and lang when no filter is given", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [OUTING_COSMIQUES, OUTING_SKITOURING], total: 14 }));
+
+    const result = await searchOutings();
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?sort=-date_end&limit=10&offset=0&lang=fr`);
+    expect(result.total).toBe(14);
+    expect(result.documents[0].areas?.[1].area_type).toBe("range");
+    expect(result.documents[0].condition_rating).toBe("average");
+    expect(result.documents[0].ski_rating).toBeUndefined();
+    expect(result.documents[1].ski_rating).toBe("3.1");
+    expect(result.documents[1].labande_global_rating).toBe("PD+");
+    expect(result.documents[1].global_rating).toBeUndefined();
+  });
+
+  it("sends every filter in order, before the sort", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({
+      query: "cosmiques",
+      area_id: 14409,
+      activity: "skitouring",
+      route_id: 53884,
+      waypoint_id: 37233,
+    });
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain("?q=cosmiques&a=14409&act=skitouring&r=53884&w=37233&sort=-date_end");
+    expect(calledUrl().searchParams.has("date")).toBe(false);
+  });
+
+  it("sends custom limit and offset and no unset filter", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ limit: 25, offset: 50 });
+
+    const params = calledUrl().searchParams;
+    expect(params.get("limit")).toBe("25");
+    expect(params.get("offset")).toBe("50");
+    for (const name of ["q", "a", "act", "date", "r", "w"]) {
+      expect(params.has(name)).toBe(false);
+    }
+  });
+
+  it("does not send q for an empty query", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ query: "" });
+
+    expect(calledUrl().searchParams.has("q")).toBe(false);
+  });
+
+  it("sends a closed date range", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ date_from: "2026-01-01", date_to: "2026-03-31" });
+
+    expect(calledUrl().searchParams.get("date")).toBe("2026-01-01,2026-03-31");
+  });
+
+  it("sends an open-ended upper bound with date_from only", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ date_from: "2026-09-01" });
+
+    const date = calledUrl().searchParams.get("date");
+    expect(date).toBe("2026-09-01,9999-12-31");
+    expect(date?.split(",")[1]).not.toBe("2026-09-01");
+  });
+
+  it("sends an open-ended lower bound with date_to only", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ date_to: "2026-01-01" });
+
+    expect(calledUrl().searchParams.get("date")).toBe("0001-01-01,2026-01-01");
+  });
+
+  it("throws on non-OK response", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
+
+    await expect(searchOutings()).rejects.toThrow("Camptocamp API error: 500 Error");
   });
 });
