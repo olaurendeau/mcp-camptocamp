@@ -44,7 +44,7 @@ Chaque agent termine par un rapport `Status` / `Deliverables`, complété par `D
 - **Périmètre / produit** : ajout, retrait ou renommage d'un outil MCP, changement visible par l'utilisateur, écart avec la demande ;
 - **Dépendances** : nouvelle dépendance runtime, montée de version majeure ;
 - **Process / sécurité** : CI, ruleset, seuils de qualité, hooks, définitions des agents ;
-- **Release** : bump de version, tag, publication npm / GHCR / registre MCP.
+- **Release** : la décision de publier et le numéro de version (l'exécution suit la section [Release](#release)).
 
 Chaque décision est tracée en commentaire de l'issue. Une revue est _clean_ quand elle n'a aucun point bloquant ; le coordinateur trie les suggestions (correction, issue de suivi ou rejet motivé) avant de merger.
 
@@ -58,11 +58,13 @@ Le coordinateur la lance après chaque ouverture ou mise à jour de PR. L'agent 
 
 Le hook [`.claude/hooks/guard.sh`](.claude/hooks/guard.sh) (`PreToolUse` sur `Bash`) fait respecter les rôles dans les sessions Claude Code de ce repo :
 
-| Commande                                                                                                                                       | Autorisée pour                               |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| merge de PR (`gh pr merge`, ou `PUT …/pulls/N/merge` via l'API)                                                                                | `coordinator` uniquement                     |
-| écriture du status `agent-review`                                                                                                              | `pr-reviewer` uniquement                     |
-| release : `npm publish`, `npm version`, `make publish`, tag `v*`, push de tag, `gh release create/upload/edit/delete`, `mcp-publisher publish` | personne : la release est faite par l'humain |
+| Commande                                                                                                              | Autorisée pour                                             |
+| --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| merge de PR (`gh pr merge`, ou `PUT …/pulls/N/merge` via l'API)                                                       | `coordinator` uniquement                                   |
+| écriture du status `agent-review`                                                                                     | `pr-reviewer` uniquement                                   |
+| bump de version : `npm version X.Y.Z --no-git-tag-version` (sans ce flag, `npm version` crée aussi un tag)            | `developer` uniquement                                     |
+| tag de version : `git tag v*`, push de tag (`v*`, `--tags`, `--follow-tags`, `refs/tags/`) ; `git tag -l` reste libre | `coordinator` uniquement                                   |
+| publication manuelle : `npm publish`, `make publish`, `mcp-publisher publish`, `gh release create/upload/edit/delete` | personne : seul `publish.yml` publie, déclenché par le tag |
 
 Le hook contrôle chaque commande d'une chaîne (`&&`, `||`, `;`, `|`) séparément. Pour les règles de merge et de release, il ignore le texte : arguments de message, de titre ou de corps (`-m`, `--body`, `--title`…), arguments d'`echo`/`printf`/`grep`, et corps de heredoc qui ne sont pas passés à un shell. Un commentaire de PR ou un message de commit peut donc citer ces commandes, alors que `sh -c "…"`, `bash -c '…'` et `$(…)` restent contrôlés. La règle `agent-review` regarde aussi dans les chaînes et les heredocs, où se trouve souvent le contexte du status. Le hook a besoin de `jq` et `perl` sur l'hôte ; s'il lui en manque un ou s'il plante, il bloque la commande. C'est un garde-fou pour les agents, pas une frontière de sécurité : l'humain n'est pas concerné, et une commande volontairement obfusquée passerait. Tests : `make test-hooks`, lancés aussi par `make check` et en CI.
 
@@ -77,4 +79,11 @@ Configurée par un ruleset GitHub :
 
 ## Release
 
-Inchangée : bump de version via une PR, puis tag `vX.Y.Z` sur `main`, qui déclenche `publish.yml`.
+Une release n'a lieu que quand l'humain la demande : la décision de publier et le numéro de version lui reviennent.
+
+1. L'humain demande la release et fixe la version `X.Y.Z`.
+2. Un `developer` ouvre la PR de bump (`package.json`, `package-lock.json`, `server.json`) : `npm version X.Y.Z --no-git-tag-version` dans le conteneur de dev, puis `server.json` à la main.
+3. Le `coordinator` la merge, comme toute PR.
+4. Le `coordinator` pousse le tag `vX.Y.Z` sur `main`, ce qui déclenche `publish.yml` (npm, GHCR, registre MCP).
+
+Aucun agent ne publie à la main : le hook bloque `npm publish`, `make publish`, `mcp-publisher publish` et `gh release …`.
