@@ -34,8 +34,8 @@ All development happens inside Docker — no local Node.js required.
 # Install dependencies (first time or after package.json changes)
 docker compose run --rm dev npm install
 
-# Type-check
-docker compose run --rm dev npm run lint
+# Everything CI runs (format, lint, typecheck, coverage, build)
+make check
 
 # Run tests
 docker compose run --rm dev npm test
@@ -46,6 +46,15 @@ docker compose run --rm dev npm run test:watch
 # Build production image
 docker compose build mcp
 ```
+
+## Workflow
+
+Every change lands through a PR; the rules and thresholds live in [CONTRIBUTING.md](CONTRIBUTING.md). Read it before opening a PR.
+
+- Work on a branch, keep each PR to one concern and ≤ 1000 changed lines (excluding `package-lock.json`); split larger work into a sequence of PRs.
+- Run `make check` before pushing.
+- Title the PR in Conventional Commits form and fill `.github/pull_request_template.md`.
+- After opening or pushing to a PR, dispatch the `pr-reviewer` subagent with the PR number. Its review is the only source of the `agent-review` status; your part is to address its blocking findings with new commits, then dispatch it again on the new head.
 
 ## Claude Desktop Integration
 
@@ -62,12 +71,12 @@ docker compose build mcp
 
 ## MCP Tools
 
-| Tool | Description |
-|------|-------------|
-| `search_routes` | Search mountain routes by keyword, returns list with ID, title, activities, elevation, rating |
-| `get_route` | Get full route detail by ID (description, ratings, elevation data, gear) |
-| `search_waypoints` | Search waypoints (summits, huts, bivouacs) by name |
-| `get_waypoint` | Get waypoint detail by ID (altitude, GPS coordinates, description) |
+| Tool               | Description                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| `search_routes`    | Search mountain routes by keyword, returns list with ID, title, activities, elevation, rating |
+| `get_route`        | Get full route detail by ID (description, ratings, elevation data, gear)                      |
+| `search_waypoints` | Search waypoints (summits, huts, bivouacs) by name                                            |
+| `get_waypoint`     | Get waypoint detail by ID (altitude, GPS coordinates, description)                            |
 
 ## Camptocamp API v6
 

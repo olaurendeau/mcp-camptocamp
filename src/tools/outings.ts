@@ -3,11 +3,7 @@ import { searchUserOutings, getOuting } from "../api/camptocamp.js";
 import type { OutingSearchResponse, OutingDetail } from "../api/camptocamp.js";
 
 export const searchUserOutingsSchema = z.object({
-  user_id: z
-    .number()
-    .int()
-    .positive()
-    .describe("Camptocamp user ID (e.g. 430052 for username o.laurendeau)"),
+  user_id: z.number().int().positive().describe("Camptocamp user ID (e.g. 430052 for username o.laurendeau)"),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
 });
 

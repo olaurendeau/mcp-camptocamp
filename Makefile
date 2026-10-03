@@ -4,7 +4,7 @@ RUN_IT := $(COMPOSE) run --rm -it dev
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install ci test test-watch lint build pack docker-build login whoami publish-prep publish shell
+.PHONY: help install ci check test test-watch coverage lint typecheck format build pack docker-build login whoami publish-prep publish shell
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -24,8 +24,20 @@ test: ci ## Lance les tests
 test-watch: ci ## Lance les tests en mode watch
 	$(RUN) npm run test:watch
 
-lint: ci ## Vérifie les types TypeScript
+coverage: ci ## Lance les tests avec seuils de couverture
+	$(RUN) npm run test:coverage
+
+lint: ci ## Lance ESLint
 	$(RUN) npm run lint
+
+typecheck: ci ## Vérifie les types TypeScript
+	$(RUN) npm run typecheck
+
+format: ci ## Formate le code avec Prettier
+	$(RUN) npm run format
+
+check: ci ## Lance tous les checks de la CI (format, lint, types, couverture, build)
+	$(RUN) npm run check
 
 build: ci ## Compile TypeScript vers dist/
 	$(RUN) npm run build
