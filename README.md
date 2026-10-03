@@ -6,21 +6,21 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 
 ## Outils disponibles
 
-| Outil                 | Description                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| `search_routes`       | Recherche d'itinéraires par mot-clé et/ou `area_id` (ID, titre, activités, alt., cotation)     |
-| `get_route`           | Détail complet d'un itinéraire par ID (description, cotations, dénivelé, matériel, zones)      |
-| `search_waypoints`    | Recherche des points de passage par nom et/ou zone `area_id` (sommets, refuges, bivouacs…)     |
-| `get_waypoint`        | Détail d'un point de passage par ID (altitude, coordonnées GPS, description, zones)            |
-| `search_user_outings` | Liste les sorties (comptes rendus) publiées par un utilisateur Camptocamp, par ID utilisateur  |
-| `get_outing`          | Détail d'une sortie par ID (conditions, météo, participants, itinéraires associés)             |
-| `search_outings`      | Recherche des sorties récentes (mot-clé, zone, activité, dates, itinéraire, point de passage)  |
-| `search_areas`        | Recherche des zones (massif, département/canton, pays) par nom ; ID réutilisable en `area_id`  |
-| `get_area`            | Détail d'une zone par ID (type, résumé, description)                                           |
-| `search_books`        | Recherche de livres (topos, histoire, romans…) par titre uniquement ; auteur/ISBN peu fiables  |
-| `get_book`            | Détail d'un livre par ID (auteur, éditeur, date, ISBN, langues, itinéraires, points, articles) |
-| `search_articles`     | Recherche d'articles par mot-clé (matériel, technique, environnement, récits…) ; collab/perso  |
-| `get_article`         | Détail d'un article par ID (texte, auteur, type, itinéraires, points, sorties, livres liés)    |
+| Outil                 | Description                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `search_routes`       | Recherche d'itinéraires par mot-clé et/ou `area_id` (ID, titre, activités, alt., cotation)            |
+| `get_route`           | Détail complet d'un itinéraire par ID (description, cotations, dénivelé, matériel, zones)             |
+| `search_waypoints`    | Recherche des points de passage par nom et/ou zone `area_id` (sommets, refuges, bivouacs…)            |
+| `get_waypoint`        | Détail d'un point de passage par ID (altitude, coordonnées GPS, description, zones)                   |
+| `search_user_outings` | Liste les sorties (comptes rendus) publiées par un utilisateur Camptocamp, par ID utilisateur         |
+| `get_outing`          | Détail d'une sortie par ID (conditions, météo, participants, itinéraires associés)                    |
+| `search_outings`      | Recherche des sorties récentes (mot-clé, zone, activité, dates, itinéraire, point de passage)         |
+| `search_areas`        | Recherche des zones (massif, département/canton, pays) par nom ; ID réutilisable en `area_id`         |
+| `get_area`            | Détail d'une zone par ID (type, résumé, description)                                                  |
+| `search_books`        | Recherche de livres (topos, histoire, romans…) par titre uniquement ; auteur/ISBN peu fiables         |
+| `get_book`            | Détail d'un livre par ID (auteur, éditeur, date, ISBN, pages, langues, itinéraires, points, articles) |
+| `search_articles`     | Recherche d'articles par mot-clé (matériel, technique, environnement, récits…) ; collab/perso         |
+| `get_article`         | Détail d'un article par ID (texte, auteur, type, itinéraires, points, sorties, livres liés)           |
 
 ## Installation
 

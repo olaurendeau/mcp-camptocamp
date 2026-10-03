@@ -5,7 +5,7 @@ Tout changement arrive sur `main` par une pull request qui passe la CI et une re
 ## Cycle d'une PR
 
 1. **Branche** depuis `main` : `feat/…`, `fix/…`, `chore/…`, `docs/…`.
-2. **Code + tests.** `make check` doit passer en local : il lance le job `checks` de la CI (format, lint, types, couverture, build) puis les tests du hook (`make test-hooks`). Les autres checks (`docker`, `audit`, `pr-size`, `pr-title`) ne tournent qu'en CI.
+2. **Code + tests.** `make check` doit passer en local : il lance le job `checks` de la CI : format, lint, types, couverture, build et tests du hook (`make test-hooks`). Les autres checks (`docker`, `audit`, `pr-size`, `pr-title`) ne tournent qu'en CI.
 3. **PR** avec un titre [Conventional Commits](https://www.conventionalcommits.org/) (`feat: add search_outings tool`). Le titre devient le message du commit squashé sur `main`.
 4. **CI** : tous les checks requis passent au vert.
 5. **Revue agent** : un agent _qui n'a pas écrit le code_ relit la PR et pose le status `agent-review` sur le commit de tête (voir plus bas).
@@ -86,5 +86,13 @@ Une release n'a lieu que quand l'humain la demande : la décision de publier et 
 2. Un `developer` ouvre la PR de bump (`package.json`, `package-lock.json`, `server.json`) : `npm version X.Y.Z --no-git-tag-version` dans le conteneur de dev, puis `server.json` à la main.
 3. Le `coordinator` la merge, comme toute PR.
 4. Le `coordinator` pose le tag `vX.Y.Z` sur le commit de merge de la PR de bump (`gh pr view <N> --json mergeCommit`) et pousse ce seul tag (`git push origin vX.Y.Z`), ce qui déclenche `publish.yml` (npm, GHCR, registre MCP).
+
+### Prérequis externes (déjà en place)
+
+`publish.yml` dépend d'une configuration faite hors du repo. Renommer `publish.yml`, renommer ou transférer le repo casse la publication suivante tant qu'elle n'est pas refaite :
+
+- **npm Trusted Publisher** sur `@olaurendeau/mcp-camptocamp` (npmjs.com → Settings → Trusted Publisher → GitHub Actions) : utilisateur `olaurendeau`, repo `mcp-camptocamp`, workflow `publish.yml`. L'étape npm de `publish.yml` n'utilise aucun token : elle repose uniquement sur ce lien (OIDC). Option _Require two-factor authentication and disallow tokens_ activée dans _Publishing access_.
+- **GHCR** : le package `ghcr.io/olaurendeau/mcp-camptocamp` a été rendu public à la main après le premier push (Settings → Packages → Change visibility).
+- **Registre MCP** : `mcp-publisher login github-oidc` n'accepte le nom `io.github.olaurendeau/…` que depuis un repo du compte `olaurendeau`.
 
 Aucun agent ne publie à la main : le hook bloque `npm publish`, `make publish`, `mcp-publisher publish` et `gh release …`. Il bloque aussi `git push --tags` / `--follow-tags` et tout déplacement ou suppression d'un tag de version ; corriger un tag est une décision de l'humain.
