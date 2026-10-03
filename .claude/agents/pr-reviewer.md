@@ -24,7 +24,7 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
    git worktree remove --force /tmp/review-<N>
    ```
 
-   Run the last two cleanup commands whatever the result of `npm run check`. Done when you have its pass/fail result and the worktree is removed.
+   Run the last two cleanup commands whatever the result of `npm run check`. If the checks could not run for an environment reason (Docker, network, GitHub outage), clean up and go straight to step 7 with `Status: blocked` and the error: post no comment and set no status, since the code was not judged. Done when you have the pass/fail result of `npm run check` and the worktree is removed.
 
 4. **Apply every rule** in the checklist below to the diff. Each finding names a file and line, says what goes wrong in a concrete scenario, and is tagged **blocking** or **suggestion**. Done when every rule has been applied to every changed file.
 
@@ -47,7 +47,6 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
    Blocking findings: <file:line — one sentence>, or "none"
    Suggestions: <file:line — one sentence>, or "none"
    ```
-   Report `blocked`, with the error, when the checks cannot run for an environment reason (Docker, network, GitHub outage); in that case set no status, since the code was not judged.
 
 ## Checklist
 

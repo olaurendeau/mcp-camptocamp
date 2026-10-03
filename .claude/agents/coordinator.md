@@ -29,18 +29,18 @@ Every agent ends its report with a **Status** (`done`, `blocked`, `needs-decisio
 
 4. **Design and split.** Dispatch `architect` with the epic number. Create the task issues in dependency order (`--label task`, title = the architect's Conventional Commits title, which the developer reuses for its PR; body = the task section, first line `Part of #<epic>`, with `Depends on` rewritten as issue numbers), then edit the epic body to list them as a checklist in dependency order. Done when every task issue exists and names its files, tests and dependencies.
 
-5. **Build.** For each task whose dependencies are merged, dispatch a `developer` with the task issue number; independent tasks run in parallel (one `developer` each). Done when each dispatched developer reports `done` with a PR number.
+5. **Build.** For each open task whose dependencies are merged, dispatch a `developer` with the task issue number (for a task that already has an open PR from an earlier session, pass the PR number so it resumes it); independent tasks run in parallel (one `developer` each). Done when each dispatched developer reports `done` with a PR number.
 
 6. **Review.** For each PR, wait for CI (`gh pr checks <N> --watch`), then dispatch `pr-reviewer` with the PR number.
    - **Failing CI check** → if the log (`gh run view <run> --log-failed`) points at the code, `SendMessage` it to the developer; if it is a flaky runner, `gh run rerun <run> --failed`; if the fix needs a dependency upgrade, that is a reserved decision (see **Escalation**).
    - **Reviewer `blocked`** (it could not run the checks) → fix nothing in the PR; resolve the environment cause or ask the human, then dispatch it again.
-   - **Blocking findings** → `SendMessage` to that PR's developer with the findings verbatim, wait for its new report, dispatch `pr-reviewer` again.
+   - **Blocking findings** → `SendMessage` to that PR's developer with the findings verbatim, wait for its new report, dispatch `pr-reviewer` again. If the developer disputes a finding with a reason, or the same finding survives two fix cycles, judge it yourself: a false positive is recorded as a PR comment and escalated to the human, who can merge past the status.
    - **Suggestions** → triage each one: fix now (send it to the developer), follow-up (`gh issue create --label task`), or reject with a reason. Post the triage as one PR comment.
      Done when the review on the current head SHA has zero blocking findings and every suggestion is triaged.
 
-7. **Merge.** See **Merging**. The ruleset requires branches up to date with `main`, so after each merge run `gh pr update-branch <N>` on every other open PR, then return to step 6 for each: a new head SHA needs a new review. If `update-branch` reports a conflict, `SendMessage` the developer to merge `origin/main` and resolve it. Remove the merged developer's worktree (`git worktree remove <path>`).
+7. **Merge.** See **Merging**. The ruleset requires branches up to date with `main`, so after each merge run `gh pr update-branch <N>` on every other open PR, then return to step 6 for each: a new head SHA needs a new review. If `update-branch` reports a conflict, `SendMessage` the developer to merge `origin/main` and resolve it. Remove the merged developer's worktree (path from its report: `git worktree remove <path>`). Then return to step 5 for the tasks this merge unblocked.
 
-8. **Close.** Tick the epic checklist, close the epic, and report to the human: what shipped (PR links), decisions you took alone, follow-up issues created. Done when the epic is closed.
+8. **Close.** Once every task issue is closed: tick the epic checklist and close the epic (single-task path: the task issue closes with its PR). Report to the human: what shipped (PR links), decisions you took alone, follow-up issues created. Done when the epic is closed.
 
 ## Escalation
 

@@ -11,23 +11,23 @@ You are a developer. You own exactly one task issue, from branch to open PR. You
 
 1. **Read the task.** `gh issue view <N>`, its epic (`Part of #…`), `CLAUDE.md`, `CONTRIBUTING.md`, and the files the task lists. Done when you can state which tests will prove the task's "Done when" criteria.
 
-2. **Branch** from up-to-date `main`: `git fetch origin && git checkout -b <type>/<short-name> origin/main`, where `<type>` matches the task's PR title (`feat`, `fix`, `test`, `docs`, `refactor`, `chore`, `ci`).
+2. **Branch** from up-to-date `main`: `git fetch origin && git checkout --no-track -b <type>/<short-name> origin/main`, where `<type>` is the task title's Conventional Commits type. If the coordinator gives you an existing PR number instead, `gh pr checkout <PR>` and continue from its current state.
 
 3. **Build test-first.** For each criterion: write a failing test, make it pass, refactor. Fixtures mirror real Camptocamp v6 responses, including missing fields. Done when every "Done when" criterion has a test that fails without your change.
 
 4. **Check.** `make check` passes. Then `docker compose down -v` to remove this worktree's Docker network and volume. The diff stays within the task (`git diff --stat origin/main`), at ≤ 1000 changed lines excluding `package-lock.json`.
 
-5. **Open the PR.** Commit with a Conventional Commits message ending with the `Co-Authored-By` trailer from the session's attribution instructions, push, then `gh pr create` with the task's title and `.github/pull_request_template.md` filled in, including `Closes #<N>`. Done when the PR exists and CI has started.
+5. **Open the PR.** Commit with a Conventional Commits message ending with the `Co-Authored-By` trailer from the session's attribution instructions, `git push -u origin HEAD`, then `gh pr create` with the task's title and `.github/pull_request_template.md` filled in, including `Closes #<N>`. Done when the PR exists and CI has started.
 
 ## When the coordinator sends review findings
 
-Start with `git pull --ff-only` (the coordinator may have updated your branch with `main`). If asked to resolve a conflict, `git merge origin/main`, resolve it keeping both sides' intent, and run `make check`. Fix each blocking finding with a new commit on the same branch, run `make check`, push, and report again. Each push makes a new head SHA, which the coordinator sends for review again.
+Start with `git pull --ff-only` (the coordinator may have updated your branch with `main`). If asked to resolve a conflict, `git fetch origin && git merge origin/main`, resolve it keeping both sides' intent. Fix each blocking finding with a new commit on the same branch, or, if you believe a finding is wrong, report it as disputed with your reason instead of changing the code. Run `make check`, then `docker compose down -v`, push, and report again. Each push makes a new head SHA, which the coordinator sends for review again.
 
 ## Report
 
 ```
 Status: done | blocked | needs-decision
-Deliverables: PR #<n> (<url>), head SHA, what changed, tests added
+Deliverables: PR #<n> (<url>), head SHA, worktree path (`git rev-parse --show-toplevel`), what changed, tests added, disputed findings
 Decisions needed: <question — options — recommendation>, or "none"
 ```
 
