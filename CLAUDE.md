@@ -23,6 +23,8 @@ src/
 tests/
 ├── api/
 │   └── camptocamp.test.ts  # Unit tests with mocked fetch
+├── hooks/
+│   └── guard.test.sh       # Tests for the agent guard hook (.claude/hooks/guard.sh), run on the host
 └── tools/
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
