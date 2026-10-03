@@ -869,7 +869,8 @@ describe("getBook", () => {
   });
 
   it("keeps a free-text isbn and null nb_pages, publication_date and activities", async () => {
-    // The live GET /books/14746?lang=fr response (2026-10-03), complete.
+    // The live GET /books/14746?lang=fr response (2026-10-03), complete except the fr locale description
+    // (1,391 characters live).
     const mockData = {
       document_id: 14746,
       version: 1,
