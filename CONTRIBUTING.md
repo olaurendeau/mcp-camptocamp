@@ -14,17 +14,17 @@ Tout changement arrive sur `main` par une pull request qui passe la CI et une re
 
 ## Règles
 
-| Règle        | Seuil                                                   | Vérifié par                 |
-| ------------ | ------------------------------------------------------- | --------------------------- |
-| Taille de PR | ≤ 1000 lignes modifiées, `package-lock.json` exclu      | check `pr-size`             |
-| Titre de PR  | Conventional Commits                                    | check `pr-title`            |
-| Formatage    | Prettier                                                | check `checks`              |
-| Lint         | ESLint (`typescript-eslint` strict)                     | check `checks`              |
-| Types        | `tsc --noEmit`                                          | check `checks`              |
-| Couverture   | lignes / fonctions / statements ≥ 80 %, branches ≥ 70 % | check `checks`              |
-| Build        | `tsc` + image Docker                                    | checks `checks` et `docker` |
-| Dépendances  | aucune vulnérabilité _high_ en production               | check `audit`               |
-| Revue        | agent indépendant, verdict sans point bloquant          | status `agent-review`       |
+| Règle        | Seuil                                              | Vérifié par                 |
+| ------------ | -------------------------------------------------- | --------------------------- |
+| Taille de PR | ≤ 1000 lignes modifiées, `package-lock.json` exclu | check `pr-size`             |
+| Titre de PR  | Conventional Commits                               | check `pr-title`            |
+| Formatage    | Prettier                                           | check `checks`              |
+| Lint         | ESLint (`typescript-eslint` strict)                | check `checks`              |
+| Types        | `tsc --noEmit`                                     | check `checks`              |
+| Couverture   | ≥ 80 % (lignes, fonctions, statements, branches)   | check `checks`              |
+| Build        | `tsc` + image Docker                               | checks `checks` et `docker` |
+| Dépendances  | aucune vulnérabilité _high_ en production          | check `audit`               |
+| Revue        | agent indépendant, verdict sans point bloquant     | status `agent-review`       |
 
 Une PR qui dépasse 1000 lignes se découpe : d'abord le refactoring préparatoire, puis la fonctionnalité, puis la doc.
 
