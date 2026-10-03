@@ -28,17 +28,33 @@ Tout changement arrive sur `main` par une pull request qui passe la CI et une re
 
 Une PR qui dépasse 1000 lignes se découpe : d'abord le refactoring préparatoire, puis la fonctionnalité, puis la doc.
 
+## Équipe d'agents
+
+Dans ce repo, la session Claude Code est le **coordinateur** ([`coordinator`](.claude/agents/coordinator.md), activé par `.claude/settings.json`). C'est à lui que l'humain s'adresse. Il planifie, pose les questions, distribue le travail et merge.
+
+| Rôle             | Agent                                                    | Produit                                                             |
+| ---------------- | -------------------------------------------------------- | ------------------------------------------------------------------- |
+| Product designer | [`product-designer`](.claude/agents/product-designer.md) | problème, user stories, critères d'acceptation → issue `epic`       |
+| Architecte       | [`architect`](.claude/agents/architect.md)               | design technique, découpage en tâches ≤ 1000 lignes → issues `task` |
+| Développeur      | [`developer`](.claude/agents/developer.md)               | une PR par tâche, test-first, dans un worktree isolé                |
+| Reviewer         | [`pr-reviewer`](.claude/agents/pr-reviewer.md)           | revue + status `agent-review`                                       |
+
+Chaque agent termine par un rapport `Status` / `Deliverables`, complété par `Decisions needed` (designer, architecte, développeur) ou par les points bloquants et suggestions (reviewer). Le coordinateur tranche lui-même, sauf pour quatre catégories qu'il remonte toujours à l'humain (label `needs-human` pendant l'attente) :
+
+- **Périmètre / produit** : ajout, retrait ou renommage d'un outil MCP, changement visible par l'utilisateur, écart avec la demande ;
+- **Dépendances** : nouvelle dépendance runtime, montée de version majeure ;
+- **Process / sécurité** : CI, ruleset, seuils de qualité, hooks, définitions des agents ;
+- **Release** : bump de version, tag, publication npm / GHCR / registre MCP.
+
+Chaque décision est tracée en commentaire de l'issue. Une revue est _clean_ quand elle n'a aucun point bloquant ; le coordinateur trie les suggestions (correction, issue de suivi ou rejet motivé) avant de merger.
+
+Pour lancer une session avec un autre rôle : `claude --agent <nom>`.
+
 ## Revue par un agent indépendant
 
 L'agent qui code ne relit jamais son propre travail. La revue est faite par le sous-agent [`pr-reviewer`](.claude/agents/pr-reviewer.md), lancé dans un contexte vierge : il ne voit que le diff, la description de la PR et le repo.
 
-Depuis Claude Code :
-
-```
-> lance l'agent pr-reviewer sur la PR 12
-```
-
-L'agent poste sa revue en commentaire de la PR, puis pose le commit status `agent-review` (`success` ou `failure`) sur le SHA qu'il a relu. La protection de `main` exige ce status : sans revue, ou après un nouveau push, le merge reste bloqué.
+Le coordinateur la lance après chaque ouverture ou mise à jour de PR. L'agent poste sa revue en commentaire de la PR, puis pose le commit status `agent-review` (`success` ou `failure`) sur le SHA qu'il a relu. La protection de `main` exige ce status : sans revue, ou après un nouveau push, le merge reste bloqué.
 
 > Limite connue : le status est posé avec ton token GitHub, donc rien n'empêche techniquement un autre agent de le poser. La règle « seul `pr-reviewer` pose `agent-review` » est une convention, inscrite dans `CLAUDE.md`.
 

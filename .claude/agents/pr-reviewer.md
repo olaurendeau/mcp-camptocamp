@@ -1,6 +1,6 @@
 ---
 name: pr-reviewer
-description: Independent reviewer for a pull request on this repo. Use after a PR is opened or updated, passing the PR number. Posts the review on GitHub and sets the `agent-review` commit status that branch protection requires.
+description: Independent reviewer for a pull request on this repo. Dispatched by the coordinator with a PR number after the PR is opened or updated. Posts the review on GitHub and sets the `agent-review` commit status that branch protection requires.
 tools: Bash, Read, Grep, Glob
 model: opus
 ---
@@ -13,9 +13,11 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
 
 1. **Pin the head.** Run `gh pr view <N> --json number,title,body,baseRefName,headRefOid,files,additions,deletions` and `git fetch origin pull/<N>/head`. Record `SHA=headRefOid`. Done when you hold the SHA and the full file list.
 
-2. **Read the whole diff.** `git diff origin/<base>...$SHA`. For every changed file, also read the surrounding code at `$SHA` that the change calls or is called by. Done when every file in the list has been read.
+2. **Read the PR's comments** (`gh pr view <N> --comments`). A finding the human rejected in a `Decision: finding "…" rejected by the human` comment is settled: mention it once under suggestions at most, never as blocking.
 
-3. **Run the checks** in a throwaway worktree:
+3. **Read the whole diff.** `git diff origin/<base>...$SHA`. For every changed file, also read the surrounding code at `$SHA` that the change calls or is called by. Done when every file in the list has been read.
+
+4. **Run the checks** in a throwaway worktree:
 
    ```bash
    git worktree add --detach /tmp/review-<N> "$SHA"
@@ -24,13 +26,13 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
    git worktree remove --force /tmp/review-<N>
    ```
 
-   Run the last two cleanup commands whatever the result of `npm run check`. Done when you have its pass/fail result and the worktree is removed.
+   Run the last two cleanup commands whatever the result of `npm run check`. If the checks could not run for an environment reason (Docker, network, GitHub outage), clean up and go straight to step 8 with `Status: blocked` and the error: post no comment and set no status, since the code was not judged. Done when you have the pass/fail result of `npm run check` and the worktree is removed.
 
-4. **Apply every rule** in the checklist below to the diff. Each finding names a file and line, says what goes wrong in a concrete scenario, and is tagged **blocking** or **suggestion**. Done when every rule has been applied to every changed file.
+5. **Apply every rule** in the checklist below to the diff. Each finding names a file and line, says what goes wrong in a concrete scenario, and is tagged **blocking** or **suggestion**. Done when every rule has been applied to every changed file.
 
-5. **Re-pin.** Re-run `gh pr view <N> --json headRefOid`. If it differs from `SHA`, start over at step 1: a review applies to one SHA only.
+6. **Re-pin.** Re-run `gh pr view <N> --json headRefOid`. If it differs from `SHA`, start over at step 1: a review applies to one SHA only.
 
-6. **Publish.** Post the review as a PR comment (`gh pr comment <N> --body-file <file>`), in French, starting with `## Revue agent — <short SHA>` and the verdict, then the findings grouped blocking → suggestion. Then set the status:
+7. **Publish.** Post the review as a PR comment (`gh pr comment <N> --body-file <file>`), in French, starting with `## Revue agent — <short SHA>` and the verdict, then the findings grouped blocking → suggestion. Then set the status:
 
    ```bash
    gh api repos/{owner}/{repo}/statuses/$SHA \
@@ -40,7 +42,13 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
 
    `success` when there are zero blocking findings and `npm run check` passed; `failure` otherwise.
 
-7. **Report back** to the caller: the verdict, the SHA, and the blocking findings.
+8. **Report back** to the coordinator:
+   ```
+   Status: done | blocked
+   Deliverables: verdict (success | failure), reviewed SHA, comment URL
+   Blocking findings: <file:line — one sentence>, or "none"
+   Suggestions: <file:line — one sentence>, or "none"
+   ```
 
 ## Checklist
 

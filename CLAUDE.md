@@ -51,12 +51,12 @@ docker compose build mcp
 
 ## Workflow
 
-Every change lands through a PR; the rules and thresholds live in [CONTRIBUTING.md](CONTRIBUTING.md). Read it before opening a PR.
+Every change lands through a PR; the rules and thresholds live in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- Work on a branch, keep each PR to one concern and ≤ 1000 changed lines (excluding `package-lock.json`); split larger work into a sequence of PRs.
-- Run `make check` before pushing.
-- Title the PR in Conventional Commits form and fill `.github/pull_request_template.md`.
-- After opening or pushing to a PR, dispatch the `pr-reviewer` subagent with the PR number. Its review is the only source of the `agent-review` status; your part is to address its blocking findings with new commits, then dispatch it again on the new head.
+Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), which plans the work in GitHub Issues and dispatches the team defined in `.claude/agents/`: `product-designer` → `architect` → `developer` → `pr-reviewer`. Each agent's file holds its steps and report format; the coordinator's file holds the escalation rules and merge conditions.
+
+- Each PR does one thing, in ≤ 1000 changed lines (excluding `package-lock.json`), passes `make check`, and has a Conventional Commits title.
+- The `agent-review` status comes only from `pr-reviewer`; merges come only from the coordinator, once that status is `success` on the PR's current head SHA.
 
 ## Claude Desktop Integration
 
