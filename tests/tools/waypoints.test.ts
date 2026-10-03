@@ -357,7 +357,7 @@ describe("get_waypoint tool definition", () => {
   it("tells the LLM about the areas section and area_id reuse", () => {
     const tool = waypointToolDefinitions.find((t) => t.name === "get_waypoint");
 
-    expect(tool?.description).toContain("areas");
-    expect(tool?.description).toContain("area_id");
+    expect(tool?.description).toContain("the areas it belongs to");
+    expect(tool?.description).toContain("Area IDs can be passed as area_id to search_routes and search_waypoints");
   });
 });
