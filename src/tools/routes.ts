@@ -3,8 +3,14 @@ import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteSearchResponse, RouteDetail } from "../api/camptocamp.js";
 
 export const searchRoutesSchema = z.object({
-  query: z.string().describe("Search query for routes (e.g. 'Mont Blanc voie normale')"),
+  query: z.string().optional().describe("Search query for routes (e.g. 'Mont Blanc voie normale')"),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
+  area_id: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)"),
 });
 
 export const getRouteSchema = z.object({
@@ -14,12 +20,13 @@ export const getRouteSchema = z.object({
 export type SearchRoutesInput = z.infer<typeof searchRoutesSchema>;
 export type GetRouteInput = z.infer<typeof getRouteSchema>;
 
-function formatRouteSearchResult(response: RouteSearchResponse): string {
+function formatRouteSearchResult(response: RouteSearchResponse, areaId?: number): string {
+  const scope = areaId !== undefined ? ` in area ${areaId}` : "";
   if (response.documents.length === 0) {
-    return "No routes found.";
+    return `No routes found${scope}.`;
   }
 
-  const lines: string[] = [`Found ${response.total} route(s). Showing ${response.documents.length}:\n`];
+  const lines: string[] = [`Found ${response.total} route(s)${scope}. Showing ${response.documents.length}:\n`];
 
   for (const route of response.documents) {
     const locale = route.locales.find((l) => l.lang === "fr") ?? route.locales[0];
@@ -67,8 +74,13 @@ function formatRouteDetail(route: RouteDetail): string {
 }
 
 export async function handleSearchRoutes(input: SearchRoutesInput): Promise<string> {
-  const response = await searchRoutes(input.query, input.limit);
-  return formatRouteSearchResult(response);
+  // A blank query counts as missing: the API treats `q=` like no `q` and returns the whole database.
+  const query = input.query?.trim() ? input.query : undefined;
+  if (query === undefined && input.area_id === undefined) {
+    throw new Error("search_routes needs a query, an area_id, or both. Use search_areas to find an area_id.");
+  }
+  const response = await searchRoutes(query, input.limit, undefined, input.area_id);
+  return formatRouteSearchResult(response, input.area_id);
 }
 
 export async function handleGetRoute(input: GetRouteInput): Promise<string> {
@@ -80,7 +92,7 @@ export const routeToolDefinitions = [
   {
     name: "search_routes",
     description:
-      "Search for mountain routes on Camptocamp.org. Returns a list of matching routes with basic info (ID, title, activities, elevation, rating).",
+      "Search for mountain routes on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching routes with basic info (ID, title, activities, elevation, rating).",
     inputSchema: searchRoutesSchema,
     handler: handleSearchRoutes,
   },

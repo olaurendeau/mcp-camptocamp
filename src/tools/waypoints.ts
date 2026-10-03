@@ -3,8 +3,14 @@ import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointSearchResponse, WaypointDetail } from "../api/camptocamp.js";
 
 export const searchWaypointsSchema = z.object({
-  query: z.string().describe("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')"),
+  query: z.string().optional().describe("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')"),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
+  area_id: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)"),
 });
 
 export const getWaypointSchema = z.object({
@@ -14,12 +20,13 @@ export const getWaypointSchema = z.object({
 export type SearchWaypointsInput = z.infer<typeof searchWaypointsSchema>;
 export type GetWaypointInput = z.infer<typeof getWaypointSchema>;
 
-function formatWaypointSearchResult(response: WaypointSearchResponse): string {
+function formatWaypointSearchResult(response: WaypointSearchResponse, areaId?: number): string {
+  const scope = areaId !== undefined ? ` in area ${areaId}` : "";
   if (response.documents.length === 0) {
-    return "No waypoints found.";
+    return `No waypoints found${scope}.`;
   }
 
-  const lines: string[] = [`Found ${response.total} waypoint(s). Showing ${response.documents.length}:\n`];
+  const lines: string[] = [`Found ${response.total} waypoint(s)${scope}. Showing ${response.documents.length}:\n`];
 
   for (const wp of response.documents) {
     const locale = wp.locales.find((l) => l.lang === "fr") ?? wp.locales[0];
@@ -74,8 +81,13 @@ function formatWaypointDetail(waypoint: WaypointDetail): string {
 }
 
 export async function handleSearchWaypoints(input: SearchWaypointsInput): Promise<string> {
-  const response = await searchWaypoints(input.query, input.limit);
-  return formatWaypointSearchResult(response);
+  // A blank query counts as missing: the API treats `q=` like no `q` and returns the whole database.
+  const query = input.query?.trim() ? input.query : undefined;
+  if (query === undefined && input.area_id === undefined) {
+    throw new Error("search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.");
+  }
+  const response = await searchWaypoints(query, input.limit, undefined, input.area_id);
+  return formatWaypointSearchResult(response, input.area_id);
 }
 
 export async function handleGetWaypoint(input: GetWaypointInput): Promise<string> {
@@ -87,7 +99,7 @@ export const waypointToolDefinitions = [
   {
     name: "search_waypoints",
     description:
-      "Search for waypoints (summits, shelters, huts, bivouacs) on Camptocamp.org. Returns a list of matching waypoints with basic info (ID, title, type, elevation).",
+      "Search for waypoints (summits, shelters, huts, bivouacs) on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching waypoints with basic info (ID, title, type, elevation).",
     inputSchema: searchWaypointsSchema,
     handler: handleSearchWaypoints,
   },

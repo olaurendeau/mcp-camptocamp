@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { handleSearchWaypoints, handleGetWaypoint } from "../../src/tools/waypoints.js";
+import { handleSearchWaypoints, handleGetWaypoint, searchWaypointsSchema } from "../../src/tools/waypoints.js";
 import * as api from "../../src/api/camptocamp.js";
 
 vi.mock("../../src/api/camptocamp.js");
@@ -124,5 +124,123 @@ describe("handleGetWaypoint", () => {
     mockGetWaypoint.mockRejectedValueOnce(new Error("Camptocamp API error: 404"));
 
     await expect(handleGetWaypoint({ id: 999 })).rejects.toThrow("Camptocamp API error: 404");
+  });
+});
+
+describe("handleSearchWaypoints with area_id", () => {
+  it('schema rejects area_id 0, -1, 1.5 and "abc", and accepts 14403', () => {
+    for (const area_id of [0, -1, 1.5, "abc"]) {
+      expect(searchWaypointsSchema.safeParse({ query: "refuge", area_id }).success).toBe(false);
+    }
+    const parsed = searchWaypointsSchema.safeParse({ query: "refuge", area_id: 14403 });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.area_id).toBe(14403);
+  });
+
+  it("schema accepts a missing query and a missing area_id", () => {
+    expect(searchWaypointsSchema.safeParse({ area_id: 14403 }).success).toBe(true);
+    expect(searchWaypointsSchema.safeParse({ query: "refuge" }).success).toBe(true);
+  });
+
+  it("passes query and area_id to the API", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({ total: 0, documents: [] });
+
+    await handleSearchWaypoints({ query: "refuge", limit: 10, area_id: 14403 });
+
+    expect(mockSearchWaypoints).toHaveBeenCalledWith("refuge", 10, undefined, 14403);
+  });
+
+  it("passes an undefined area to the API and keeps today's messages without area_id", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({
+      total: 12,
+      documents: [
+        {
+          document_id: 104143,
+          locales: [{ lang: "fr", title: "Refuge du Glacier Blanc" }],
+          waypoint_type: "hut",
+          elevation: 2542,
+        },
+      ],
+    });
+
+    const result = await handleSearchWaypoints({ query: "x", limit: 10 });
+
+    expect(mockSearchWaypoints).toHaveBeenCalledWith("x", 10, undefined, undefined);
+    expect(result.split("\n")[0]).toBe("Found 12 waypoint(s). Showing 1:");
+
+    mockSearchWaypoints.mockResolvedValueOnce({ total: 0, documents: [] });
+    expect(await handleSearchWaypoints({ query: "x", limit: 10 })).toBe("No waypoints found.");
+  });
+
+  it("scopes the header to the area with area_id", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({
+      total: 37,
+      documents: Array.from({ length: 10 }, () => ({
+        document_id: 104143,
+        locales: [{ lang: "fr", title: "Refuge du Glacier Blanc" }],
+        waypoint_type: "hut",
+        elevation: 2542,
+      })),
+    });
+
+    const result = await handleSearchWaypoints({ query: "refuge", limit: 10, area_id: 14403 });
+
+    expect(result.split("\n")[0]).toBe("Found 37 waypoint(s) in area 14403. Showing 10:");
+    expect(result).toContain("[104143] Refuge du Glacier Blanc (hut) | 2542m");
+    expect(result).not.toContain("undefined");
+  });
+
+  it("scopes the empty message to the area with area_id", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({ total: 0, documents: [] });
+
+    const result = await handleSearchWaypoints({ query: "refuge", limit: 10, area_id: 999999999 });
+
+    expect(result).toBe("No waypoints found in area 999999999.");
+  });
+
+  it("returns exactly the area-scoped empty message for area 14403", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({ total: 0, documents: [] });
+
+    const result = await handleSearchWaypoints({ query: "xyznotfound", limit: 10, area_id: 14403 });
+
+    expect(result).toBe("No waypoints found in area 14403.");
+  });
+
+  it("searches by area_id alone, passing query as undefined", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({
+      total: 37,
+      documents: [
+        {
+          document_id: 104143,
+          locales: [{ lang: "fr", title: "Refuge du Glacier Blanc" }],
+          waypoint_type: "hut",
+          elevation: 2542,
+        },
+      ],
+    });
+
+    const result = await handleSearchWaypoints({ area_id: 14403, limit: 10 });
+
+    expect(mockSearchWaypoints).toHaveBeenCalledWith(undefined, 10, undefined, 14403);
+    expect(result).toContain("in area 14403");
+  });
+
+  it("rejects a call with neither query nor area_id without calling the API", async () => {
+    await expect(handleSearchWaypoints({ limit: 10 })).rejects.toThrow("query, an area_id");
+    expect(mockSearchWaypoints).not.toHaveBeenCalled();
+  });
+
+  it("treats a blank query as missing", async () => {
+    await expect(handleSearchWaypoints({ query: "  ", limit: 10 })).rejects.toThrow("query, an area_id");
+    await expect(handleSearchWaypoints({ query: "", limit: 10 })).rejects.toThrow("query, an area_id");
+    expect(mockSearchWaypoints).not.toHaveBeenCalled();
+  });
+
+  it("drops a blank query when area_id is given", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({ total: 0, documents: [] });
+
+    await handleSearchWaypoints({ query: "  ", limit: 10, area_id: 14403 });
+
+    expect(mockSearchWaypoints).toHaveBeenCalledWith(undefined, 10, undefined, 14403);
   });
 });
