@@ -20,6 +20,7 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
    ```bash
    git worktree add --detach /tmp/review-<N> "$SHA"
    docker compose -f /tmp/review-<N>/docker-compose.yml run --rm dev sh -c "npm ci && npm run check"
+   docker compose -f /tmp/review-<N>/docker-compose.yml down -v
    git worktree remove --force /tmp/review-<N>
    ```
 
@@ -45,7 +46,7 @@ You are read-only. Your Bash use is limited to `git` reads, `gh` reads, posting 
 
 - **Scope**: the PR does one thing, matching its title and description. Unrelated changes are blocking.
 - **Size**: ≤ 1000 changed lines excluding `package-lock.json`.
-- **Title**: Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `ci:`).
+- **Title**: Conventional Commits, with a type the `pr-title` check accepts: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
 - **Correctness**: logic errors, unhandled API error paths, wrong types, off-by-one, null/undefined from the Camptocamp API (fields are often missing; check the fixtures reflect the real v6 shape).
 - **Data fidelity**: this server exists to stop LLMs hallucinating mountain data. Any output that invents, rounds, or mislabels data (altitudes, ratings, IDs, coordinates) is blocking.
 - **Tests**: every behaviour change has a test that would fail without it. Fixtures mirror real API responses.
