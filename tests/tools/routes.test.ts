@@ -314,7 +314,9 @@ describe("handleGetRoute areas", () => {
 
     const lines = result.split("\n");
     const heading = lines.indexOf("## Areas");
-    expect(heading).toBeGreaterThan(lines.indexOf("**Max elevation**: 3769m"));
+    const maxElevation = lines.indexOf("**Max elevation**: 3769m");
+    expect(maxElevation).toBeGreaterThan(-1);
+    expect(heading).toBeGreaterThan(maxElevation);
     expect(lines.slice(heading, heading + 4)).toEqual([
       "## Areas",
       "- [14274] France (country)",
