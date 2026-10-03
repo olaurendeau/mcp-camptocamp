@@ -4,13 +4,19 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { routeToolDefinitions } from "./tools/routes.js";
 import { waypointToolDefinitions } from "./tools/waypoints.js";
 import { outingToolDefinitions } from "./tools/outings.js";
+import { areaToolDefinitions } from "./tools/areas.js";
 
 const server = new McpServer({
   name: "mcp-camptocamp",
   version: "1.0.0",
 });
 
-const allTools = [...routeToolDefinitions, ...waypointToolDefinitions, ...outingToolDefinitions];
+const allTools = [
+  ...routeToolDefinitions,
+  ...waypointToolDefinitions,
+  ...outingToolDefinitions,
+  ...areaToolDefinitions,
+];
 
 for (const tool of allTools) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
