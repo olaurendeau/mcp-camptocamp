@@ -74,7 +74,7 @@ export interface WaypointDetail {
 export async function searchRoutes(
   query: string,
   limit = DEFAULT_LIMIT,
-  lang = DEFAULT_LANG
+  lang = DEFAULT_LANG,
 ): Promise<RouteSearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit), lang });
   const response = await fetch(`${BASE_URL}/routes?${params}`);
@@ -96,7 +96,7 @@ export async function getRoute(id: number, lang = DEFAULT_LANG): Promise<RouteDe
 export async function searchWaypoints(
   query: string,
   limit = DEFAULT_LIMIT,
-  lang = DEFAULT_LANG
+  lang = DEFAULT_LANG,
 ): Promise<WaypointSearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit), lang });
   const response = await fetch(`${BASE_URL}/waypoints?${params}`);
@@ -172,7 +172,7 @@ export interface OutingDetail {
 export async function searchUserOutings(
   userId: number,
   limit = DEFAULT_LIMIT,
-  lang = DEFAULT_LANG
+  lang = DEFAULT_LANG,
 ): Promise<OutingSearchResponse> {
   const params = new URLSearchParams({ u: String(userId), limit: String(limit), lang });
   const response = await fetch(`${BASE_URL}/outings?${params}`);
