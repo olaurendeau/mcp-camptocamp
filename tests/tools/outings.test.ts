@@ -968,7 +968,13 @@ describe("handleSearchUserOutings", () => {
     expect(Object.keys(searchUserOutingsSchema.shape).sort()).toEqual(["limit", "offset", "user_id"]);
     expect(searchUserOutingsSchema.parse({ user_id: 430052 })).toEqual({ user_id: 430052, limit: 10, offset: 0 });
     expect(searchUserOutingsSchema.safeParse({ user_id: 430052, offset: -1 }).success).toBe(false);
-    expect(searchUserOutingsSchema.safeParse({ query: "x" }).success).toBe(false);
+    expect(searchUserOutingsSchema.safeParse({ limit: 10 }).success).toBe(false);
+    // Other search_outings filters are not part of the alias: they are dropped, never sent.
+    expect(searchUserOutingsSchema.parse({ user_id: 430052, query: "x", area_id: 14403 })).toEqual({
+      user_id: 430052,
+      limit: 10,
+      offset: 0,
+    });
   });
 });
 

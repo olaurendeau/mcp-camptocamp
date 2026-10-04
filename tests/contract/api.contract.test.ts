@@ -32,6 +32,15 @@ interface Search {
 // Author line everywhere: documents that carry an author must keep it after parsing.
 const AUTHOR = { name: expect.any(String), user_id: expect.any(Number) };
 
+// Whether the dates start → end (YYYY-MM-DD) cover at least one day of June in some year.
+function overlapsJune(start: string, end: string): boolean {
+  const years = Number(end.slice(0, 4)) - Number(start.slice(0, 4));
+  const [startDay, endDay] = [start.slice(5), end.slice(5)];
+  if (years > 1) return true;
+  if (years === 1) return startDay <= "06-30" || endDay >= "06-01";
+  return start !== "" && startDay <= "06-30" && endDay >= "06-01";
+}
+
 // Shape beyond what the schemas already enforce: a search found something and each document has a locale.
 function expectNonEmptySearch(result: Search): void {
   expect(result.documents.length).toBeGreaterThan(0);
@@ -97,16 +106,15 @@ describe("searches (AC8.2, AC8.3)", () => {
   });
 
   // `period=2020-06-01,2020-06-30`: the same days in every year.
-  it("outings at waypoint 37916 in the period 06-01 → 06-30, all in June", async () => {
+  // An outing may start or end outside June (05-30 → 06-02): it only has to overlap a June.
+  it("outings at waypoint 37916 in the period 06-01 → 06-30, each overlapping June", async () => {
     const result = await searchOutings({ waypoint_id: 37916, period: { start: "06-01", end: "06-30" } });
 
     expectNonEmptySearch(result);
     for (const outing of result.documents) {
-      const dates = [outing.date_start, outing.date_end];
-      expect(
-        dates.map((date) => date?.slice(5, 7)),
-        `outing ${outing.document_id} (${dates.join(" → ")})`,
-      ).toEqual(["06", "06"]);
+      const start = outing.date_start ?? outing.date_end ?? "";
+      const end = outing.date_end ?? outing.date_start ?? "";
+      expect(overlapsJune(start, end), `outing ${outing.document_id} (${start} → ${end})`).toBe(true);
     }
   });
 

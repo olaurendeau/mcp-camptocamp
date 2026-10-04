@@ -83,12 +83,10 @@ export const searchOutingsSchema = z.object({
   offset: searchOffset(),
 });
 
-// search_user_outings: the user_id, limit and offset of search_outings, nothing else.
-export const searchUserOutingsSchema = z.object({
-  user_id: documentId("Camptocamp user ID of the outings' author (the number in their profile URL)"),
-  limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
-  offset: searchOffset(),
-});
+// search_user_outings: the user_id (required here), limit and offset of search_outings, nothing else.
+export const searchUserOutingsSchema = searchOutingsSchema
+  .pick({ user_id: true, limit: true, offset: true })
+  .required({ user_id: true });
 
 export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
 export type GetOutingInput = z.infer<typeof getOutingSchema>;
