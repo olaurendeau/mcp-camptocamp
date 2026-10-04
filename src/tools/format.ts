@@ -1,15 +1,7 @@
-// Formatting helpers shared by the tool handlers. Parameter types are structural, so any response
-// shape with the fields a helper reads (search result, detail, association) can be passed.
-
-interface Locale {
-  lang: string;
-  title: string;
-}
-
-interface TitledDocument {
-  document_id: number;
-  locales: Locale[];
-}
+// Formatting helpers shared by the tool handlers. Parameter types come from the shared response
+// schemas and are structural, so any response shape with the fields a helper reads (search result,
+// detail, association) can be passed.
+import type { AreaSummary, Locale, RouteAssociation, TitledAssociation, WaypointAssociation } from "../api/schemas.js";
 
 // The API's own fallback order for `pl=fr` (route 675555 has [it, en] and a `pl=fr` search returns en).
 const LANG_ORDER = ["fr", "en", "it", "de", "es", "ca", "eu", "sl", "zh"];
@@ -36,32 +28,27 @@ export function formatHeader(title: string, documentId: number): string {
   return `# ${title} (ID: ${documentId})`;
 }
 
-export function formatRouteLine(route: {
-  document_id: number;
-  locales: Array<Locale & { title_prefix?: string | null }>;
-}): string {
+export function formatRouteLine(route: RouteAssociation): string {
   const title = pickTitle(route.locales);
   const prefix = pickLocale(route.locales)?.title_prefix;
   const name = prefix ? `${prefix} : ${title}` : title;
   return `- [${route.document_id}] ${name}`;
 }
 
-export function formatWaypointLine(
-  waypoint: TitledDocument & { waypoint_type: string; elevation?: number | null },
-): string {
+export function formatWaypointLine(waypoint: WaypointAssociation): string {
   const elevation = waypoint.elevation != null ? ` | ${waypoint.elevation}m` : "";
   return `- [${waypoint.document_id}] ${pickTitle(waypoint.locales)} (${waypoint.waypoint_type})${elevation}`;
 }
 
-export function formatTitledLine(document: TitledDocument): string {
+export function formatTitledLine(document: TitledAssociation): string {
   return `- [${document.document_id}] ${pickTitle(document.locales)}`;
 }
 
-export function formatAreaLine(area: TitledDocument & { area_type: string }): string {
+export function formatAreaLine(area: AreaSummary): string {
   return `- [${area.document_id}] ${pickTitle(area.locales)} (${area.area_type})`;
 }
 
-export function formatAreasSection(areas?: Array<TitledDocument & { area_type: string }> | null): string[] {
+export function formatAreasSection(areas?: AreaSummary[] | null): string[] {
   if (!areas || areas.length === 0) return [];
   return ["\n## Areas", ...areas.map(formatAreaLine)];
 }

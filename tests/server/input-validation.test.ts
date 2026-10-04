@@ -165,3 +165,116 @@ describe("search query inputs", () => {
     expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.has("q")).toBe(false);
   });
 });
+
+const OUTING_ACTIVITY_LIST =
+  "skitouring, snow_ice_mixed, mountain_climbing, rock_climbing, ice_climbing, hiking, snowshoeing, paragliding, mountain_biking, via_ferrata, slacklining";
+
+// D2: the SDK reports search_outings field rules, naming the field.
+describe("search_outings field inputs", () => {
+  it.each<[string, Record<string, unknown>, string, string]>([
+    [
+      "a date that does not exist",
+      { date_from: "2026-02-30" },
+      "date_from",
+      "must be a real date in YYYY-MM-DD format",
+    ],
+    ["a malformed date", { date_to: "2026-9-1" }, "date_to", "must be a real date in YYYY-MM-DD format"],
+    ["an unknown activity", { activity: "skiing" }, "activity", `must be one of: ${OUTING_ACTIVITY_LIST}`],
+  ])("rejects %s with the field and the rule", async (_label, args, field, message) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_outings", arguments: args });
+
+    expect(result.isError).toBe(true);
+    const text = resultText(result);
+    expect(text).toContain("Invalid arguments for tool search_outings");
+    expect(text).toContain(`"${field}"`);
+    expect(text).toContain(message);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, Record<string, unknown>, string]>([
+    ["limit 0", { limit: 0 }, "limit"],
+    ["limit 51", { limit: 51 }, "limit"],
+    ["a negative offset", { offset: -1 }, "offset"],
+    ["a non-integer offset", { offset: 1.5 }, "offset"],
+    ["a negative route_id", { route_id: -1 }, "route_id"],
+    ["a non-integer area_id", { area_id: 1.5 }, "area_id"],
+  ])("rejects %s naming the field without calling Camptocamp", async (_label, args, field) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_outings", arguments: args });
+
+    expect(result.isError).toBe(true);
+    const text = resultText(result);
+    expect(text).toContain("Invalid arguments for tool search_outings");
+    expect(text).toContain(`"${field}"`);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("applies the default limit and offset before searching", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_outings", arguments: {} });
+
+    expect(resultText(result)).toBe("No outings found.");
+    const params = new URL(String(fetchMock.mock.calls[0][0])).searchParams;
+    expect(params.get("limit")).toBe("10");
+    expect(params.get("offset")).toBe("0");
+  });
+});
+
+// AC5.5: rules across several fields keep their exact messages through MCP.
+describe("cross-field rules", () => {
+  it.each<[string, string, Record<string, unknown>, string]>([
+    [
+      "search_outings",
+      "a reversed date range",
+      { date_from: "2026-09-30", date_to: "2026-09-01" },
+      "Error: date_from (2026-09-30) must be on or before date_to (2026-09-01).",
+    ],
+    [
+      "search_outings",
+      "offset + limit above 10,000",
+      { offset: 9995, limit: 10 },
+      "Error: offset + limit must not exceed 10000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.",
+    ],
+    [
+      "search_routes",
+      "neither query nor area_id",
+      {},
+      "Error: search_routes needs a query, an area_id, or both. Use search_areas to find an area_id.",
+    ],
+    [
+      "search_waypoints",
+      "neither query nor area_id",
+      {},
+      "Error: search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.",
+    ],
+  ])("%s rejects %s with its message", async (tool, _label, args, message) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: tool, arguments: args });
+
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe(message);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ["offset + limit of exactly 10,000", { offset: 9990, limit: 10 }],
+    ["equal date_from and date_to", { date_from: "2026-08-10", date_to: "2026-08-10" }],
+  ])("search_outings accepts %s", async (_label, args) => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_outings", arguments: args });
+
+    expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});

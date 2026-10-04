@@ -77,9 +77,9 @@ export const searchOutingsSchema = z.object({
 
 export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
 export type GetOutingInput = z.infer<typeof getOutingSchema>;
-export type SearchOutingsInput = z.input<typeof searchOutingsSchema>;
+export type SearchOutingsInput = z.infer<typeof searchOutingsSchema>;
 
-function formatDateRange(dateStart?: string, dateEnd?: string): string {
+function formatDateRange(dateStart?: string | null, dateEnd?: string | null): string {
   if (!dateStart) return "";
   if (!dateEnd || dateStart === dateEnd) return dateStart;
   return `${dateStart} → ${dateEnd}`;
@@ -195,7 +195,7 @@ function formatOutingLine(outing: OutingListItem): string {
     if (isPresent(value)) parts.push(`${label}${value}${unit}`);
   };
 
-  push("", formatDateRange(outing.date_start ?? undefined, outing.date_end ?? undefined));
+  push("", formatDateRange(outing.date_start, outing.date_end));
   push("Conditions: ", outing.condition_rating);
   push("Max elevation: ", outing.elevation_max, "m");
   push("Elevation gain: ", outing.height_diff_up, "m");
@@ -232,14 +232,9 @@ function formatOutingList(response: OutingListResponse, params: OutingSearchPara
   return lines.join("\n");
 }
 
+// The SDK has already validated `input` against searchOutingsSchema and applied its defaults.
 export async function handleSearchOutings(input: SearchOutingsInput): Promise<string> {
-  const parsed = searchOutingsSchema.safeParse(input);
-  if (!parsed.success) {
-    const issues = parsed.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`);
-    throw new Error(`Invalid search_outings input: ${[...new Set(issues)].join("; ")}`);
-  }
-
-  const { query, ...rest } = parsed.data;
+  const { query, ...rest } = input;
   // A blank query counts as missing: the API treats `q=` like no `q` and returns every outing.
   const params: OutingSearchParams = query?.trim() ? { query, ...rest } : rest;
 
