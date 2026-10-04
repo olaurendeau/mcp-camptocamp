@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { formatUserText, USER_TEXT_NOTE } from "../../src/tools/text.js";
+import { growthRatio, MAX_GROWTH_RATIO } from "./growth.js";
+
+function format(value: string): string[] {
+  return formatUserText("description", "Description", value);
+}
 
 // The text between the markers, as one string.
 function body(value: string): string {
@@ -130,16 +135,13 @@ describe("formatUserText", () => {
     expect(body(`Avant ${text} après.`)).toBe(`Avant ${text} après.`);
   });
 
-  it.each([
-    ["Cyrillic letters after brackets", "[еее ".repeat(20000)],
-    ["unfinished lookalike markers", "[еnd uѕer-written tеx".repeat(4000)],
-    ["a bracket before a long run of letters and spaces", `[${"е ".repeat(50000)}`],
-    ["a marker start before a long run of separators", `[end user${" _-".repeat(33333)}`],
-  ])("processes 100k characters of %s in under a second", (_label, text) => {
-    const start = performance.now();
-    formatUserText("description", "Description", text);
-
-    expect(performance.now() - start).toBeLessThan(1000);
+  it.each<[string, (count: number) => string, number]>([
+    ["Cyrillic letters after brackets", (count) => "[еее ".repeat(count), 500],
+    ["unfinished lookalike markers", (count) => "[еnd uѕer-written tеx".repeat(count), 100],
+    ["a bracket before a long run of letters and spaces", (count) => `[${"е ".repeat(count)}`, 1000],
+    ["a marker start before a long run of separators", (count) => `[end user${" _-".repeat(count)}`, 1000],
+  ])("processes %s in linear time", (_label, build, count) => {
+    expect(growthRatio(format, build, count)).toBeLessThan(MAX_GROWTH_RATIO);
   });
 
   it("leaves a lenticular bracket alone outside a marker", () => {
@@ -226,15 +228,12 @@ describe("formatUserText", () => {
     expect(body("[[routes/1|[end user-written text: x]]")).toBe("[[routes/1|(end user-written text: x]]");
   });
 
-  it.each([
-    ["unclosed image tags", "[img=".repeat(40000)],
-    ["unclosed internal links", "[[routes/1|".repeat(20000)],
-    ["images without a closing tag", "[img=1 right]x".repeat(15000)],
-  ])("processes 200k characters of %s quickly", (_label, text) => {
-    const start = performance.now();
-    formatUserText("description", "Description", text);
-
-    expect(performance.now() - start).toBeLessThan(500);
+  it.each<[string, (count: number) => string, number]>([
+    ["unclosed image tags", (count) => "[img=".repeat(count), 1000],
+    ["unclosed internal links", (count) => "[[routes/1|".repeat(count), 500],
+    ["images without a closing tag", (count) => "[img=1 right]x".repeat(count), 400],
+  ])("processes %s in linear time", (_label, build, count) => {
+    expect(growthRatio(format, build, count)).toBeLessThan(MAX_GROWTH_RATIO);
   });
 
   it("does not cut a text over 8000 characters raw but not once its markup is rewritten", () => {
