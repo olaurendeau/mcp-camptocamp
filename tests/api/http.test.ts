@@ -238,16 +238,19 @@ const MiB = 1024 * 1024;
 const TOO_LARGE = new Error("Camptocamp API error: response too large (over 10 MiB)");
 
 /** A body that produces nothing until read: a pull spy shows whether it was read. */
-function lazyBody(pull: (controller: ReadableStreamDefaultController<Uint8Array>) => void) {
+function lazyBody(
+  pull: (controller: ReadableStreamDefaultController<Uint8Array>) => void,
+  cancel: () => Promise<void> = () => Promise.resolve(),
+) {
   const pullSpy = vi.fn(pull);
-  const cancelSpy = vi.fn();
+  const cancelSpy = vi.fn(cancel);
   // highWaterMark 0: the stream does not pull ahead on its own, only when the reader asks
   const stream = new ReadableStream<Uint8Array>({ pull: pullSpy, cancel: cancelSpy }, { highWaterMark: 0 });
   return { stream, pullSpy, cancelSpy };
 }
 
 /** A 20 MiB body streamed lazily in 1 MiB chunks, like a gzip/chunked response without Content-Length. */
-function twentyMiBInChunks() {
+function twentyMiBInChunks(cancel?: () => Promise<void>) {
   let sent = 0;
   return lazyBody((controller) => {
     if (sent === 20) {
@@ -256,8 +259,11 @@ function twentyMiBInChunks() {
     }
     sent += 1;
     controller.enqueue(new Uint8Array(MiB).fill(0x20));
-  });
+  }, cancel);
 }
+
+/** A cancel that fails, like a connection already torn down: cancel() then rejects with this error. */
+const failingCancel = () => Promise.reject(new Error("socket hang up"));
 
 /** A JSON body of exactly `bytes` bytes: {"x":"aaa…"}. */
 function jsonOfSize(bytes: number): string {
@@ -279,6 +285,28 @@ describe("getJson response size cap", () => {
 
   it("rejects a streamed body without Content-Length once it goes over 10 MiB and cancels the reader", async () => {
     const { stream, pullSpy, cancelSpy } = twentyMiBInChunks();
+    mockFetch.mockResolvedValueOnce(new Response(stream, { status: 200, statusText: "OK" }));
+
+    await expect(getJson({ path: "/areas/14067", schema: anySchema })).rejects.toThrow(TOO_LARGE);
+
+    expect(pullSpy).toHaveBeenCalledTimes(11);
+    expect(cancelSpy).toHaveBeenCalledOnce();
+  });
+
+  it("still says too large when cancelling a body refused by its Content-Length fails", async () => {
+    const { stream, pullSpy, cancelSpy } = lazyBody((controller) => controller.close(), failingCancel);
+    mockFetch.mockResolvedValueOnce(
+      new Response(stream, { status: 200, statusText: "OK", headers: { "Content-Length": String(20 * MiB) } }),
+    );
+
+    await expect(getJson({ path: "/areas/14067", schema: anySchema })).rejects.toThrow(TOO_LARGE);
+
+    expect(pullSpy).not.toHaveBeenCalled();
+    expect(cancelSpy).toHaveBeenCalledOnce();
+  });
+
+  it("still says too large when cancelling a streamed body over 10 MiB fails", async () => {
+    const { stream, pullSpy, cancelSpy } = twentyMiBInChunks(failingCancel);
     mockFetch.mockResolvedValueOnce(new Response(stream, { status: 200, statusText: "OK" }));
 
     await expect(getJson({ path: "/areas/14067", schema: anySchema })).rejects.toThrow(TOO_LARGE);
