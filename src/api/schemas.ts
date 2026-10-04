@@ -205,8 +205,8 @@ export const waypointDetailSchema = z.object({
   url: z.string().nullish(),
   geometry: z.object({ geom: z.string().nullish() }).nullish(), // GeoJSON Point as a string
   areas: z.array(areaSummarySchema).nullish(),
-  // routes, waypoints, waypoint_children, articles, images and xreports are not read: all_routes is the list
-  // Camptocamp shows on the waypoint's page (hut 104151 has 27 there and an empty routes list).
+  // waypoints, waypoint_children, articles, images and xreports are not read. all_routes is the list Camptocamp
+  // shows on the waypoint's page (27 for hut 104151); the response has no routes key.
   associations: z
     .object({
       all_routes: routeSearchResponseSchema.nullish(), // shaped like /routes search results, with their total
