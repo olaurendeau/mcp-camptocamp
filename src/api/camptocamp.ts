@@ -50,8 +50,52 @@ interface KeywordOrAreaSearchOptions {
   area_id?: number;
   limit?: number; // default DEFAULT_LIMIT
 }
-export type RouteSearchOptions = KeywordOrAreaSearchOptions;
 export type WaypointSearchOptions = KeywordOrAreaSearchOptions;
+
+// The 20 route rating systems (Labande counts as two), with the search parameter of each, from
+// c2corg v6_api's route search mapping. Each takes a `min,max` range of values from the system's scale.
+export const ROUTE_RATING_PARAMS = {
+  ski_rating: "trat",
+  global_rating: "grat",
+  labande_global_rating: "lrat",
+  labande_ski_rating: "srat",
+  ski_exposition: "sexpo",
+  engagement_rating: "erat",
+  risk_rating: "orrat",
+  equipment_rating: "prat",
+  ice_rating: "irat",
+  mixed_rating: "mrat",
+  exposition_rock_rating: "rexpo",
+  rock_free_rating: "frat",
+  rock_required_rating: "rrat",
+  aid_rating: "arat",
+  via_ferrata_rating: "krat",
+  hiking_rating: "hrat",
+  hiking_mtb_exposition: "hexpo",
+  snowshoe_rating: "wrat",
+  mtb_up_rating: "mbur",
+  mtb_down_rating: "mbdr",
+} as const;
+export type RouteRatingField = keyof typeof ROUTE_RATING_PARAMS;
+export const ROUTE_RATING_FIELDS = Object.keys(ROUTE_RATING_PARAMS) as RouteRatingField[];
+
+export interface RouteSearchOptions extends KeywordOrAreaSearchOptions {
+  waypoint_id?: number;
+  activity?: string;
+  rating?: { system: RouteRatingField; min?: string; max?: string };
+  height_diff_up?: { min?: number; max?: number };
+  route_types?: string[];
+  configuration?: string[];
+  offset?: number;
+}
+
+// Range filters: `x=min,max`; `x=min` keeps every value from min up and `x=,max` every value up to
+// max (checked live: `trat=3.1` matches `3.1,5.6`, `trat=,3.1` matches `1.1,3.1`).
+function rangeParam(min?: string | number, max?: string | number): string | undefined {
+  if (min === undefined && max === undefined) return undefined;
+  if (max === undefined) return String(min);
+  return `${min ?? ""},${max}`;
+}
 
 function keywordOrAreaParams(options: KeywordOrAreaSearchOptions): URLSearchParams {
   const params = new URLSearchParams();
@@ -75,7 +119,19 @@ function keywordParams(options: KeywordSearchOptions): URLSearchParams {
 }
 
 export async function searchRoutes(options: RouteSearchOptions): Promise<RouteSearchResponse> {
-  return getJson<RouteSearchResponse>({ path: "/routes", params: keywordOrAreaParams(options) });
+  const params = keywordOrAreaParams(options);
+  if (options.waypoint_id !== undefined) params.set("w", String(options.waypoint_id));
+  if (options.activity !== undefined) params.set("act", options.activity);
+  if (options.rating !== undefined) {
+    const range = rangeParam(options.rating.min, options.rating.max);
+    if (range !== undefined) params.set(ROUTE_RATING_PARAMS[options.rating.system], range);
+  }
+  const heightDiffUp = rangeParam(options.height_diff_up?.min, options.height_diff_up?.max);
+  if (heightDiffUp !== undefined) params.set("hdif", heightDiffUp);
+  if (options.route_types?.length) params.set("rtyp", options.route_types.join(","));
+  if (options.configuration?.length) params.set("conf", options.configuration.join(","));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  return getJson<RouteSearchResponse>({ path: "/routes", params });
 }
 
 export async function getRoute(id: number): Promise<RouteDetail> {
