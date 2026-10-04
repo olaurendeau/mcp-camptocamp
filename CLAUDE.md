@@ -14,6 +14,7 @@ src/
 ├── api/
 │   └── camptocamp.ts     # Camptocamp API v6 client (fetch wrapper, typed responses)
 └── tools/
+    ├── enums.ts          # Camptocamp's closed value lists (CUSTODIANSHIPS: hut custodianship meanings)
     ├── format.ts         # Shared formatting helpers: locales, headers, document lines, dates, isPresent (0 and false are printed)
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY), shared by every route/outing line
     ├── routes.ts         # Tools: search_routes, get_route
@@ -97,7 +98,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `search_routes`       | Search by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, gain, ratings |
 | `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas) |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
-| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
+| `get_waypoint`        | Waypoint by ID (altitude, GPS, areas; huts: capacity, custodianship, phones, website, access period) |
 | `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings        |
 | `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings) |
 | `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged |

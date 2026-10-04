@@ -4,6 +4,7 @@ import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointSearchResponse, WaypointDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, isPresent, formatHeader, formatWaypointLine, formatAreasSection } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
+import { CUSTODIANSHIPS } from "./enums.js";
 
 export const searchWaypointsSchema = z.object({
   query: searchQuery("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')", {
@@ -48,6 +49,28 @@ function parseCoordinates(geom?: string | null): { lat: number; lng: number } | 
   }
 }
 
+// On a hut, capacity counts the unstaffed places (the winter room) and capacity_staffed the places when
+// wardened; on other types (bivouac, gîte…) capacity is just the number of places.
+function formatHutLines(waypoint: WaypointDetail): string[] {
+  const capacityLabel = waypoint.waypoint_type === "hut" ? "Capacity (unstaffed)" : "Capacity";
+  const fields: Array<[string, string | number | null | undefined]> = [
+    [capacityLabel, waypoint.capacity],
+    ["Capacity (staffed)", waypoint.capacity_staffed],
+    ["Custodianship", waypoint.custodianship],
+    ["Phone", waypoint.phone],
+    ["Custodian's phone", waypoint.phone_custodian],
+    ["Website", waypoint.url],
+  ];
+  return fields.filter(([, value]) => isPresent(value)).map(([label, value]) => `**${label}**: ${value}`);
+}
+
+const CUSTODIANSHIP_NOTE =
+  "Custodianship is one of: " +
+  Object.entries(CUSTODIANSHIPS)
+    .map(([value, meaning]) => `${value} (${meaning})`)
+    .join(", ") +
+  "; any other value is printed as Camptocamp sends it.";
+
 function formatWaypointDetail(waypoint: WaypointDetail): string {
   const locale = pickLocale(waypoint.locales);
   const lines: string[] = [];
@@ -62,10 +85,14 @@ function formatWaypointDetail(waypoint: WaypointDetail): string {
     lines.push(`**Coordinates**: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`);
   }
 
+  lines.push(...formatHutLines(waypoint));
+
   lines.push(...formatAreasSection(waypoint.areas));
 
+  lines.push(...formatUserText("summary", "Summary", locale?.summary));
   lines.push(...formatUserText("description", "Description", locale?.description));
   lines.push(...formatUserText("access", "Access", locale?.access));
+  lines.push(...formatUserText("access_period", "Access period", locale?.access_period));
 
   return lines.join("\n");
 }
@@ -98,7 +125,9 @@ export const waypointToolDefinitions = [
     name: "get_waypoint",
     title: "Get waypoint details",
     description:
-      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, description, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, hut capacity (unstaffed and staffed), custodianship, phones and website, summary, description, access, access period (free text, as written), and the areas it belongs to (range, admin_limits, country). " +
+      CUSTODIANSHIP_NOTE +
+      " Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,
     inputSchema: getWaypointSchema,
     handler: handleGetWaypoint,
