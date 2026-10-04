@@ -25,8 +25,12 @@ export function joinList(values?: string[] | null): string | undefined {
   return values && values.length > 0 ? values.join(", ") : undefined;
 }
 
-export function formatHeader(title: string, documentId: number): string {
-  return `# ${title} (ID: ${documentId})`;
+const SITE_URL = "https://www.camptocamp.org";
+
+// The heading and, on the next line, the document's page on camptocamp.org, where `path` is the
+// document type segment of the URL (routes, waypoints, outings, areas, books, articles).
+export function formatHeader(title: string, documentId: number, path: string): string[] {
+  return [`# ${title} (ID: ${documentId})`, `**URL**: ${SITE_URL}/${path}/${documentId}`];
 }
 
 // A route's name as Camptocamp shows it: "<summit> : <title>". Both parts are trimmed, so a blank

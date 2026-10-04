@@ -34,7 +34,7 @@ function formatAreaDetail(area: AreaDetail): string {
   const locale = pickLocale(area.locales);
   const lines: string[] = [];
 
-  lines.push(formatHeader(pickTitle(area.locales), area.document_id));
+  lines.push(...formatHeader(pickTitle(area.locales), area.document_id, "areas"));
   lines.push(`\n**Type**: ${area.area_type}`);
 
   if (locale?.summary) {
@@ -71,7 +71,7 @@ export const areaToolDefinitions = [
     name: "get_area",
     title: "Get area details",
     description:
-      "Get a Camptocamp.org area by ID: title, type, summary and description as published (Camptocamp markup included). No geometry, no route count; use search_routes / search_waypoints with area_id for those.",
+      "Get a Camptocamp.org area by ID: title, type, summary and description as published (Camptocamp markup included). No geometry, no route count; use search_routes / search_waypoints with area_id for those. The second line is the document's camptocamp.org URL, to cite as the source.",
     inputSchema: getAreaSchema,
     handler: handleGetArea,
   },

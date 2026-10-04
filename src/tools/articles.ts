@@ -49,7 +49,7 @@ function formatArticleSearchResult(response: ArticleSearchResponse): string {
 
 function formatArticleDetail(article: ArticleDetail): string {
   const locale = pickLocale(article.locales);
-  const lines: string[] = [formatHeader(pickTitle(article.locales), article.document_id)];
+  const lines: string[] = formatHeader(pickTitle(article.locales), article.document_id, "articles");
 
   // A collab article has many editors, so its creator is not labelled as the author (#11, D3).
   const authorLabel = article.article_type === "personal" ? "Author" : "Created by";
@@ -125,7 +125,7 @@ export const articleToolDefinitions = [
     name: "get_article",
     title: "Get article details",
     description:
-      "Get a Camptocamp.org article by ID: full text (Camptocamp markup kept as is), summary, author, type (collab/personal), categories, activities, quality, and the IDs of associated routes, waypoints, articles, outings and books, which can be followed with get_route, get_waypoint, get_article, get_outing and get_book. The Language line gives the language of the returned text (fr when available, otherwise another locale).",
+      "Get a Camptocamp.org article by ID: full text (Camptocamp markup kept as is), summary, author, type (collab/personal), categories, activities, quality, and the IDs of associated routes, waypoints, articles, outings and books, which can be followed with get_route, get_waypoint, get_article, get_outing and get_book. The Language line gives the language of the returned text (fr when available, otherwise another locale). The second line is the document's camptocamp.org URL, to cite as the source.",
     inputSchema: getArticleSchema,
     handler: handleGetArticle,
   },

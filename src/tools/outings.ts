@@ -112,7 +112,7 @@ function formatOutingDetail(outing: OutingDetail): string {
   const locale = pickLocale(outing.locales);
   const lines: string[] = [];
 
-  lines.push(formatHeader(pickTitle(outing.locales), outing.document_id));
+  lines.push(...formatHeader(pickTitle(outing.locales), outing.document_id, "outings"));
 
   if (outing.author) {
     lines.push(`**Author**: ${outing.author.name} (user ID: ${outing.author.user_id})`);
@@ -274,7 +274,7 @@ export const outingToolDefinitions = [
     name: "get_outing",
     title: "Get outing details",
     description:
-      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including description, conditions, weather, participants, and associated routes (named '<summit> : <route title>').",
+      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including description, conditions, weather, participants, and associated routes (named '<summit> : <route title>'). The second line is the document's camptocamp.org URL, to cite as the source.",
     inputSchema: getOutingSchema,
     handler: handleGetOuting,
   },
