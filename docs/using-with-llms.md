@@ -131,7 +131,7 @@ More: search_outings with waypoint_id=104059
 
 Copy the hut facts as they are written:
 
-- `**Capacity (unstaffed)**` is the number of places outside the wardened period, `**Capacity (staffed)**` the number when the hut is wardened. A bivouac has a single `**Capacity**` line.
+- In this output, `**Capacity (unstaffed)**: 18` is the number of places outside the wardened period, and `**Capacity (staffed)**: 84` the number when the hut is wardened. On a bivouac, the first of these lines is labelled `**Capacity**` instead.
 - `**Custodianship**` is a code, copied verbatim. Its meanings, from the tool description: `accessible_when_wardened` (wardened, closed outside the wardened period), `always_accessible` (always open, wardened or not), `key_needed` (a key is needed to open it), `no_warden` (not wardened). Any other value is printed as Camptocamp sends it.
 - The access period is free text written by a Camptocamp user, not a pair of dates. Quote it, give its source, and tell the user to check with the hut before relying on it.
 
@@ -158,7 +158,7 @@ Then `get_outing {id: 1912989}` gives the conditions, weather and timing its aut
 
 `search_books` matches its `query` against book titles only: a search by author or ISBN is unreliable. Filter with `book_type: "topo"` (guidebooks) and an `activity`.
 
-`search_books {query: "vanoise", book_type: "topo", activity: "skitouring", limit: 2}`, captured from v1.3.0 on 2026-10-05:
+`search_books {query: "vanoise", book_type: "topo", activity: "skitouring", limit: 3}`, captured from v1.3.0 on 2026-10-05:
 
 ```text
 Found 3 book(s). Showing 2 from offset 0:
@@ -169,6 +169,8 @@ Filters: query "vanoise", book type topo, activity skitouring
 
 Next page: offset=2
 ```
+
+Here Camptocamp returned 2 books for `limit: 3`, out of 3 matches. The footer still gives the offset to continue from.
 
 `get_book {id: 1520795}` then lists the routes, waypoints and articles the book covers. `get_route` and `get_waypoint` also list the books that cover a route or a waypoint.
 
@@ -483,7 +485,7 @@ Descriptions, remarks, conditions, weather, access and other free text are writt
 
 ### Paging
 
-Every search tool takes `limit` (1 to 50, default 10) and `offset` (default 0). The output starts with `Found <total> <kind>(s). Showing <n> from offset <offset>:` and a `Filters:` line that repeats the filters applied. When more results follow, it ends with:
+Every search tool takes `limit` (1 to 50, default 10) and `offset` (default 0). The output starts with `Found <total> <kind>(s). Showing <n> from offset <offset>:`, which `search_outings` and `search_user_outings` print as `Found <total> outing(s), most recent first. Showing <n> from offset <offset>:`, and a `Filters:` line that repeats the filters applied. When more results follow, it ends with:
 
 - `Next page: offset=N`: call again with `offset: N` and the same filters;
 - `Next page: offset=N (limit at most M)` near the end of the window: call again with `offset: N` and a `limit` of M or less;
