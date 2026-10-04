@@ -2,7 +2,7 @@
 
 Start the server from your own agent code. Each SDK below can launch a local MCP server as a subprocess and talk to it over stdio, which is the only transport this server has.
 
-Each example is the vendor's own minimal stdio example, with its source linked. Under each one, **Changes from the source** lists every line we changed, apart from quotes, commas and line breaks in the JavaScript examples, which this repository's formatter (Prettier) normalises. Where the vendor calls MCP support experimental, so does this page.
+Each example is the vendor's own minimal stdio example, with its source linked. Under each one, **Changes from the source** lists every line we changed or removed, apart from formatting: quotes, commas, spacing and line breaks in the JavaScript examples, which this repository's formatter (Prettier) normalises. Where the vendor calls MCP support experimental, so does this page.
 
 ## Before you start
 
@@ -38,7 +38,7 @@ async with MCPServerStdio(
 
 Changes from the source:
 
-- `name`, `command` and `args` start this server instead of the filesystem server; the `pathlib` import and `samples_dir` it needed are gone.
+- `name`, `command` and `args` start this server instead of the filesystem server; the `pathlib` import and the `current_dir = Path(__file__).parent` and `samples_dir` lines it needed are gone.
 - `require_approval="never"` is added (see below).
 - `instructions` and the question passed to `Runner.run` are ours.
 
@@ -146,6 +146,7 @@ if __name__ == "__main__":
 Changes from the source:
 
 - `command` and `args` start this server instead of the example's Python weather server; the `pathlib` import and `cwd` it needed are gone.
+- The comment above `server_params`, which described the weather server, is gone.
 - The agent's variable name, `name`, `instructions` and the `inputs` question are ours.
 - The source also registers a local `get_location` function and asks for a `WeatherResult` output format (and prints it as `output_as_model`). Both belong to its weather demo, not to MCP, so they are gone, with the `random` and `BaseModel` imports they used. `output_format` is optional in `RunContext`.
 
@@ -197,7 +198,7 @@ asyncio.run(run())
 Changes from the source:
 
 - `args` starts this server instead of the weather server.
-- The prompt is ours; the `datetime` import it used is gone.
+- The prompt is ours; the comment above it, which described the weather prompt, and the `datetime` import it used are gone.
 - `system_instruction` is added to `GenerateContentConfig`, the field the same README uses for system instructions.
 
 The example also needs the `mcp` package.
