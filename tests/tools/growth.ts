@@ -10,6 +10,8 @@ export const MAX_GROWTH_RATIO = 8;
 // overhead do not distort the ratio.
 const MIN_SMALL_MS = 5;
 const MAX_DOUBLINGS = 8;
+// Runs per doubling step: a single slow run must not stop the doubling while the input is still short.
+const DOUBLING_RUNS = 3;
 const MIN_RUNS = 3;
 const MAX_RUNS = 10;
 
@@ -22,17 +24,35 @@ function time(run: () => void): number {
   return (user + system) / 1000;
 }
 
+// The fastest of `runs` runs.
+function fastest(run: () => void, runs: number): number {
+  let best = Infinity;
+  for (let i = 0; i < runs; i++) best = Math.min(best, time(run));
+  return best;
+}
+
+export interface Growth {
+  /** The `count` the smaller input was built with; the larger one was built with GROWTH times it. */
+  n: number;
+  /** Fastest run on each input, in milliseconds of CPU time. */
+  smallMs: number;
+  largeMs: number;
+  /** largeMs / smallMs. */
+  ratio: number;
+}
+
 /**
- * How many times longer `run` takes on `build(GROWTH * n)` than on `build(n)`, `n` being doubled from
- * `count` until `build(n)` takes MIN_SMALL_MS. Both inputs are run in turn, MIN_RUNS times and then
- * up to MAX_RUNS times until the ratio of their fastest runs is under MAX_GROWTH_RATIO: noise only ever
- * slows a run down, so a linear scan gets under it after a few runs, a quadratic one never.
+ * Measures how many times longer `run` takes on `build(GROWTH * n)` than on `build(n)`, `n` being doubled from
+ * `count` until the fastest of DOUBLING_RUNS runs on `build(n)` takes MIN_SMALL_MS. Both inputs are
+ * then run in turn, MIN_RUNS times and then up to MAX_RUNS times until the ratio of their fastest runs
+ * is under MAX_GROWTH_RATIO: noise only ever slows a run down, so a linear scan gets under it after a
+ * few runs, a quadratic one never.
  */
-export function growthRatio(run: (text: string) => unknown, build: (count: number) => string, count: number): number {
+export function measureGrowth(run: (text: string) => unknown, build: (count: number) => string, count: number): Growth {
   let n = count;
   let small = build(n);
   run(small); // warm-up: the first call also compiles the code and the regular expressions
-  while (time(() => run(small)) < MIN_SMALL_MS && n < count * 2 ** MAX_DOUBLINGS) {
+  while (fastest(() => run(small), DOUBLING_RUNS) < MIN_SMALL_MS && n < count * 2 ** MAX_DOUBLINGS) {
     n *= 2;
     small = build(n);
   }
@@ -47,5 +67,10 @@ export function growthRatio(run: (text: string) => unknown, build: (count: numbe
     smallMs = Math.min(smallMs, Math.max(smallRun, 1));
     largeMs = Math.min(largeMs, largeRun);
   }
-  return largeMs / smallMs;
+  return { n, smallMs, largeMs, ratio: largeMs / smallMs };
+}
+
+// The assertion message of a growth check: the input size and both timings behind the ratio.
+export function describeGrowth({ n, smallMs, largeMs }: Growth): string {
+  return `n = ${n}: ${smallMs.toFixed(2)} ms, ${GROWTH} × n: ${largeMs.toFixed(2)} ms`;
 }

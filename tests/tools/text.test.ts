@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { formatUserText, USER_TEXT_NOTE } from "../../src/tools/text.js";
-import { growthRatio, MAX_GROWTH_RATIO } from "./growth.js";
+import { describeGrowth, measureGrowth, MAX_GROWTH_RATIO } from "./growth.js";
 
 function format(value: string): string[] {
   return formatUserText("description", "Description", value);
@@ -141,7 +141,9 @@ describe("formatUserText", () => {
     ["a bracket before a long run of letters and spaces", (count) => `[${"е ".repeat(count)}`, 1000],
     ["a marker start before a long run of separators", (count) => `[end user${" _-".repeat(count)}`, 1000],
   ])("processes %s in linear time", (_label, build, count) => {
-    expect(growthRatio(format, build, count)).toBeLessThan(MAX_GROWTH_RATIO);
+    const growth = measureGrowth(format, build, count);
+
+    expect(growth.ratio, describeGrowth(growth)).toBeLessThan(MAX_GROWTH_RATIO);
   });
 
   it("leaves a lenticular bracket alone outside a marker", () => {
@@ -233,7 +235,9 @@ describe("formatUserText", () => {
     ["unclosed internal links", (count) => "[[routes/1|".repeat(count), 500],
     ["images without a closing tag", (count) => "[img=1 right]x".repeat(count), 400],
   ])("processes %s in linear time", (_label, build, count) => {
-    expect(growthRatio(format, build, count)).toBeLessThan(MAX_GROWTH_RATIO);
+    const growth = measureGrowth(format, build, count);
+
+    expect(growth.ratio, describeGrowth(growth)).toBeLessThan(MAX_GROWTH_RATIO);
   });
 
   it("does not cut a text over 8000 characters raw but not once its markup is rewritten", () => {
