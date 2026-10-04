@@ -90,15 +90,16 @@ Prérequis : [Docker](https://docs.docker.com/get-docker/) et [Docker Compose](h
 Toutes les commandes npm passent par Docker via le `Makefile` :
 
 ```bash
-make install      # Installer les dépendances
-make check        # Équivalent du job `checks` de la CI (format, lint, types, couverture, build, tests du hook)
-make test         # Lancer les tests
-make lint         # Lint ESLint
-make typecheck    # Vérification des types
-make test-watch   # Tests en mode watch
-make build        # Compiler TypeScript
-make docker-build # Construire l'image de production
-make help         # Liste toutes les commandes
+make install       # Installer les dépendances
+make check         # Équivalent du job `checks` de la CI (format, lint, types, couverture, build, tests du hook)
+make test          # Lancer les tests
+make test-contract # Tests de contrat contre l'API Camptocamp réelle (npm run test:contract, réseau requis, hors make check)
+make lint          # Lint ESLint
+make typecheck     # Vérification des types
+make test-watch    # Tests en mode watch
+make build         # Compiler TypeScript
+make docker-build  # Construire l'image de production
+make help          # Liste toutes les commandes
 ```
 
 ## Publication
