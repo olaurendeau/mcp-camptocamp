@@ -77,7 +77,7 @@ export const searchOutingsSchema = z.object({
 
 export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
 export type GetOutingInput = z.infer<typeof getOutingSchema>;
-export type SearchOutingsInput = z.input<typeof searchOutingsSchema>;
+export type SearchOutingsInput = z.infer<typeof searchOutingsSchema>;
 
 function formatDateRange(dateStart?: string | null, dateEnd?: string | null): string {
   if (!dateStart) return "";
@@ -232,14 +232,9 @@ function formatOutingList(response: OutingListResponse, params: OutingSearchPara
   return lines.join("\n");
 }
 
+// The SDK has already validated `input` against searchOutingsSchema and applied its defaults.
 export async function handleSearchOutings(input: SearchOutingsInput): Promise<string> {
-  const parsed = searchOutingsSchema.safeParse(input);
-  if (!parsed.success) {
-    const issues = parsed.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`);
-    throw new Error(`Invalid search_outings input: ${[...new Set(issues)].join("; ")}`);
-  }
-
-  const { query, ...rest } = parsed.data;
+  const { query, ...rest } = input;
   // A blank query counts as missing: the API treats `q=` like no `q` and returns every outing.
   const params: OutingSearchParams = query?.trim() ? { query, ...rest } : rest;
 
