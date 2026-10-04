@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   searchRoutes,
@@ -29,6 +30,9 @@ function makeResponse(data: unknown, status = 200, statusText = status === 200 ?
 beforeEach(() => {
   mockFetch.mockReset();
 });
+
+// The required fields of every detail schema; each schema drops the ones it does not declare.
+const MINIMAL_DETAIL = { document_id: 1, locales: [], activities: [], waypoint_type: "summit", area_type: "range" };
 
 describe("searchRoutes", () => {
   it("calls the correct URL and returns parsed response", async () => {
@@ -1229,12 +1233,46 @@ describe("locale parameters", () => {
   ];
 
   it.each(details)("%s sends no query string", async (_name, call, path) => {
-    // The required fields of every detail schema; each schema drops the ones it does not declare.
-    const body = { document_id: 675555, locales: [], activities: [], waypoint_type: "summit", area_type: "range" };
-    mockFetch.mockResolvedValueOnce(makeResponse(body));
+    mockFetch.mockResolvedValueOnce(makeResponse({ ...MINIMAL_DETAIL, document_id: 675555 }));
 
     await call(675555);
 
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/${path}/675555`);
+  });
+});
+
+// AC2.1, AC2.2: every endpoint goes through getJson, so each one sends the User-Agent and an abort signal.
+describe("request headers and timeout signal", () => {
+  const packageVersion = (
+    JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }
+  ).version;
+
+  const calls: Array<[string, () => Promise<unknown>]> = [
+    ["searchRoutes", () => searchRoutes({ query: "gamma" })],
+    ["getRoute", () => getRoute(53914)],
+    ["searchWaypoints", () => searchWaypoints({ query: "resegone" })],
+    ["getWaypoint", () => getWaypoint(37305)],
+    ["searchUserOutings", () => searchUserOutings({ user_id: 430052 })],
+    ["getOuting", () => getOuting(1525071)],
+    ["searchOutings", () => searchOutings({ area_id: 14403 })],
+    ["searchAreas", () => searchAreas({ query: "valais" })],
+    ["getArea", () => getArea(14403)],
+    ["searchBooks", () => searchBooks({ query: "vallot" })],
+    ["getBook", () => getBook(183333)],
+    ["searchArticles", () => searchArticles({ query: "crampons" })],
+    ["getArticle", () => getArticle(1066806)],
+  ];
+
+  it.each(calls)("%s sends the User-Agent and an AbortSignal", async (_name, call) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0, ...MINIMAL_DETAIL }));
+
+    await call();
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const init = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(new Headers(init.headers).get("User-Agent")).toBe(
+      `mcp-camptocamp/${packageVersion} (+https://github.com/olaurendeau/mcp-camptocamp)`,
+    );
   });
 });

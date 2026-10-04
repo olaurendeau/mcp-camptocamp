@@ -1,9 +1,15 @@
 import type { z } from "zod";
+import { VERSION } from "../version.js";
 
 export const BASE_URL = "https://api.camptocamp.org";
 
 const ERROR_PREFIX = "Camptocamp API error:";
 const MAX_REASON_LENGTH = 200;
+const TIMEOUT_MS = 15_000;
+const HEADERS = {
+  "User-Agent": `mcp-camptocamp/${VERSION} (+https://github.com/olaurendeau/mcp-camptocamp)`,
+  Accept: "application/json",
+};
 
 export type DocumentType = "route" | "waypoint" | "outing" | "area" | "book" | "article";
 
@@ -15,16 +21,35 @@ export interface JsonRequest<S extends z.ZodTypeAny> {
 }
 
 // The only place that calls the Camptocamp API: every endpoint goes through here.
-export async function getJson<S extends z.ZodTypeAny>({
-  path,
-  params,
-  schema,
-  document,
-}: JsonRequest<S>): Promise<z.infer<S>> {
+// A global setTimeout (not AbortSignal.timeout, which fake timers cannot drive) aborts the request
+// after 15 s; it covers the fetch, the body read and its validation.
+export async function getJson<S extends z.ZodTypeAny>(request: JsonRequest<S>): Promise<z.infer<S>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    return await fetchJson(request, controller.signal);
+  } catch (error) {
+    // Once our timer has fired, whatever failed (fetch, body read) failed because of it
+    if (controller.signal.aborted) {
+      throw new Error(`${ERROR_PREFIX} request timed out after ${TIMEOUT_MS / 1000} s`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchJson<S extends z.ZodTypeAny>(
+  { path, params, schema, document }: JsonRequest<S>,
+  signal: AbortSignal,
+): Promise<z.infer<S>> {
   const query = params?.toString();
   let response: Response;
   try {
-    response = await fetch(query ? `${BASE_URL}${path}?${query}` : `${BASE_URL}${path}`);
+    response = await fetch(query ? `${BASE_URL}${path}?${query}` : `${BASE_URL}${path}`, {
+      headers: HEADERS,
+      signal,
+    });
   } catch (error) {
     throw new Error(`${ERROR_PREFIX} network error (${networkErrorDetail(error)})`);
   }
