@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { BASE_URL, getJson } from "../../src/api/http.js";
 
 const mockFetch = vi.fn();
@@ -7,6 +8,25 @@ vi.stubGlobal("fetch", mockFetch);
 beforeEach(() => {
   mockFetch.mockReset();
 });
+
+const TIMED_OUT = new Error("Camptocamp API error: request timed out after 15 s");
+
+/** A fetch that never answers on its own and rejects like undici once its signal aborts. */
+function fetchSettlingOnAbort(_url: string, init: RequestInit): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+  });
+}
+
+/** A response whose body streams nothing until the request signal aborts, then errors like undici. */
+function responseStalledUntilAbort(init: RequestInit, responseInit: ResponseInit): Response {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      init.signal?.addEventListener("abort", () => controller.error(init.signal?.reason));
+    },
+  });
+  return new Response(body, responseInit);
+}
 
 function jsonResponse(body: unknown, init: ResponseInit): Response {
   return new Response(JSON.stringify(body), { ...init, headers: { "Content-Type": "application/json" } });
@@ -168,5 +188,95 @@ describe("getJson network errors", () => {
     await expect(getJson({ path: "/routes/1", document: { type: "route", id: 1 } })).rejects.toThrow(
       new Error(`Camptocamp API error: network error (${detail})`),
     );
+  });
+});
+
+describe("getJson request headers", () => {
+  it("sends the User-Agent with the package.json version and asks for JSON", async () => {
+    const packageVersion = (
+      JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }
+    ).version;
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, { status: 200, statusText: "OK" }));
+
+    await getJson({ path: "/routes/53914" });
+
+    const headers = new Headers((mockFetch.mock.calls[0][1] as RequestInit).headers);
+    expect(headers.get("User-Agent")).toBe(
+      `mcp-camptocamp/${packageVersion} (+https://github.com/olaurendeau/mcp-camptocamp)`,
+    );
+    expect(headers.get("Accept")).toBe("application/json");
+  });
+});
+
+describe("getJson timeout", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("aborts a fetch that never answers after 15 s and says it timed out", async () => {
+    mockFetch.mockImplementationOnce(fetchSettlingOnAbort);
+    let settled = false;
+    const request = getJson({ path: "/routes/53914", document: { type: "route", id: 53914 } }).finally(() => {
+      settled = true;
+    });
+    const outcome = expect(request).rejects.toThrow(TIMED_OUT);
+
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(settled).toBe(false);
+    expect((mockFetch.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await outcome;
+    expect((mockFetch.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true);
+  });
+
+  it("covers reading a successful body", async () => {
+    mockFetch.mockImplementationOnce((_url: string, init: RequestInit) =>
+      Promise.resolve(responseStalledUntilAbort(init, { status: 200, statusText: "OK" })),
+    );
+    const outcome = expect(getJson({ path: "/areas/14067" })).rejects.toThrow(TIMED_OUT);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    await outcome;
+  });
+
+  it("covers reading an error body", async () => {
+    mockFetch.mockImplementationOnce((_url: string, init: RequestInit) =>
+      Promise.resolve(responseStalledUntilAbort(init, { status: 500, statusText: "Internal Server Error" })),
+    );
+    const outcome = expect(getJson({ path: "/routes" })).rejects.toThrow(TIMED_OUT);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    await outcome;
+  });
+
+  it("clears the timer after a success", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ documents: [], total: 0 }, { status: 200, statusText: "OK" }));
+
+    await getJson({ path: "/routes" });
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("clears the timer after an HTTP error", async () => {
+    mockFetch.mockResolvedValueOnce(new Response("", { status: 503, statusText: "Service Unavailable" }));
+
+    await expect(getJson({ path: "/routes" })).rejects.toThrow("503");
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("clears the timer after a network error", async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError("fetch failed", { cause: { code: "ECONNRESET" } }));
+
+    await expect(getJson({ path: "/routes" })).rejects.toThrow("network error (ECONNRESET)");
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
