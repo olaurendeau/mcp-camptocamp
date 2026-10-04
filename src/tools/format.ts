@@ -33,6 +33,22 @@ export function joinList(values?: string[] | null): string | undefined {
   return values && values.length > 0 ? values.join(", ") : undefined;
 }
 
+// Rule R1 of #58: null, undefined, "" and [] are absent and their line is left out; 0 and false are
+// values and are printed (waypoint 1350803 is at elevation 0).
+export function isPresent<T>(value: T | null | undefined): value is T {
+  if (value == null || value === "") return false;
+  return !Array.isArray(value) || value.length > 0;
+}
+
+// An outing's dates: "start → end", or one date when both are equal or only one is set (#36: an outing
+// with only date_end prints that date). The missing bound is never invented.
+export function formatDateRange(dateStart?: string | null, dateEnd?: string | null): string {
+  const start = isPresent(dateStart) ? dateStart : undefined;
+  const end = isPresent(dateEnd) ? dateEnd : undefined;
+  if (start && end && start !== end) return `${start} → ${end}`;
+  return start ?? end ?? "";
+}
+
 const SITE_URL = "https://www.camptocamp.org";
 
 // The document type segment of a camptocamp.org URL: a typo fails the typecheck instead of printing a
@@ -55,8 +71,8 @@ export function formatRouteName(locale?: RouteAssociation["locales"][number]): s
 export function formatRouteLine(route: RouteSearchResult): string {
   const activities = route.activities.length > 0 ? ` (${route.activities.join(", ")})` : "";
   const parts = [`- [${route.document_id}] ${formatRouteName(pickLocale(route.locales))}${activities}`];
-  if (route.elevation_max != null) parts.push(`Max elevation: ${route.elevation_max}m`);
-  if (route.height_diff_up != null) parts.push(`Elevation gain: ${route.height_diff_up}m`);
+  if (isPresent(route.elevation_max)) parts.push(`Max elevation: ${route.elevation_max}m`);
+  if (isPresent(route.height_diff_up)) parts.push(`Elevation gain: ${route.height_diff_up}m`);
   return [...parts, ...formatRatingParts(route)].join(" | ");
 }
 
@@ -67,7 +83,7 @@ export function formatAssociatedRouteLine(route: RouteAssociation): string {
 }
 
 export function formatWaypointLine(waypoint: WaypointAssociation): string {
-  const elevation = waypoint.elevation != null ? ` | ${waypoint.elevation}m` : "";
+  const elevation = isPresent(waypoint.elevation) ? ` | ${waypoint.elevation}m` : "";
   return `- [${waypoint.document_id}] ${pickTitle(waypoint.locales)} (${waypoint.waypoint_type})${elevation}`;
 }
 
