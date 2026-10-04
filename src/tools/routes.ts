@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searchQuery } from "./inputs.js";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteDetail, RouteRatingField, RouteSearchOptions } from "../api/camptocamp.js";
 import {
@@ -15,10 +15,12 @@ import {
   formatTitledLine,
   formatRecentOutings,
   formatListItems,
+  formatLanguageLine,
 } from "./format.js";
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 import { ACTIVITIES, ROUTE_CONFIGURATIONS, ROUTE_TYPES, enumValue } from "./enums.js";
+import type { Lang } from "./enums.js";
 import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
 import { describeRange, heightDiffUp, rangeFilter, ratingBound, ratingFilter, ratingScales } from "./filters.js";
 
@@ -62,6 +64,7 @@ export const searchRoutesSchema = z.object({
 
 export const getRouteSchema = z.object({
   id: documentId("Route ID from Camptocamp"),
+  lang: langInput(),
 });
 
 export type SearchRoutesInput = z.infer<typeof searchRoutesSchema>;
@@ -118,7 +121,7 @@ function describeFilters(options: RouteSearchOptions): string[] {
 
 // The documents linked to a route, so that one get_route call gives the books covering it (#58, S3).
 // An empty or missing list prints no section.
-function formatRouteAssociations(route: RouteDetail): string[] {
+function formatRouteAssociations(route: RouteDetail, lang?: Lang): string[] {
   const associations = route.associations;
   const lines: string[] = [];
   const section = (heading: string, items: string[] = []): void => {
@@ -132,13 +135,25 @@ function formatRouteAssociations(route: RouteDetail): string[] {
     (associations?.waypoints ?? []).map((waypoint) =>
       formatWaypointLine(waypoint, {
         main: waypoint.document_id !== undefined && waypoint.document_id === route.main_waypoint_id,
+        lang,
       }),
     ),
   );
-  section("Associated routes", formatListItems(associations?.routes ?? [], formatAssociatedRouteLine));
-  section("Associated books", formatListItems(associations?.books ?? [], formatBookLine));
-  section("Associated articles", formatListItems(associations?.articles ?? [], formatTitledLine));
-  lines.push(...formatRecentOutings(associations?.recent_outings, `search_outings with route_id=${route.document_id}`));
+  section(
+    "Associated routes",
+    formatListItems(associations?.routes ?? [], (item) => formatAssociatedRouteLine(item, lang)),
+  );
+  section(
+    "Associated books",
+    formatListItems(associations?.books ?? [], (item) => formatBookLine(item, lang)),
+  );
+  section(
+    "Associated articles",
+    formatListItems(associations?.articles ?? [], (item) => formatTitledLine(item, lang)),
+  );
+  lines.push(
+    ...formatRecentOutings(associations?.recent_outings, `search_outings with route_id=${route.document_id}`, lang),
+  );
   return lines;
 }
 
@@ -163,11 +178,12 @@ function formatRouteFacts(route: RouteDetail): string[] {
   return lines;
 }
 
-function formatRouteDetail(route: RouteDetail): string {
-  const locale = pickLocale(route.locales);
+function formatRouteDetail(route: RouteDetail, lang?: Lang): string {
+  const locale = pickLocale(route.locales, lang);
   const lines: string[] = [];
 
   lines.push(...formatHeader(formatRouteName(locale), route.document_id, "routes"));
+  lines.push(...formatLanguageLine(route.locales, lang));
   lines.push(`\n**Activities**: ${route.activities.join(", ")}`);
 
   lines.push(...formatRatingLines(route));
@@ -178,7 +194,7 @@ function formatRouteDetail(route: RouteDetail): string {
   if (isPresent(route.height_diff_down)) lines.push(`**Elevation loss**: ${route.height_diff_down}m`);
   lines.push(...formatRouteFacts(route));
 
-  lines.push(...formatAreasSection(route.areas));
+  lines.push(...formatAreasSection(route.areas, lang));
 
   lines.push(...formatUserText("summary", "Summary", locale?.summary));
   lines.push(...formatUserText("description", "Description", locale?.description));
@@ -188,7 +204,7 @@ function formatRouteDetail(route: RouteDetail): string {
   lines.push(...formatUserText("route_history", "Route history", locale?.route_history));
   lines.push(...formatUserText("external_resources", "External resources", locale?.external_resources));
 
-  lines.push(...formatRouteAssociations(route));
+  lines.push(...formatRouteAssociations(route, lang));
 
   return lines.join("\n");
 }
@@ -209,7 +225,7 @@ export async function handleSearchRoutes(input: SearchRoutesInput): Promise<stri
 
 export async function handleGetRoute(input: GetRouteInput): Promise<string> {
   const route = await getRoute(input.id);
-  return formatRouteDetail(route);
+  return formatRouteDetail(route, input.lang);
 }
 
 export const routeToolDefinitions = [
@@ -226,7 +242,7 @@ export const routeToolDefinitions = [
     title: "Get route details",
     description:
       "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including every rating labelled by its grading system (Toponeige ski rating, Labande, global rating, rock, ice, hiking…), elevation data, practical facts printed as Camptocamp's codes (orientations, duration in days, route types, configuration, glacier gear, difficulties and access height differences, lift access yes/no), its summary, description, slope, remarks, gear, route history and external resources, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. It also lists, with their IDs, the guidebooks and other books that cover it, its waypoints (the main one marked), sibling routes, related articles, and its most recent outings ('Recent outings (<shown> of <total>)'; list them all with search_outings with route_id). The second line is the document's camptocamp.org URL, to cite as the source. " +
-      USER_TEXT_NOTE,
+      `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${USER_TEXT_NOTE}`,
     inputSchema: getRouteSchema,
     handler: handleGetRoute,
   },

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchBooks, getBook } from "../api/camptocamp.js";
 import type { BookDetail } from "../api/camptocamp.js";
@@ -13,9 +13,11 @@ import {
   formatTitledLine,
   formatBookLine,
   formatListItems,
+  formatLanguageLine,
 } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 import { ACTIVITIES, BOOK_TYPES, enumValue } from "./enums.js";
+import type { Lang } from "./enums.js";
 
 export const searchBooksSchema = z.object({
   query: searchQuery("Search query matched against book titles (e.g. 'Vallot', 'Mont Blanc')", { allowBlank: false }),
@@ -31,14 +33,18 @@ export const searchBooksSchema = z.object({
 
 export const getBookSchema = z.object({
   id: documentId("Book ID from Camptocamp"),
+  lang: langInput(),
 });
 
 export type SearchBooksInput = z.infer<typeof searchBooksSchema>;
 export type GetBookInput = z.infer<typeof getBookSchema>;
 
-function formatBookDetail(book: BookDetail): string {
-  const locale = pickLocale(book.locales);
-  const lines: string[] = formatHeader(pickTitle(book.locales), book.document_id, "books");
+function formatBookDetail(book: BookDetail, lang?: Lang): string {
+  const locale = pickLocale(book.locales, lang);
+  const lines: string[] = [
+    ...formatHeader(pickTitle(book.locales, lang), book.document_id, "books"),
+    ...formatLanguageLine(book.locales, lang),
+  ];
 
   const fields: Array<[string, string | number | null | undefined]> = [
     ["Author", book.author],
@@ -63,17 +69,17 @@ function formatBookDetail(book: BookDetail): string {
 
   const routes = book.associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...formatListItems(routes, formatAssociatedRouteLine));
+    lines.push("\n## Associated routes", ...formatListItems(routes, (route) => formatAssociatedRouteLine(route, lang)));
   }
 
   const waypoints = book.associations?.waypoints;
   if (waypoints && waypoints.length > 0) {
-    lines.push("\n## Associated waypoints", ...formatListItems(waypoints, (waypoint) => formatWaypointLine(waypoint)));
+    lines.push("\n## Associated waypoints", ...waypoints.map((waypoint) => formatWaypointLine(waypoint, { lang })));
   }
 
   const articles = book.associations?.articles;
   if (articles && articles.length > 0) {
-    lines.push("\n## Associated articles", ...formatListItems(articles, formatTitledLine));
+    lines.push("\n## Associated articles", ...formatListItems(articles, (article) => formatTitledLine(article, lang)));
   }
 
   return lines.join("\n");
@@ -99,7 +105,7 @@ export async function handleSearchBooks(input: SearchBooksInput): Promise<string
 
 export async function handleGetBook(input: GetBookInput): Promise<string> {
   const book = await getBook(input.id);
-  return formatBookDetail(book);
+  return formatBookDetail(book, input.lang);
 }
 
 export const bookToolDefinitions = [
@@ -117,7 +123,7 @@ export const bookToolDefinitions = [
     title: "Get book details",
     description:
       "Get full details of a specific book from Camptocamp.org by its ID: author, editor, publication date, ISBN, pages, languages, website, book types, activities, summary, description, the routes and waypoints it covers, and its related articles (with IDs for get_route, get_waypoint and get_article). Labelled fields are shown as Camptocamp stores them; missing fields are left out. The second line is the document's camptocamp.org URL, to cite as the source. " +
-      USER_TEXT_NOTE,
+      `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${USER_TEXT_NOTE}`,
     inputSchema: getBookSchema,
     handler: handleGetBook,
   },

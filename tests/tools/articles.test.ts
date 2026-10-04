@@ -656,7 +656,6 @@ describe("handleGetArticle", () => {
         "# Les crampons (ID: 226838)",
         "**URL**: https://www.camptocamp.org/articles/226838",
         "",
-        "**Language**: fr",
         "**Type**: collab",
         "**Created by**: Thomas Ribière (user ID: 4060)",
         "**Categories**: gear",
@@ -697,7 +696,7 @@ describe("handleGetArticle", () => {
     expect(result).toContain(" Face N (routes/45148)\n[end user-written text: description]\n");
   });
 
-  it("names the fallback language when there is no fr locale", async () => {
+  it("names the language shown, right after the URL line, when there is no fr locale", async () => {
     mockGetArticle.mockResolvedValueOnce(ARTICLE_110093);
 
     const result = await handleGetArticle({ id: 110093 });
@@ -706,8 +705,8 @@ describe("handleGetArticle", () => {
       [
         "# Valanghe in video (ID: 110093)",
         "**URL**: https://www.camptocamp.org/articles/110093",
+        "**Language**: it (no fr version; available: it)",
         "",
-        "**Language**: it",
         "**Type**: collab",
         "**Created by**: Franco Pecchio (user ID: 2000)",
         "**Categories**: mountain_environment",
@@ -724,7 +723,6 @@ describe("handleGetArticle", () => {
 
     expect(result).toContain(
       [
-        "**Language**: fr",
         "**Type**: personal",
         "**Author**: henri leveque (user ID: 136499)",
         "**Categories**: stories",
@@ -840,7 +838,9 @@ describe("handleGetArticle", () => {
 
     const result = await handleGetArticle({ id: 302774 });
 
-    expect(result).toContain("**Language**: en\n");
+    expect(result).toContain(
+      "**URL**: https://www.camptocamp.org/articles/302774\n**Language**: en (no fr version; available: en)\n",
+    );
     expect(result).toContain(
       "\n## Associated routes\n- [45148] Le Portalet : Face N\n- [53804] Traversée Midi - Plan\n\n## Associated articles\n- [306206] HELP: How to translate route descriptions in English?",
     );
@@ -970,7 +970,6 @@ describe("handleGetArticle", () => {
         "# Descendre en rappel (source Petzl) (ID: 716039)",
         "**URL**: https://www.camptocamp.org/articles/716039",
         "",
-        "**Language**: fr",
         "**Type**: personal",
         "**Author**: Frédéric Bunoz (user ID: 288)",
         "**Categories**: technical",
@@ -1054,5 +1053,75 @@ describe("malformed list items", () => {
 
     expect(lines[0]).toBe(`Found ${CRAMPONS_SEARCH.total} article(s). Showing ${rest.length + 1} from offset 0:`);
     expect(lines).toContain(`- [${first.document_id}] ${PLACEHOLDER}`);
+  });
+});
+
+describe("get_article lang", () => {
+  // Article 583439 of GET /articles/583439 (2026-10-04): locales de, en, fr (first sentence of each description; the
+  // de locale is in English), images and the article association left out.
+  const ARTICLE_583439 = {
+    document_id: 583439,
+    locales: [
+      {
+        lang: "de",
+        title: "Regional patterns of avalanche accidents in Switzerland",
+        summary: null,
+        description:
+          "Maybe you still remember the news from the many tragic avalanche accidents which occurred last winter in the Lower Valais.",
+      },
+      {
+        lang: "en",
+        title: "Regional patterns of avalanche accidents in Switzerland",
+        summary: null,
+        description:
+          "Maybe you still remember the news from the many tragic avalanche accidents which occurred last winter in the Lower Valais.",
+      },
+      {
+        lang: "fr",
+        title: "Répartition régionale des accidents d’avalanche en Suisse",
+        summary: null,
+        description:
+          "Un regard sur la carte des accidents mortels d’avalanche dans les Alpes suisses au cours des vingt dernières années montre que ceux-ci ont été particulièrement nombreux dans le Valais et dans les Grisons.",
+      },
+    ],
+    quality: "medium",
+    categories: ["mountain_environment"],
+    activities: ["skitouring"],
+    article_type: "collab",
+    author: { name: "frankt", user_id: 396626 },
+  };
+
+  it("prints the de locale verbatim, with no Language line (AC5.8)", async () => {
+    mockGetArticle.mockResolvedValueOnce(ARTICLE_583439);
+
+    const result = await handleGetArticle({ id: 583439, lang: "de" });
+
+    expect(result.split("\n").slice(0, 4)).toEqual([
+      "# Regional patterns of avalanche accidents in Switzerland (ID: 583439)",
+      "**URL**: https://www.camptocamp.org/articles/583439",
+      "",
+      "**Type**: collab",
+    ]);
+    expect(result).not.toContain("**Language**");
+    expect(result).not.toContain("Un regard sur la carte");
+  });
+
+  it("prints the fr locale without lang", async () => {
+    mockGetArticle.mockResolvedValueOnce(ARTICLE_583439);
+
+    const result = await handleGetArticle({ id: 583439 });
+
+    expect(result.startsWith("# Répartition régionale des accidents d’avalanche en Suisse (ID: 583439)\n")).toBe(true);
+    expect(result).toContain("Un regard sur la carte");
+    expect(result).not.toContain("**Language**");
+  });
+
+  it("names associated documents in the requested language", async () => {
+    mockGetArticle.mockResolvedValueOnce(ARTICLE_302774);
+
+    const result = await handleGetArticle({ id: 302774, lang: "es" });
+
+    expect(result).toContain("**Language**: en (no es version; available: en)");
+    expect(result).toContain("\n## Associated routes\n- [45148] Le Portalet : Face N\n- [53804] Travesía Midi-Plan\n");
   });
 });

@@ -717,6 +717,70 @@ describe("virtual waypoints", () => {
 
     expect(tool?.description).toContain(`altitude and GPS coordinates. ${VIRTUAL_SENTENCE}`);
   });
+
+  it("prints the en locale of 1947492 for lang en, with no Language line", async () => {
+    mockGetWaypoint.mockResolvedValueOnce(ouvertures2013);
+
+    const result = await handleGetWaypoint({ id: 1947492, lang: "en" });
+
+    expect(result.split("\n").slice(0, 4)).toEqual([
+      "# First Ascents in 2013 (ID: 1947492)",
+      "**URL**: https://www.camptocamp.org/waypoints/1947492",
+      "",
+      "**Type**: virtual",
+    ]);
+    expect(result).toContain("[Search - Filters](https://www.camptocamp.org/routes?w=1947492)");
+    expect(result).not.toContain("## Summary");
+  });
+
+  it("names the language shown after the URL line when the requested one is missing", async () => {
+    mockGetWaypoint.mockResolvedValueOnce(ouvertures2013);
+
+    const result = await handleGetWaypoint({ id: 1947492, lang: "de" });
+
+    expect(result.split("\n").slice(0, 3)).toEqual([
+      "# Ouvertures 2013 (ID: 1947492)",
+      "**URL**: https://www.camptocamp.org/waypoints/1947492",
+      "**Language**: fr (no de version; available: en, fr)",
+    ]);
+  });
+});
+
+describe("get_waypoint lang", () => {
+  it("names the areas and associations in the requested language", async () => {
+    // Derived: hut 104143 with the areas above and route 46624 of GET /routes/54085 associations (2026-10-04) as
+    // its only route, in the search_routes shape.
+    mockGetWaypoint.mockResolvedValueOnce({
+      ...waypoint104143,
+      areas: areasOf104143,
+      associations: {
+        all_routes: {
+          total: 1,
+          documents: [
+            {
+              document_id: 46624,
+              locales: [
+                { lang: "en", title: "Traverse via Grand Col", title_prefix: "Mont Pourri" },
+                { lang: "de", title: "Traverse über den Grand Col", title_prefix: "Mont Pourri" },
+                { lang: "fr", title: "Versant W - Grand Col", title_prefix: "Mont Pourri" },
+              ],
+              activities: ["skitouring"],
+            },
+          ],
+        },
+      },
+    });
+
+    const result = await handleGetWaypoint({ id: 104143, lang: "de" });
+
+    expect(result.split("\n").slice(0, 3)).toEqual([
+      "# Refuge du Glacier Blanc (ID: 104143)",
+      "**URL**: https://www.camptocamp.org/waypoints/104143",
+      "**Language**: fr (no de version; available: en, fr)",
+    ]);
+    expect(result).toContain("\n## Areas\n- [14274] Frankreich (country)\n- [14361] Hautes-Alpes (admin_limits)\n");
+    expect(result).toContain("\n## Routes (1 of 1)\n- [46624] Mont Pourri : Traverse über den Grand Col (skitouring)");
+  });
 });
 
 describe("get_waypoint hut details", () => {
@@ -797,7 +861,13 @@ describe("get_waypoint hut details", () => {
 
     const result = await handleGetWaypoint({ id: 1925122 });
 
-    expect(result.split("\n").slice(2)).toEqual(["", "**Type**: bivouac", "**Elevation**: 2084m", "**Capacity**: 12"]);
+    expect(result.split("\n").slice(2)).toEqual([
+      "**Language**: it (no fr version; available: it)",
+      "",
+      "**Type**: bivouac",
+      "**Elevation**: 2084m",
+      "**Capacity**: 12",
+    ]);
   });
 
   it("labels a gîte's capacity Capacity (unstaffed) next to its staffed capacity", async () => {
@@ -818,7 +888,7 @@ describe("get_waypoint hut details", () => {
 
     const result = await handleGetWaypoint({ id: 1931523 });
 
-    expect(result.split("\n").slice(5)).toEqual([
+    expect(result.split("\n").slice(6)).toEqual([
       "**Capacity (unstaffed)**: 10",
       "**Capacity (staffed)**: 40",
       "**Custodianship**: always_accessible",

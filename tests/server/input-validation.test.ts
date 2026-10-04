@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { connect, jsonResponse, stubFetch } from "./helpers.js";
+import { DETAIL_LANG_NOTE, LANG_NOTE } from "../../src/tools/inputs.js";
 
 const ACCEPTED_ID = 1956293;
 
@@ -659,4 +660,55 @@ describe("search_outings rating, condition and elevation filters", () => {
       pl: "fr",
     });
   });
+});
+
+// AC5.1, AC5.3 on #153: the get_* tools take an optional lang, checked before any request; a detail request still
+// has no query string, whatever the lang.
+describe("get_* lang input", () => {
+  const DETAIL_CASES = ID_FIELDS.filter((f) => f.tool.startsWith("get_")).map((f) => [f.tool, f] as const);
+
+  it("covers the six get_* tools", () => {
+    expect(DETAIL_CASES.map(([tool]) => tool)).toEqual([
+      "get_route",
+      "get_waypoint",
+      "get_outing",
+      "get_area",
+      "get_book",
+      "get_article",
+    ]);
+  });
+
+  it.each(DETAIL_CASES)("%s refuses lang ru without calling Camptocamp", async (tool) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: tool, arguments: { id: ACCEPTED_ID, lang: "ru" } });
+
+    expect(validationIssues(result, tool)).toEqual(["must be one of: fr, en, de, it, es, ca, eu, sl, zh at lang"]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(DETAIL_CASES)("%s accepts lang de and sends no query string", async (tool, { response }) => {
+    const fetchMock = stubFetch(jsonResponse(response));
+    const client = await connect();
+
+    const result = await client.callTool({ name: tool, arguments: { id: ACCEPTED_ID, lang: "de" } });
+
+    expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
+    expect(new URL(fetchMock.mock.calls[0][0] as string).search).toBe("");
+    expect(resultText(result)).toContain("(no de version; available: fr)");
+  });
+
+  it.each(DETAIL_CASES)(
+    "%s states lang, its default, the fallback order and the Language line (AC5.10)",
+    async (tool) => {
+      const client = await connect();
+
+      const { tools } = await client.listTools();
+
+      const description = tools.find((t) => t.name === tool)?.description;
+      expect(description).toContain(LANG_NOTE);
+      expect(description).toContain(DETAIL_LANG_NOTE);
+    },
+  );
 });

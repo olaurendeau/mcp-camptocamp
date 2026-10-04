@@ -359,7 +359,8 @@ describe("handleGetOuting", () => {
       ]);
     });
 
-    // AC4.3 on #153: a malformed account or route is a placeholder; the inline list has no "- " before it.
+    // AC4.3 on #153: a malformed account or route is a placeholder; in the inline list an account's ID reads like the
+    // others' "(user ID: N)", since "[N]" elsewhere is a document ID (review of #188).
     it("prints a placeholder for a malformed account and a malformed route", async () => {
       const [marion, emag] = outing1757161.associations.users;
       const [route] = outing1757161.associations.routes;
@@ -376,11 +377,45 @@ describe("handleGetOuting", () => {
 
       expect(lines).toContain(
         "**Participants with a Camptocamp account**: " +
-          "[466185] (not shown: Camptocamp sent this item in an unexpected format), emag (user ID: 944173), " +
+          "(user ID: 466185, not shown: Camptocamp sent this item in an unexpected format), emag (user ID: 944173), " +
           "(not shown: Camptocamp sent an item in an unexpected format)",
       );
       expect(lines.slice(lines.indexOf("## Associated routes") + 1)).toEqual([
         "- [45186] (not shown: Camptocamp sent this item in an unexpected format)",
+      ]);
+    });
+
+    it("names the language shown after the URL line and the routes in the requested language", async () => {
+      // Derived: route 54085 with its four locales, as associated with outing 1880674 in GET /outings/1880674
+      // (2026-10-04), in place of route 45186.
+      mockGetOuting.mockResolvedValueOnce({
+        ...outing1757161,
+        associations: {
+          ...outing1757161.associations,
+          routes: [
+            {
+              document_id: 54085,
+              locales: [
+                { lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" },
+                { lang: "de", title: "Voie normale du Glacier du Geay", title_prefix: "Mont Pourri" },
+                { lang: "en", title: "Normal route from Glacier du Geay", title_prefix: "Mont Pourri" },
+                { lang: "it", title: "Voie normale du Glacier du Geay", title_prefix: "Mont Pourri" },
+              ],
+            },
+          ],
+        },
+      });
+
+      const lines = (await handleGetOuting({ id: 1757161, lang: "en" })).split("\n");
+
+      expect(lines.slice(0, 3)).toEqual([
+        "# Rosablanche : Depuis Fionnay (ID: 1757161)",
+        "**URL**: https://www.camptocamp.org/outings/1757161",
+        "**Language**: fr (no en version; available: fr)",
+      ]);
+      expect(lines).toContain("Une bien jolie sortie pour commencer notre semaine de ski en Suisse!");
+      expect(lines.slice(lines.indexOf("## Associated routes") + 1)).toEqual([
+        "- [54085] Mont Pourri : Normal route from Glacier du Geay",
       ]);
     });
 

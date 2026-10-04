@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointDetail } from "../api/camptocamp.js";
@@ -15,9 +15,11 @@ import {
   formatBookLine,
   formatRecentOutings,
   formatListItems,
+  formatLanguageLine,
 } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 import { CUSTODIANSHIPS, WAYPOINT_TYPES, enumValue } from "./enums.js";
+import type { Lang } from "./enums.js";
 
 export const searchWaypointsSchema = z.object({
   query: searchQuery("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')", {
@@ -36,6 +38,7 @@ export const searchWaypointsSchema = z.object({
 
 export const getWaypointSchema = z.object({
   id: documentId("Waypoint ID from Camptocamp"),
+  lang: langInput(),
 });
 
 export type SearchWaypointsInput = z.infer<typeof searchWaypointsSchema>;
@@ -84,11 +87,12 @@ const CUSTODIANSHIP_NOTE =
     .join(", ") +
   "; any other value is printed as Camptocamp sends it.";
 
-function formatWaypointDetail(waypoint: WaypointDetail): string {
-  const locale = pickLocale(waypoint.locales);
+function formatWaypointDetail(waypoint: WaypointDetail, lang?: Lang): string {
+  const locale = pickLocale(waypoint.locales, lang);
   const lines: string[] = [];
 
-  lines.push(...formatHeader(pickTitle(waypoint.locales), waypoint.document_id, "waypoints"));
+  lines.push(...formatHeader(pickTitle(waypoint.locales, lang), waypoint.document_id, "waypoints"));
+  lines.push(...formatLanguageLine(waypoint.locales, lang));
   lines.push(`\n**Type**: ${waypoint.waypoint_type}`);
 
   // A virtual waypoint's elevation and position are placeholders (see isVirtualWaypoint).
@@ -103,14 +107,14 @@ function formatWaypointDetail(waypoint: WaypointDetail): string {
 
   lines.push(...formatHutLines(waypoint));
 
-  lines.push(...formatAreasSection(waypoint.areas));
+  lines.push(...formatAreasSection(waypoint.areas, lang));
 
   lines.push(...formatUserText("summary", "Summary", locale?.summary));
   lines.push(...formatUserText("description", "Description", locale?.description));
   lines.push(...formatUserText("access", "Access", locale?.access));
   lines.push(...formatUserText("access_period", "Access period", locale?.access_period));
 
-  lines.push(...formatWaypointAssociations(waypoint));
+  lines.push(...formatWaypointAssociations(waypoint, lang));
 
   return lines.join("\n");
 }
@@ -119,22 +123,31 @@ function formatWaypointDetail(waypoint: WaypointDetail): string {
 const MAX_ROUTES = 50;
 
 // The routes, books and recent outings of a waypoint. An empty or missing list prints no section.
-function formatWaypointAssociations(waypoint: WaypointDetail): string[] {
+function formatWaypointAssociations(waypoint: WaypointDetail, lang?: Lang): string[] {
   const associations = waypoint.associations;
   const lines: string[] = [];
 
   const routes = associations?.all_routes;
   if (routes && routes.documents.length > 0) {
     const shown = routes.documents.slice(0, MAX_ROUTES);
-    lines.push(`\n## Routes (${shown.length} of ${routes.total})`, ...formatListItems(shown, formatRouteLine));
+    lines.push(
+      `\n## Routes (${shown.length} of ${routes.total})`,
+      ...formatListItems(shown, (route) => formatRouteLine(route, lang)),
+    );
     if (routes.total > shown.length) lines.push(`More: search_routes with waypoint_id=${waypoint.document_id}`);
   }
 
   const books = associations?.books ?? [];
-  if (books.length > 0) lines.push("\n## Associated books", ...formatListItems(books, formatBookLine));
+  if (books.length > 0) {
+    lines.push("\n## Associated books", ...formatListItems(books, (book) => formatBookLine(book, lang)));
+  }
 
   lines.push(
-    ...formatRecentOutings(associations?.recent_outings, `search_outings with waypoint_id=${waypoint.document_id}`),
+    ...formatRecentOutings(
+      associations?.recent_outings,
+      `search_outings with waypoint_id=${waypoint.document_id}`,
+      lang,
+    ),
   );
   return lines;
 }
@@ -165,7 +178,7 @@ export async function handleSearchWaypoints(input: SearchWaypointsInput): Promis
 
 export async function handleGetWaypoint(input: GetWaypointInput): Promise<string> {
   const waypoint = await getWaypoint(input.id);
-  return formatWaypointDetail(waypoint);
+  return formatWaypointDetail(waypoint, input.lang);
 }
 
 export const waypointToolDefinitions = [
@@ -189,7 +202,7 @@ export const waypointToolDefinitions = [
       " It also gives capacity (for huts, gîtes and camp sites: places outside the wardened period, then places when wardened; for a bivouac: its number of places), custodianship, phones and website, summary, description, access, access period (free text, as written), the areas it belongs to (range, admin_limits, country), then its routes (at most 50, in search_routes format; a 'More: search_routes with waypoint_id=N' line follows when there are more), the books that cover it, and its most recent outings with their total ('More: search_outings with waypoint_id=N' lists them all). " +
       CUSTODIANSHIP_NOTE +
       " Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
-      USER_TEXT_NOTE,
+      `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${USER_TEXT_NOTE}`,
     inputSchema: getWaypointSchema,
     handler: handleGetWaypoint,
   },

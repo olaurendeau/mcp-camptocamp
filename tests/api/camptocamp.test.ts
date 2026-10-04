@@ -22,6 +22,7 @@ import {
 } from "../../src/api/camptocamp.js";
 import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
 import { wellFormed } from "./well-formed.js";
+import type { Lang } from "../../src/tools/enums.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -2216,7 +2217,7 @@ describe("locale parameters", () => {
   });
 
   // AC5.2, AC5.3: the requested language goes out as `pl`, in place of fr.
-  const searchesIn: Array<[string, (lang: string) => Promise<unknown>, string]> = [
+  const searchesIn: Array<[string, (lang: Lang) => Promise<unknown>, string]> = [
     ["searchRoutes", (lang) => searchRoutes({ query: "gamma", lang }), "/routes"],
     ["searchWaypoints", (lang) => searchWaypoints({ query: "resegone", lang }), "/waypoints"],
     ["searchOutings", (lang) => searchOutings({ area_id: 14403, lang }), "/outings"],

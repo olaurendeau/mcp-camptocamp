@@ -1,4 +1,5 @@
 import { getJson } from "./http.js";
+import type { Lang } from "../tools/enums.js";
 import type {
   RouteSearchResponse,
   RouteDetail,
@@ -52,7 +53,7 @@ export type {
 
 // Searches send `pl=<lang>` (default fr): one locale per document, that language first, then the API's
 // fallback (en, it, ...). `lang` does nothing and `pl` is ignored on details, so they send no query string.
-const DEFAULT_LANG = "fr";
+const DEFAULT_LANG: Lang = "fr";
 const DEFAULT_LIMIT = 10;
 
 // Options of searchRoutes and searchWaypoints: a keyword, an area, or both.
@@ -60,7 +61,7 @@ interface KeywordOrAreaSearchOptions {
   query?: string;
   area_id?: number;
   limit?: number; // default DEFAULT_LIMIT
-  lang?: string; // sent as pl, default DEFAULT_LANG
+  lang?: Lang; // sent as pl, default DEFAULT_LANG
 }
 export interface WaypointSearchOptions extends KeywordOrAreaSearchOptions {
   waypoint_type?: string;
@@ -148,7 +149,7 @@ interface KeywordSearchOptions {
   query: string;
   limit?: number; // default DEFAULT_LIMIT
   offset?: number; // sent only when given
-  lang?: string; // sent as pl, default DEFAULT_LANG
+  lang?: Lang; // sent as pl, default DEFAULT_LANG
 }
 export interface BookSearchOptions extends KeywordSearchOptions {
   book_type?: string;
@@ -241,7 +242,7 @@ export interface OutingSearchParams {
   height_diff_up?: { min?: number; max?: number };
   limit?: number; // default DEFAULT_LIMIT
   offset?: number; // default 0
-  lang?: string; // sent as pl, default DEFAULT_LANG
+  lang?: Lang; // sent as pl, default DEFAULT_LANG
 }
 
 export async function searchOutings(params: OutingSearchParams = {}): Promise<OutingListResponse> {

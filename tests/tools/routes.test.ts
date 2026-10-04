@@ -1841,3 +1841,155 @@ describe("get_route practical facts", () => {
     );
   });
 });
+
+// Route 54085 of GET /routes/54085 (2026-10-04): its four locales (first sentence of each description; the fr
+// one starts with an image tag), its three areas and two of its associations, reduced to the typed fields.
+const route54085Locales = {
+  document_id: 54085,
+  locales: [
+    {
+      lang: "fr",
+      title: "Versant W par le Glacier du Geay",
+      title_prefix: "Mont Pourri",
+      description: "[img=192710 right]Mont Pourri, itinéraire 1[/img]",
+    },
+    {
+      lang: "de",
+      title: "Voie normale du Glacier du Geay",
+      title_prefix: "Mont Pourri",
+      description: "Zustieg zur Mont-Pourri Hütte über das Ponturin-Tal (Peisey-Nancroix)",
+    },
+    {
+      lang: "en",
+      title: "Normal route from Glacier du Geay",
+      title_prefix: "Mont Pourri",
+      description: "Access to Mont Pourri refuge via Vallée du Ponturin (Peisey-Nancroix)",
+    },
+    {
+      lang: "it",
+      title: "Voie normale du Glacier du Geay",
+      title_prefix: "Mont Pourri",
+      description: "Accesso al rifugio del Mont Pourri dalla valle del Ponturin (Peisey-Nancroix)",
+    },
+  ],
+  activities: ["skitouring"],
+  elevation_max: 3779,
+  main_waypoint_id: 37916,
+  areas: [
+    areasOf54275[0],
+    {
+      document_id: 14295,
+      locales: [
+        { lang: "it", title: "Savoia" },
+        { lang: "zh", title: "萨瓦省" },
+        { lang: "de", title: "Savoie" },
+        { lang: "en", title: "Savoie" },
+        { lang: "fr", title: "Savoie" },
+      ],
+      area_type: "admin_limits",
+      available_langs: null,
+    },
+    { document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: "range", available_langs: null },
+  ],
+  associations: {
+    waypoints: [
+      { document_id: 37916, locales: [{ lang: "fr", title: "Mont Pourri" }], waypoint_type: "summit", elevation: 3779 },
+    ],
+    routes: [
+      {
+        document_id: 46624,
+        locales: [
+          { lang: "en", title: "Traverse via Grand Col", title_prefix: "Mont Pourri" },
+          {
+            lang: "it",
+            title: "Versant W: Col des Roches >> Glacier du Geay - da les Arcs",
+            title_prefix: "Mont Pourri",
+          },
+          { lang: "de", title: "Traverse über den Grand Col", title_prefix: "Mont Pourri" },
+          {
+            lang: "fr",
+            title: "Versant W - Grand Col → Col des Roches → Glacier du Geay",
+            title_prefix: "Mont Pourri",
+          },
+        ],
+      },
+    ],
+  },
+};
+
+// Route 675555 of GET /routes/675555 (2026-10-04): locales [it, en] in that order, no fr.
+const route675555 = {
+  document_id: 675555,
+  locales: [
+    {
+      lang: "it",
+      title: "Via Ferrata Gamma 2",
+      title_prefix: "Resegone",
+      description: "## Attacco\r\nDai **Piani d'Erna 1330m**, prendere il sentiero numero 1",
+    },
+    {
+      lang: "en",
+      title: "Via ferrata Gamma 2 - al Dente del Resegone",
+      title_prefix: "Resegone",
+      description: "Good things about this route ...",
+    },
+  ],
+  activities: ["via_ferrata"],
+  elevation_max: 1809,
+  via_ferrata_rating: "K5",
+};
+
+describe("get_route lang", () => {
+  it("prints the requested language's title and text, with no Language line when it exists (AC5.4)", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085Locales);
+
+    const result = await handleGetRoute({ id: 54085, lang: "en" });
+
+    expect(mockGetRoute).toHaveBeenCalledWith(54085);
+    expect(result.startsWith("# Mont Pourri : Normal route from Glacier du Geay (ID: 54085)\n")).toBe(true);
+    expect(result).toContain("Access to Mont Pourri refuge via Vallée du Ponturin (Peisey-Nancroix)");
+    expect(result).not.toContain("Zustieg");
+    expect(result).not.toContain("**Language**");
+  });
+
+  it.each([
+    ["de", { lang: "de" as const }, "**Language**: en (no de version; available: it, en)"],
+    ["no lang", {}, "**Language**: en (no fr version; available: it, en)"],
+  ])(
+    "says after the URL line which language is shown when the requested one is missing (%s, AC5.5)",
+    async (_label, lang, line) => {
+      mockGetRoute.mockResolvedValueOnce(route675555);
+
+      const result = await handleGetRoute({ id: 675555, ...lang });
+
+      expect(result.split("\n").slice(0, 3)).toEqual([
+        "# Resegone : Via ferrata Gamma 2 - al Dente del Resegone (ID: 675555)",
+        "**URL**: https://www.camptocamp.org/routes/675555",
+        line,
+      ]);
+      expect(result).toContain("Good things about this route ...");
+    },
+  );
+
+  it("prints the it text of route 675555 for lang it, with no Language line (AC5.5)", async () => {
+    mockGetRoute.mockResolvedValueOnce(route675555);
+
+    const result = await handleGetRoute({ id: 675555, lang: "it" });
+
+    expect(result.startsWith("# Resegone : Via Ferrata Gamma 2 (ID: 675555)\n")).toBe(true);
+    expect(result).toContain("Piani d'Erna 1330m");
+    expect(result).not.toContain("**Language**");
+  });
+
+  it("names areas and associations in the requested language (AC5.7)", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085Locales);
+
+    const result = await handleGetRoute({ id: 54085, lang: "de" });
+
+    expect(result).toContain(
+      "\n## Areas\n- [14274] Frankreich (country)\n- [14295] Savoie (admin_limits)\n- [14409] Vanoise (range)\n",
+    );
+    expect(result).toContain("\n## Associated waypoints\n- [37916] Mont Pourri (summit) | 3779m | main waypoint\n");
+    expect(result).toContain("\n## Associated routes\n- [46624] Mont Pourri : Traverse über den Grand Col");
+  });
+});

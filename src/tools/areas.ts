@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchAreas, getArea } from "../api/camptocamp.js";
 import type { AreaDetail } from "../api/camptocamp.js";
-import { pickLocale, pickTitle, formatHeader, formatAreaLine, formatListItems } from "./format.js";
+import { pickLocale, pickTitle, formatHeader, formatAreaLine, formatListItems, formatLanguageLine } from "./format.js";
+import type { Lang } from "./enums.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchAreasSchema = z.object({
@@ -18,16 +19,18 @@ export const searchAreasSchema = z.object({
 
 export const getAreaSchema = z.object({
   id: documentId("Area ID from Camptocamp"),
+  lang: langInput(),
 });
 
 export type SearchAreasInput = z.infer<typeof searchAreasSchema>;
 export type GetAreaInput = z.infer<typeof getAreaSchema>;
 
-function formatAreaDetail(area: AreaDetail): string {
-  const locale = pickLocale(area.locales);
+function formatAreaDetail(area: AreaDetail, lang?: Lang): string {
+  const locale = pickLocale(area.locales, lang);
   const lines: string[] = [];
 
-  lines.push(...formatHeader(pickTitle(area.locales), area.document_id, "areas"));
+  lines.push(...formatHeader(pickTitle(area.locales, lang), area.document_id, "areas"));
+  lines.push(...formatLanguageLine(area.locales, lang));
   lines.push(`\n**Type**: ${area.area_type}`);
 
   lines.push(...formatUserText("summary", "Summary", locale?.summary));
@@ -55,7 +58,7 @@ export async function handleSearchAreas(input: SearchAreasInput): Promise<string
 
 export async function handleGetArea(input: GetAreaInput): Promise<string> {
   const area = await getArea(input.id);
-  return formatAreaDetail(area);
+  return formatAreaDetail(area, input.lang);
 }
 
 export const areaToolDefinitions = [
@@ -73,7 +76,7 @@ export const areaToolDefinitions = [
     title: "Get area details",
     description:
       "Get a Camptocamp.org area by ID: title, type, summary and description. No geometry, no route count; use search_routes / search_waypoints with area_id for those. The second line is the document's camptocamp.org URL, to cite as the source. " +
-      USER_TEXT_NOTE,
+      `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${USER_TEXT_NOTE}`,
     inputSchema: getAreaSchema,
     handler: handleGetArea,
   },

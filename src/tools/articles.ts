@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchArticles, getArticle } from "../api/camptocamp.js";
 import type { ArticleSearchResult, ArticleDetail } from "../api/camptocamp.js";
@@ -12,7 +12,9 @@ import {
   formatWaypointLine,
   formatTitledLine,
   formatListItems,
+  formatLanguageLine,
 } from "./format.js";
+import type { Lang } from "./enums.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchArticlesSchema = z.object({
@@ -23,6 +25,7 @@ export const searchArticlesSchema = z.object({
 
 export const getArticleSchema = z.object({
   id: documentId("Article ID from Camptocamp"),
+  lang: langInput(),
 });
 
 export type SearchArticlesInput = z.infer<typeof searchArticlesSchema>;
@@ -40,16 +43,18 @@ function formatArticleSearchLine(article: ArticleSearchResult): string {
   return parts.join(" | ");
 }
 
-function formatArticleDetail(article: ArticleDetail): string {
-  const locale = pickLocale(article.locales);
-  const lines: string[] = formatHeader(pickTitle(article.locales), article.document_id, "articles");
+function formatArticleDetail(article: ArticleDetail, lang?: Lang): string {
+  const locale = pickLocale(article.locales, lang);
+  const lines: string[] = [
+    ...formatHeader(pickTitle(article.locales, lang), article.document_id, "articles"),
+    ...formatLanguageLine(article.locales, lang),
+  ];
 
   // A collab article has many editors, so its creator is not labelled as the author (#11, D3).
   const authorLabel = article.article_type === "personal" ? "Author" : "Created by";
   const author = article.author ? `${article.author.name} (user ID: ${article.author.user_id})` : "";
 
   const fields: Array<[string, string | null | undefined]> = [
-    ["Language", locale?.lang],
     ["Type", article.article_type],
     [authorLabel, author],
     ["Categories", joinList(article.categories)],
@@ -68,12 +73,12 @@ function formatArticleDetail(article: ArticleDetail): string {
 
   const routes = associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...formatListItems(routes, formatAssociatedRouteLine));
+    lines.push("\n## Associated routes", ...formatListItems(routes, (route) => formatAssociatedRouteLine(route, lang)));
   }
 
   const waypoints = associations?.waypoints;
   if (waypoints && waypoints.length > 0) {
-    lines.push("\n## Associated waypoints", ...formatListItems(waypoints, (waypoint) => formatWaypointLine(waypoint)));
+    lines.push("\n## Associated waypoints", ...waypoints.map((waypoint) => formatWaypointLine(waypoint, { lang })));
   }
 
   const titled: Array<[string, Associations["articles"]]> = [
@@ -83,7 +88,10 @@ function formatArticleDetail(article: ArticleDetail): string {
   ];
   for (const [kind, documents] of titled) {
     if (documents && documents.length > 0) {
-      lines.push(`\n## Associated ${kind}`, ...formatListItems(documents, formatTitledLine));
+      lines.push(
+        `\n## Associated ${kind}`,
+        ...formatListItems(documents, (document) => formatTitledLine(document, lang)),
+      );
     }
   }
 
@@ -107,7 +115,7 @@ export async function handleSearchArticles(input: SearchArticlesInput): Promise<
 
 export async function handleGetArticle(input: GetArticleInput): Promise<string> {
   const article = await getArticle(input.id);
-  return formatArticleDetail(article);
+  return formatArticleDetail(article, input.lang);
 }
 
 export const articleToolDefinitions = [
@@ -124,8 +132,8 @@ export const articleToolDefinitions = [
     name: "get_article",
     title: "Get article details",
     description:
-      "Get a Camptocamp.org article by ID: text, summary, author, type (collab/personal), categories, activities, quality, and the IDs of associated routes, waypoints, articles, outings and books, which can be followed with get_route, get_waypoint, get_article, get_outing and get_book. The Language line gives the language of the returned text (fr when available, otherwise another locale). The second line is the document's camptocamp.org URL, to cite as the source. " +
-      USER_TEXT_NOTE,
+      "Get a Camptocamp.org article by ID: text, summary, author, type (collab/personal), categories, activities, quality, and the IDs of associated routes, waypoints, articles, outings and books, which can be followed with get_route, get_waypoint, get_article, get_outing and get_book. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${USER_TEXT_NOTE}`,
     inputSchema: getArticleSchema,
     handler: handleGetArticle,
   },
