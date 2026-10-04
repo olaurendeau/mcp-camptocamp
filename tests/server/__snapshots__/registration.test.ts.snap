@@ -9,6 +9,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "id": {
         "description": "Area ID from Camptocamp",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
     },
@@ -24,6 +25,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "id": {
         "description": "Article ID from Camptocamp",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
     },
@@ -39,6 +41,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "id": {
         "description": "Book ID from Camptocamp",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
     },
@@ -54,6 +57,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "id": {
         "description": "Outing ID from Camptocamp",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
     },
@@ -69,6 +73,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "id": {
         "description": "Route ID from Camptocamp",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
     },
@@ -84,6 +89,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "id": {
         "description": "Waypoint ID from Camptocamp",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
     },
@@ -188,6 +194,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "area_id": {
         "description": "Camptocamp area ID from search_areas (e.g. 14409 for Vanoise)",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
       "date_from": {
@@ -219,11 +226,13 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "route_id": {
         "description": "Camptocamp route ID from search_routes",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
       "waypoint_id": {
         "description": "Camptocamp waypoint ID from search_waypoints",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
     },
@@ -236,6 +245,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "area_id": {
         "description": "Camptocamp area ID from search_areas (e.g. 14403 for Écrins)",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
       "limit": {
@@ -266,6 +276,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "user_id": {
         "description": "Camptocamp user ID (e.g. 430052 for username o.laurendeau)",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
     },
@@ -281,6 +292,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       "area_id": {
         "description": "Camptocamp area ID from search_areas (e.g. 14403 for Écrins)",
         "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
         "type": "integer",
       },
       "limit": {

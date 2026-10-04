@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentId } from "./inputs.js";
 import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
 import type {
   OutingSearchResponse,
@@ -10,12 +11,12 @@ import type {
 import { pickLocale, pickTitle, formatHeader, formatTitledLine } from "./format.js";
 
 export const searchUserOutingsSchema = z.object({
-  user_id: z.number().int().positive().describe("Camptocamp user ID (e.g. 430052 for username o.laurendeau)"),
+  user_id: documentId("Camptocamp user ID (e.g. 430052 for username o.laurendeau)"),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
 });
 
 export const getOutingSchema = z.object({
-  id: z.number().int().positive().describe("Outing ID from Camptocamp"),
+  id: documentId("Outing ID from Camptocamp"),
 });
 
 export const OUTING_ACTIVITIES = [
@@ -49,12 +50,7 @@ const MAX_RESULT_WINDOW = 10000;
 
 export const searchOutingsSchema = z.object({
   query: z.string().optional().describe("Keyword matched against outing titles (e.g. 'cosmiques')"),
-  area_id: z
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .describe("Camptocamp area ID from search_areas (e.g. 14409 for Vanoise)"),
+  area_id: documentId("Camptocamp area ID from search_areas (e.g. 14409 for Vanoise)").optional(),
   activity: z
     .enum(OUTING_ACTIVITIES, {
       errorMap: () => ({ message: `must be one of: ${OUTING_ACTIVITIES.join(", ")}` }),
@@ -67,8 +63,8 @@ export const searchOutingsSchema = z.object({
   date_to: isoDate
     .optional()
     .describe("Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it"),
-  route_id: z.number().int().positive().optional().describe("Camptocamp route ID from search_routes"),
-  waypoint_id: z.number().int().positive().optional().describe("Camptocamp waypoint ID from search_waypoints"),
+  route_id: documentId("Camptocamp route ID from search_routes").optional(),
+  waypoint_id: documentId("Camptocamp waypoint ID from search_waypoints").optional(),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   offset: z
     .number()

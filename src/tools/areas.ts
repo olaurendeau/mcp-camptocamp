@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentId } from "./inputs.js";
 import { searchAreas, getArea } from "../api/camptocamp.js";
 import type { AreaSearchResponse, AreaDetail } from "../api/camptocamp.js";
 import { pickLocale, formatHeader, formatAreaLine } from "./format.js";
@@ -13,7 +14,7 @@ export const searchAreasSchema = z.object({
 });
 
 export const getAreaSchema = z.object({
-  id: z.number().int().positive().describe("Area ID from Camptocamp"),
+  id: documentId("Area ID from Camptocamp"),
 });
 
 export type SearchAreasInput = z.infer<typeof searchAreasSchema>;
