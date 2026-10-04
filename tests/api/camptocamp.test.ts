@@ -54,7 +54,7 @@ describe("searchRoutes", () => {
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain("/routes");
     expect(url).toContain("q=Mont+Blanc");
-    expect(url).toContain("lang=fr");
+    expect(url).toContain("pl=fr");
 
     expect(result.total).toBe(1);
     expect(result.documents[0].document_id).toBe(123);
@@ -66,7 +66,7 @@ describe("searchRoutes", () => {
 
     await searchRoutes({ query: "test", limit: 5 });
 
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/routes?q=test&limit=5&lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/routes?q=test&limit=5&pl=fr`);
   });
 
   it("throws on non-OK response", async () => {
@@ -191,7 +191,7 @@ describe("searchUserOutings", () => {
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain("/outings");
     expect(url).toContain("u=430052");
-    expect(url).toContain("lang=fr");
+    expect(url).toContain("pl=fr");
 
     expect(result.total).toBe(42);
     expect(result.documents[0].document_id).toBe(1915495);
@@ -203,7 +203,7 @@ describe("searchUserOutings", () => {
 
     await searchUserOutings({ user_id: 430052, limit: 5 });
 
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?u=430052&limit=5&lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?u=430052&limit=5&pl=fr`);
   });
 
   it("throws on non-OK response", async () => {
@@ -326,7 +326,7 @@ describe("searchAreas", () => {
     const result = await searchAreas({ query: "ecrins" });
 
     expect(mockFetch).toHaveBeenCalledOnce();
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/areas?q=ecrins&limit=10&lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/areas?q=ecrins&limit=10&pl=fr`);
     expect(result.total).toBe(1);
     expect(result.documents[0].area_type).toBe("range");
     expect(result.documents[0].locales[0].title).toBe("Écrins");
@@ -338,7 +338,7 @@ describe("searchAreas", () => {
     const result = await searchAreas({ query: "valais", area_type: "range" });
 
     const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toBe(`${API}/areas?q=valais&limit=10&lang=fr&atyp=range`);
+    expect(url).toBe(`${API}/areas?q=valais&limit=10&pl=fr&atyp=range`);
     expect(url.endsWith("&atyp=range")).toBe(true);
     expect(result.total).toBe(2);
     expect(result.documents[0].locales[0].lang).toBe("sl");
@@ -396,7 +396,7 @@ describe("getArea", () => {
     const result = await getArea(14403);
 
     expect(mockFetch).toHaveBeenCalledOnce();
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/areas/14403?lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/areas/14403`);
     expect(result.document_id).toBe(14403);
     expect(result.area_type).toBe("range");
     expect(result.locales[0].summary).toBe(summary);
@@ -429,7 +429,7 @@ describe("area filter on searchRoutes and searchWaypoints", () => {
 
         await fn({ query: "Mont Blanc" });
 
-        expect(mockFetch.mock.calls[0][0]).toBe(`${API}/${path}?q=Mont+Blanc&limit=10&lang=fr`);
+        expect(mockFetch.mock.calls[0][0]).toBe(`${API}/${path}?q=Mont+Blanc&limit=10&pl=fr`);
       });
 
       it("appends a= after the existing parameters when an area is given", async () => {
@@ -437,7 +437,7 @@ describe("area filter on searchRoutes and searchWaypoints", () => {
 
         await fn({ query: "couloir", limit: 10, area_id: 14403 });
 
-        expect(mockFetch.mock.calls[0][0]).toBe(`${API}/${path}?q=couloir&limit=10&lang=fr&a=14403`);
+        expect(mockFetch.mock.calls[0][0]).toBe(`${API}/${path}?q=couloir&limit=10&pl=fr&a=14403`);
       });
 
       it("omits q= when no query is given", async () => {
@@ -446,7 +446,7 @@ describe("area filter on searchRoutes and searchWaypoints", () => {
         await fn({ limit: 10, area_id: 14403 });
 
         const url = mockFetch.mock.calls[0][0] as string;
-        expect(url).toBe(`${API}/${path}?limit=10&lang=fr&a=14403`);
+        expect(url).toBe(`${API}/${path}?limit=10&pl=fr&a=14403`);
         expect(url).not.toContain("q=");
       });
 
@@ -456,7 +456,7 @@ describe("area filter on searchRoutes and searchWaypoints", () => {
         await fn({ query: undefined, limit: 10, area_id: 14403 });
 
         const url = mockFetch.mock.calls[0][0] as string;
-        expect(url).toBe(`${API}/${path}?limit=10&lang=fr&a=14403`);
+        expect(url).toBe(`${API}/${path}?limit=10&pl=fr&a=14403`);
         expect(url).not.toContain("q=");
       });
     });
@@ -496,7 +496,7 @@ describe("areas on route details", () => {
 
     const result = await getRoute(54275);
 
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/routes/54275?lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/routes/54275`);
     expect(result.areas?.[0].document_id).toBe(14274);
     expect(result.areas?.map((a) => a.area_type)).toEqual(["country", "admin_limits", "range"]);
     expect(result.areas?.[1].locales[6]).toMatchObject({ lang: "fr", title: "Hautes-Alpes" });
@@ -596,13 +596,13 @@ describe("searchOutings", () => {
     return new URL(mockFetch.mock.calls[0][0] as string);
   }
 
-  it("sends only sort, limit, offset and lang when no filter is given", async () => {
+  it("sends only sort, limit, offset and pl when no filter is given", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [OUTING_COSMIQUES, OUTING_SKITOURING], total: 14 }));
 
     const result = await searchOutings();
 
     expect(mockFetch).toHaveBeenCalledOnce();
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?sort=-date_end&limit=10&offset=0&lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?sort=-date_end&limit=10&offset=0&pl=fr`);
     expect(result.total).toBe(14);
     expect(result.documents[0].areas?.[1].area_type).toBe("range");
     expect(result.documents[0].condition_rating).toBe("average");
@@ -763,7 +763,7 @@ describe("searchBooks", () => {
     const result = await searchBooks({ query: "vallot" });
 
     expect(mockFetch).toHaveBeenCalledOnce();
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books?q=vallot&limit=10&lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books?q=vallot&limit=10&pl=fr`);
     expect(result.total).toBe(12);
     expect(result.documents[0].author).toBe("Lucien Devies, Pierre Henry");
     expect(result.documents[0].locales[0].summary).toBeNull();
@@ -776,7 +776,7 @@ describe("searchBooks", () => {
 
     await searchBooks({ query: "x", limit: 5 });
 
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books?q=x&limit=5&lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books?q=x&limit=5&pl=fr`);
   });
 
   it("throws on non-OK response", async () => {
@@ -862,7 +862,7 @@ describe("getBook", () => {
     const result = await getBook(209293);
 
     expect(mockFetch).toHaveBeenCalledOnce();
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books/209293?lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books/209293`);
     expect(result.document_id).toBe(209293);
     expect(result.langs).toEqual(["fr"]);
     expect(result.isbn).toBeNull();
@@ -898,7 +898,7 @@ describe("getBook", () => {
 
     const result = await getBook(14746);
 
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books/14746?lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books/14746`);
     expect(result.isbn).toBe("2 911755  57 X");
     expect(result.nb_pages).toBeNull();
     expect(result.publication_date).toBeNull();
@@ -978,7 +978,7 @@ describe("searchArticles", () => {
     const result = await searchArticles({ query: "crampons", limit: 10 });
 
     expect(mockFetch).toHaveBeenCalledOnce();
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=crampons&limit=10&lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=crampons&limit=10&pl=fr`);
     expect(result.total).toBe(3);
     expect(result.documents[0].article_type).toBe("collab");
     expect(result.documents[0].categories).toEqual(["gear"]);
@@ -1011,7 +1011,7 @@ describe("searchArticles", () => {
 
     const result = await searchArticles({ query: "Du lointain nous nous rappellons", limit: 10 });
 
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=Du+lointain+nous+nous+rappellons&limit=10&lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=Du+lointain+nous+nous+rappellons&limit=10&pl=fr`);
     expect(result.total).toBe(1);
     expect(result.documents[0].document_id).toBe(193302);
     expect(result.documents[0].activities).toBeNull();
@@ -1023,7 +1023,7 @@ describe("searchArticles", () => {
 
     await searchArticles({ query: "x", limit: 5 });
 
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=x&limit=5&lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=x&limit=5&pl=fr`);
   });
 
   it("throws on non-OK response", async () => {
@@ -1092,7 +1092,7 @@ describe("getArticle", () => {
     const result = await getArticle(226838);
 
     expect(mockFetch).toHaveBeenCalledOnce();
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles/226838?lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles/226838`);
     expect(result.document_id).toBe(226838);
     expect(result.author?.user_id).toBe(4060);
     expect(result.author?.name).toBe("Thomas Ribière");
@@ -1177,7 +1177,7 @@ describe("getArticle", () => {
 
     const result = await getArticle(302774);
 
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles/302774?lang=fr`);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles/302774`);
     expect(result.associations?.routes?.[0].document_id).toBe(45148);
     expect(result.associations?.routes?.[0].locales[0].title_prefix).toBe("Le Portalet");
     expect(result.associations?.routes?.[0].locales[1].title).toBe("Face N");
@@ -1197,5 +1197,50 @@ describe("getArticle", () => {
     });
 
     await expect(getArticle(999999999)).rejects.toThrow("Camptocamp API error: 404 Not Found");
+  });
+});
+
+// D1: `lang=fr` is a no-op on every endpoint; `pl=fr` makes a search return one locale per document,
+// French first with the API's own fallback. `pl` does nothing on detail endpoints, so they send nothing.
+describe("locale parameters", () => {
+  const searches: Array<[string, () => Promise<unknown>, string]> = [
+    ["searchRoutes", () => searchRoutes({ query: "gamma" }), "/routes?q=gamma&limit=10&pl=fr"],
+    ["searchWaypoints", () => searchWaypoints({ query: "resegone" }), "/waypoints?q=resegone&limit=10&pl=fr"],
+    ["searchUserOutings", () => searchUserOutings({ user_id: 430052 }), "/outings?u=430052&limit=10&pl=fr"],
+    [
+      "searchOutings",
+      () => searchOutings({ area_id: 14403 }),
+      "/outings?a=14403&sort=-date_end&limit=10&offset=0&pl=fr",
+    ],
+    ["searchAreas", () => searchAreas({ query: "valais" }), "/areas?q=valais&limit=10&pl=fr"],
+    ["searchBooks", () => searchBooks({ query: "vallot" }), "/books?q=vallot&limit=10&pl=fr"],
+    ["searchArticles", () => searchArticles({ query: "crampons" }), "/articles?q=crampons&limit=10&pl=fr"],
+  ];
+
+  it.each(searches)("%s sends pl=fr and no lang", async (_name, call, expected) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await call();
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toBe(`${API}${expected}`);
+    expect(new URL(url).searchParams.has("lang")).toBe(false);
+  });
+
+  const details: Array<[string, (id: number) => Promise<unknown>, string]> = [
+    ["getRoute", getRoute, "routes"],
+    ["getWaypoint", getWaypoint, "waypoints"],
+    ["getOuting", getOuting, "outings"],
+    ["getArea", getArea, "areas"],
+    ["getBook", getBook, "books"],
+    ["getArticle", getArticle, "articles"],
+  ];
+
+  it.each(details)("%s sends no query string", async (_name, call, path) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ document_id: 675555, locales: [] }));
+
+    await call(675555);
+
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/${path}/675555`);
   });
 });

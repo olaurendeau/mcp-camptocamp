@@ -39,12 +39,10 @@ export type {
   ArticleDetail,
 } from "./schemas.js";
 
-const DEFAULT_LANG = "fr";
+// Searches send `pl=fr`: one locale per document, fr first, then the API's fallback (en, it, ...).
+// `lang` does nothing and `pl` is ignored on details, so detail requests send no query string.
+const PREFERRED_LANG = "fr";
 const DEFAULT_LIMIT = 10;
-
-function detailParams(): URLSearchParams {
-  return new URLSearchParams({ lang: DEFAULT_LANG });
-}
 
 // Options of searchRoutes and searchWaypoints: a keyword, an area, or both.
 interface KeywordOrAreaSearchOptions {
@@ -59,7 +57,7 @@ function keywordOrAreaParams(options: KeywordOrAreaSearchOptions): URLSearchPara
   const params = new URLSearchParams();
   if (options.query !== undefined) params.set("q", options.query);
   params.set("limit", String(options.limit ?? DEFAULT_LIMIT));
-  params.set("lang", DEFAULT_LANG);
+  params.set("pl", PREFERRED_LANG);
   if (options.area_id !== undefined) params.set("a", String(options.area_id));
   return params;
 }
@@ -73,7 +71,7 @@ export type BookSearchOptions = KeywordSearchOptions;
 export type ArticleSearchOptions = KeywordSearchOptions;
 
 function keywordParams(options: KeywordSearchOptions): URLSearchParams {
-  return new URLSearchParams({ q: options.query, limit: String(options.limit ?? DEFAULT_LIMIT), lang: DEFAULT_LANG });
+  return new URLSearchParams({ q: options.query, limit: String(options.limit ?? DEFAULT_LIMIT), pl: PREFERRED_LANG });
 }
 
 export async function searchRoutes(options: RouteSearchOptions): Promise<RouteSearchResponse> {
@@ -81,7 +79,7 @@ export async function searchRoutes(options: RouteSearchOptions): Promise<RouteSe
 }
 
 export async function getRoute(id: number): Promise<RouteDetail> {
-  return getJson<RouteDetail>({ path: `/routes/${id}`, params: detailParams() });
+  return getJson<RouteDetail>({ path: `/routes/${id}` });
 }
 
 export async function searchWaypoints(options: WaypointSearchOptions): Promise<WaypointSearchResponse> {
@@ -89,7 +87,7 @@ export async function searchWaypoints(options: WaypointSearchOptions): Promise<W
 }
 
 export async function getWaypoint(id: number): Promise<WaypointDetail> {
-  return getJson<WaypointDetail>({ path: `/waypoints/${id}`, params: detailParams() });
+  return getJson<WaypointDetail>({ path: `/waypoints/${id}` });
 }
 
 export interface UserOutingSearchOptions {
@@ -101,13 +99,13 @@ export async function searchUserOutings(options: UserOutingSearchOptions): Promi
   const params = new URLSearchParams({
     u: String(options.user_id),
     limit: String(options.limit ?? DEFAULT_LIMIT),
-    lang: DEFAULT_LANG,
+    pl: PREFERRED_LANG,
   });
   return getJson<OutingSearchResponse>({ path: "/outings", params });
 }
 
 export async function getOuting(id: number): Promise<OutingDetail> {
-  return getJson<OutingDetail>({ path: `/outings/${id}`, params: detailParams() });
+  return getJson<OutingDetail>({ path: `/outings/${id}` });
 }
 
 export type AreaType = "range" | "admin_limits" | "country";
@@ -123,7 +121,7 @@ export async function searchAreas(options: AreaSearchOptions): Promise<AreaSearc
 }
 
 export async function getArea(id: number): Promise<AreaDetail> {
-  return getJson<AreaDetail>({ path: `/areas/${id}`, params: detailParams() });
+  return getJson<AreaDetail>({ path: `/areas/${id}` });
 }
 
 // The API treats `date=X,` as the single day X, so open-ended ranges use these bounds.
@@ -156,7 +154,7 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
   search.set("sort", "-date_end");
   search.set("limit", String(params.limit ?? DEFAULT_LIMIT));
   search.set("offset", String(params.offset ?? 0));
-  search.set("lang", DEFAULT_LANG);
+  search.set("pl", PREFERRED_LANG);
   return getJson<OutingListResponse>({ path: "/outings", params: search });
 }
 
@@ -165,7 +163,7 @@ export async function searchBooks(options: BookSearchOptions): Promise<BookSearc
 }
 
 export async function getBook(id: number): Promise<BookDetail> {
-  return getJson<BookDetail>({ path: `/books/${id}`, params: detailParams() });
+  return getJson<BookDetail>({ path: `/books/${id}` });
 }
 
 export async function searchArticles(options: ArticleSearchOptions): Promise<ArticleSearchResponse> {
@@ -173,5 +171,5 @@ export async function searchArticles(options: ArticleSearchOptions): Promise<Art
 }
 
 export async function getArticle(id: number): Promise<ArticleDetail> {
-  return getJson<ArticleDetail>({ path: `/articles/${id}`, params: detailParams() });
+  return getJson<ArticleDetail>({ path: `/articles/${id}` });
 }

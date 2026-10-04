@@ -257,6 +257,16 @@ describe("schemas", () => {
     expect(searchAreasSchema.safeParse({}).success).toBe(false);
   });
 
+  it("rejects a blank query", () => {
+    for (const query of ["", "   "]) {
+      const parsed = searchAreasSchema.safeParse({ query });
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues).toEqual([
+        expect.objectContaining({ path: ["query"], message: "must not be blank" }),
+      ]);
+    }
+  });
+
   it("requires a positive integer id", () => {
     expect(getAreaSchema.safeParse({ id: 0 }).success).toBe(false);
     expect(getAreaSchema.safeParse({ id: -1 }).success).toBe(false);
