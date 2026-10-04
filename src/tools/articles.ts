@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
-import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
+import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchArticles, getArticle } from "../api/camptocamp.js";
 import type { ArticleSearchResult, ArticleDetail } from "../api/camptocamp.js";
 import {
@@ -101,7 +101,7 @@ export async function handleSearchArticles(input: SearchArticlesInput): Promise<
     offset,
     limit,
     lines: formatListItems(response.documents, formatArticleSearchLine),
-    filters: [`query "${query}"`],
+    filters: [`query ${quote(query)}`],
   });
 }
 
