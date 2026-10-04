@@ -84,7 +84,7 @@ Un point bloquant ne doit disparaître que de deux façons : le développeur le 
 
 Ce commentaire va sur la PR, et non sur l'issue, parce que le reviewer ne lit que la PR.
 
-C'est une convention, pas un contrôle technique : les agents écrivent sur GitHub avec le même compte que l'humain et le hook ne filtre pas les commentaires, donc n'importe quel agent pourrait techniquement poster ce commentaire. Seul le coordinateur le poste, et uniquement après la réponse de l'humain ; l'historique de la PR et de l'issue permet de le vérifier.
+C'est une convention, pas un contrôle technique : les agents écrivent sur GitHub avec le même compte que l'humain et le hook ne filtre pas les commentaires, donc n'importe quel agent pourrait techniquement poster ce commentaire. Seul le coordinateur le poste, et uniquement après la réponse de l'humain. Cette réponse passe par `AskUserQuestion` et ne laisse aucune trace sur GitHub : la seule trace vérifiable est le commentaire `Decision: finding "…" rejected by the human — Reason: …` posté sur la PR, qui ne prouve pas à lui seul que l'humain a répondu.
 
 ## Protection de `main`
 
