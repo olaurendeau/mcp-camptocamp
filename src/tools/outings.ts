@@ -79,7 +79,7 @@ export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
 export type GetOutingInput = z.infer<typeof getOutingSchema>;
 export type SearchOutingsInput = z.infer<typeof searchOutingsSchema>;
 
-function formatDateRange(dateStart?: string, dateEnd?: string): string {
+function formatDateRange(dateStart?: string | null, dateEnd?: string | null): string {
   if (!dateStart) return "";
   if (!dateEnd || dateStart === dateEnd) return dateStart;
   return `${dateStart} → ${dateEnd}`;
@@ -195,7 +195,7 @@ function formatOutingLine(outing: OutingListItem): string {
     if (isPresent(value)) parts.push(`${label}${value}${unit}`);
   };
 
-  push("", formatDateRange(outing.date_start ?? undefined, outing.date_end ?? undefined));
+  push("", formatDateRange(outing.date_start, outing.date_end));
   push("Conditions: ", outing.condition_rating);
   push("Max elevation: ", outing.elevation_max, "m");
   push("Elevation gain: ", outing.height_diff_up, "m");
