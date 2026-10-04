@@ -377,7 +377,8 @@ describe("search_articles filters", () => {
       activity: "skitouring",
     });
 
-    expect(mockSearchArticles).toHaveBeenCalledWith({
+    expect(mockSearchArticles).toHaveBeenCalledOnce();
+    expect(mockSearchArticles.mock.calls[0][0]).toStrictEqual({
       query: "avalanche",
       limit: 10,
       offset: 0,
@@ -496,7 +497,7 @@ describe("article tool definitions", () => {
     expect(description).toContain("listed when any of its categories or activities matches");
   });
 
-  it("gives the meaning of site_info, association, c2c_meetings and soft_mobility, and none for tags", () => {
+  it("gives the meaning of site_info, association, c2c_meetings and soft_mobility only", () => {
     const description = articleToolDefinitions[0].description;
     for (const meaning of [
       "site_info (help pages about Camptocamp.org)",
@@ -507,7 +508,10 @@ describe("article tool definitions", () => {
       expect(description).toContain(meaning);
     }
     expect(description).toContain("tags,");
-    expect(description).not.toMatch(/tags \(/);
+    // The live data does not bear out a meaning for these (2026-10-04, first acat results): none is given.
+    for (const category of ["tags", "topoguide_supplements", "topoguide supplements", "mountain environment"]) {
+      expect(description).not.toContain(`${category} (`);
+    }
   });
 
   it("accepts only a positive integer id", () => {
