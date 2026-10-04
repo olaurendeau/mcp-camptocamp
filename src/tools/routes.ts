@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentId } from "./inputs.js";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteSearchResponse, RouteDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, formatHeader, formatAreasSection } from "./format.js";
@@ -6,16 +7,11 @@ import { pickLocale, pickTitle, formatHeader, formatAreasSection } from "./forma
 export const searchRoutesSchema = z.object({
   query: z.string().optional().describe("Search query for routes (e.g. 'Mont Blanc voie normale')"),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
-  area_id: z
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .describe("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)"),
+  area_id: documentId("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)").optional(),
 });
 
 export const getRouteSchema = z.object({
-  id: z.number().int().positive().describe("Route ID from Camptocamp"),
+  id: documentId("Route ID from Camptocamp"),
 });
 
 export type SearchRoutesInput = z.infer<typeof searchRoutesSchema>;
