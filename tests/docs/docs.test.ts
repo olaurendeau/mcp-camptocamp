@@ -9,17 +9,21 @@ import {
   checkNames,
   checkNodeVersion,
   checkSources,
+  checkSupportMatrix,
   fencedBlocks,
   headingSlugs,
   inlineCodeSpans,
   jsonBlocks,
   links,
   listMarkdownFiles,
+  section,
   slugify,
 } from "./markdown.js";
 
 const DOCS = join(ROOT, "docs");
 const README = join(ROOT, "README.md");
+const INDEX = join(DOCS, "README.md");
+const REMOTE_ONLY = join(DOCS, "clients", "remote-only.md");
 const docFiles = listMarkdownFiles(DOCS);
 const checkedFiles = [...docFiles, README];
 const engines = (JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { engines: { node: string } }).engines
@@ -303,6 +307,43 @@ describe("docs checks fail on bad fixtures", () => {
       checkSources("## Sources\n\n- https://example.com/docs\n\nLast verified: 2026-10-04 against official docs\n"),
     ).toEqual([]);
   });
+
+  it("a support matrix that is missing, has other columns, a row without a page link or another date", () => {
+    const head = "## Support matrix\n\n| Client | Works? | Page | Last verified |\n| --- | --- | --- | --- |";
+    const gettingStarted = join(DOCS, "getting-started.md");
+    const troubleshooting = join(DOCS, "troubleshooting.md");
+
+    expect(checkSupportMatrix(INDEX, "## Clients", [])).toEqual(['no "## Support matrix" section']);
+    expect(checkSupportMatrix(INDEX, "## Support matrix\n\n| Client | Page |\n| --- | --- |", [])).toEqual([
+      "expected the columns Client, Works?, Page, Last verified, got Client, Page",
+    ]);
+    const rows = [
+      head,
+      "| A | Yes | none | 2026-10-04 |",
+      "| B | Yes | [page](getting-started.md#prerequisites) | 2026-01-01 |",
+      "| C | Yes | [page](getting-started.md) |",
+    ].join("\n");
+    expect(checkSupportMatrix(INDEX, rows, [gettingStarted, troubleshooting])).toEqual([
+      'row "A": no link to a page',
+      'row "B": Last verified 2026-01-01, but docs/getting-started.md says 2026-10-04',
+      'row "C": expected 4 cells, got 3',
+      "docs/troubleshooting.md: no row links this page",
+    ]);
+  });
+
+  it("accepts a support matrix whose rows link the pages with their Last verified date", () => {
+    const text = [
+      "## Support matrix",
+      "",
+      "| Client | Works? | Page | Last verified |",
+      "| --- | --- | --- | --- |",
+      "| A | Yes | [Getting started](getting-started.md#prerequisites) | 2026-10-04 |",
+      "",
+      "## Next",
+    ].join("\n");
+
+    expect(checkSupportMatrix(INDEX, text, [join(DOCS, "getting-started.md")])).toEqual([]);
+  });
 });
 
 describe("docs/ and README.md", () => {
@@ -351,6 +392,28 @@ describe("pages", () => {
     expect(headingSlugs(read(join(DOCS, "README.md")))).toEqual(
       expect.arrayContaining(["start-here", "clients", "guides", "tool-reference"]),
     );
+  });
+
+  it("the docs index has a support matrix that links every client page and the agent SDK guide", () => {
+    const pages = [...listMarkdownFiles(join(DOCS, "clients")), join(DOCS, "agent-sdks.md")];
+
+    expect(checkSupportMatrix(INDEX, read(INDEX), pages)).toEqual([]);
+  });
+
+  it("the remote-only page quotes a source for 6 surfaces, links a local alternative, and has no recipe", () => {
+    const text = read(REMOTE_ONLY);
+    const surfaces = text
+      .split(/^## /m)
+      .slice(1)
+      .filter(
+        (part) => /^> /m.test(part) && /https:\/\//.test(part) && links(part).some((link) => /\.md(#|$)/.test(link)),
+      );
+
+    expect(surfaces.map((part) => part.split("\n")[0])).toHaveLength(6);
+    expect(section(text, "Gemini app (gemini.google.com)")).toMatch(
+      /no official MCP documentation found \(\d{4}-\d{2}-\d{2}\)/,
+    );
+    expect(fencedBlocks(text)).toEqual([]);
   });
 
   it("getting started gives the launch, pre-warm, smoke-test and Claude Code commands", () => {

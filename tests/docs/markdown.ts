@@ -279,3 +279,58 @@ export function checkSources(text: string): string[] {
   }
   return problems;
 }
+
+const LAST_VERIFIED = /^Last verified: (\d{4}-\d{2}-\d{2}) against official docs$/m;
+const MATRIX_COLUMNS = ["Client", "Works?", "Page", "Last verified"];
+
+/** The body of the `## <title>` section of `text`, up to the next `## ` heading, or undefined without one. */
+export function section(text: string, title: string): string | undefined {
+  const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^## ${escaped}\\s*$([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, "m").exec(text)?.[1];
+}
+
+/**
+ * Problems with the `## Support matrix` of the docs index `file` (content `text`): its columns, a page link and
+ * the page's own `Last verified` date in each row, and a row for each of `pages`.
+ */
+export function checkSupportMatrix(file: string, text: string, pages: string[]): string[] {
+  const body = section(text, "Support matrix");
+  if (body === undefined) {
+    return ['no "## Support matrix" section'];
+  }
+  const table = body
+    .split("\n")
+    .filter((line) => line.startsWith("|"))
+    .map((line) =>
+      line
+        .slice(1, -1)
+        .split("|")
+        .map((cell) => cell.trim()),
+    );
+  const header = table.length === 0 ? "no table" : table[0].join(", ");
+  if (header !== MATRIX_COLUMNS.join(", ")) {
+    return [`expected the columns ${MATRIX_COLUMNS.join(", ")}, got ${header}`];
+  }
+  const rows = table.slice(2);
+  const linked = new Set<string>();
+  const problems = rows.flatMap((cells) => {
+    const [client, , page, date] = cells;
+    if (cells.length !== MATRIX_COLUMNS.length) {
+      return [`row "${client}": expected ${MATRIX_COLUMNS.length} cells, got ${cells.length}`];
+    }
+    const target = links(page).find((link) => !/^[a-z][a-z0-9+.-]*:/i.test(link));
+    if (target === undefined) {
+      return [`row "${client}": no link to a page`];
+    }
+    const resolved = resolve(dirname(file), target.replace(/#.*/, ""));
+    linked.add(resolved);
+    const verified = existsSync(resolved) ? LAST_VERIFIED.exec(readFileSync(resolved, "utf8"))?.[1] : undefined;
+    return verified === date
+      ? []
+      : [`row "${client}": Last verified ${date}, but ${relative(ROOT, resolved)} says ${verified ?? "nothing"}`];
+  });
+  return [
+    ...problems,
+    ...pages.filter((page) => !linked.has(page)).map((page) => `${relative(ROOT, page)}: no row links this page`),
+  ];
+}
