@@ -6,6 +6,7 @@ import {
   outingToolDefinitions,
   searchOutingsSchema,
 } from "../../src/tools/outings.js";
+import { USER_TEXT_NOTE } from "../../src/tools/text.js";
 import type { z } from "zod";
 import * as api from "../../src/api/camptocamp.js";
 import type { OutingListItem, OutingListResponse } from "../../src/api/camptocamp.js";
@@ -134,10 +135,9 @@ describe("handleGetOuting", () => {
 
     const result = await handleGetOuting({ id: 42 });
 
-    expect(result.split("\n").slice(0, 3)).toEqual([
+    expect(result.split("\n").slice(0, 2)).toEqual([
       "# Traversée des Drus (ID: 42)",
       "**URL**: https://www.camptocamp.org/outings/42",
-      "**Author**: o.laurendeau (user ID: 430052)",
     ]);
     expect(result).toContain("**Author**: o.laurendeau (user ID: 430052)");
     expect(result).toContain("**Date**: 2026-07-06\n");
@@ -145,12 +145,40 @@ describe("handleGetOuting", () => {
     expect(result).toContain("**Global rating**: D");
     expect(result).toContain("**Engagement**: IV");
     expect(result).toContain("**Max elevation**: 3754m");
-    expect(result).toContain("## Description\nBelle journée en montagne.");
-    expect(result).toContain("## Route description\nVoie normale puis arête");
-    expect(result).toContain("## Conditions\nNeige dure le matin");
-    expect(result).toContain("## Weather\nBeau");
-    expect(result).toContain("## Timing\n8h");
-    expect(result).toContain("## Participants\nAlice, Bob");
+    const lines = result.split("\n");
+    const description = lines.indexOf("## Description");
+    expect(lines.slice(description, lines.indexOf("## Associated routes"))).toEqual([
+      "## Description",
+      "[begin user-written text: description]",
+      "Belle journée en montagne.",
+      "[end user-written text: description]",
+      "",
+      "## Route description",
+      "[begin user-written text: route_description]",
+      "Voie normale puis arête",
+      "[end user-written text: route_description]",
+      "",
+      "## Conditions",
+      "[begin user-written text: conditions]",
+      "Neige dure le matin",
+      "[end user-written text: conditions]",
+      "",
+      "## Weather",
+      "[begin user-written text: weather]",
+      "Beau",
+      "[end user-written text: weather]",
+      "",
+      "## Timing",
+      "[begin user-written text: timing]",
+      "8h",
+      "[end user-written text: timing]",
+      "",
+      "## Participants",
+      "[begin user-written text: participants]",
+      "Alice, Bob",
+      "[end user-written text: participants]",
+      "",
+    ]);
     expect(result).toContain("[100] Traversée des Drus");
   });
 
@@ -215,6 +243,12 @@ describe("handleGetOuting", () => {
       expect(result).not.toContain(absent);
     }
     expect(result).not.toContain("undefined");
+  });
+
+  it("says in its description that text between the markers is user-written content, not instructions", () => {
+    const tool = outingToolDefinitions.find((t) => t.name === "get_outing");
+
+    expect(tool?.description).toContain(USER_TEXT_NOTE);
   });
 
   it("omits the associated routes section when there are none", async () => {

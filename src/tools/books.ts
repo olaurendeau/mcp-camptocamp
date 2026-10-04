@@ -11,6 +11,7 @@ import {
   formatWaypointLine,
   formatTitledLine,
 } from "./format.js";
+import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchBooksSchema = z.object({
   query: searchQuery("Search query matched against book titles (e.g. 'Vallot', 'Mont Blanc')", { allowBlank: false }),
@@ -67,13 +68,8 @@ function formatBookDetail(book: BookDetail): string {
     lines.push("", ...labelled);
   }
 
-  if (locale?.summary) {
-    lines.push(`\n## Summary\n${locale.summary}`);
-  }
-
-  if (locale?.description) {
-    lines.push(`\n## Description\n${locale.description}`);
-  }
+  lines.push(...formatUserText("summary", "Summary", locale?.summary));
+  lines.push(...formatUserText("description", "Description", locale?.description));
 
   const routes = book.associations?.routes;
   if (routes && routes.length > 0) {
@@ -116,7 +112,8 @@ export const bookToolDefinitions = [
     name: "get_book",
     title: "Get book details",
     description:
-      "Get full details of a specific book from Camptocamp.org by its ID: author, editor, publication date, ISBN, pages, languages, website, book types, activities, summary, description, the routes and waypoints it covers, and its related articles (with IDs for get_route, get_waypoint and get_article). Values are shown exactly as Camptocamp stores them; missing fields are left out. The second line is the document's camptocamp.org URL, to cite as the source.",
+      "Get full details of a specific book from Camptocamp.org by its ID: author, editor, publication date, ISBN, pages, languages, website, book types, activities, summary, description, the routes and waypoints it covers, and its related articles (with IDs for get_route, get_waypoint and get_article). Labelled fields are shown as Camptocamp stores them; missing fields are left out. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      USER_TEXT_NOTE,
     inputSchema: getBookSchema,
     handler: handleGetBook,
   },
