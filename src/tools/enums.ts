@@ -64,6 +64,10 @@ export const BOOK_TYPES = [
   "magazine",
 ] as const;
 
+// Outing conditions, best first (v6_common condition_ratings).
+export const CONDITION_RATINGS = ["excellent", "good", "average", "poor", "awful"] as const;
+export type ConditionRating = (typeof CONDITION_RATINGS)[number];
+
 /** One value of `values`; anything else fails with "must be one of: <values>". */
 export function enumValue<T extends string>(values: readonly [T, ...T[]]) {
   return z.enum(values, { errorMap: () => ({ message: `must be one of: ${values.join(", ")}` }) });

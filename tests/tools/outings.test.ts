@@ -15,7 +15,12 @@ import { outingDetailSchema, outingListResponseSchema } from "../../src/api/sche
 import { throughSchema } from "./through-schema.js";
 import { BARE_RATING } from "./bare-rating.js";
 
-vi.mock("../../src/api/camptocamp.js");
+// Not an automock: it would empty OUTING_RATING_FIELDS, from which the search_outings schema is built.
+vi.mock("../../src/api/camptocamp.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof api>()),
+  getOuting: vi.fn(),
+  searchOutings: vi.fn(),
+}));
 
 const mockGetOuting = throughSchema(vi.mocked(api.getOuting), outingDetailSchema);
 const mockSearchOutings = throughSchema(vi.mocked(api.searchOutings), outingListResponseSchema);
@@ -1078,6 +1083,228 @@ describe("handleSearchOutings", () => {
 
       await expect(search({})).rejects.toThrow("Camptocamp API error: 500 Internal Server Error");
     });
+  });
+});
+
+// S6 on #153: outings by the rating, conditions, max elevation and elevation gain their author reported.
+describe("search_outings reported rating, conditions and elevation filters", () => {
+  // From GET /outings?a=14409&act=skitouring&trat=3.1,4.1&ocond=excellent,good&oalt=3000,4000&odif=1000,1500
+  // &sort=-date_end&pl=fr (2026-10-04, total 192), the first result: no global_rating key at all.
+  const peclet: OutingListItem = {
+    document_id: 1913877,
+    locales: [{ lang: "fr", title: "Aiguille de Péclet : Versant W" }],
+    activities: ["skitouring"],
+    condition_rating: "good",
+    date_end: "2026-06-06",
+    date_start: "2026-06-06",
+    elevation_max: 3561,
+    height_diff_up: 1261,
+    ski_rating: "3.3",
+    labande_global_rating: "AD+",
+    areas: [
+      { document_id: 14274, area_type: "country", locales: [{ lang: "fr", title: "France" }] },
+      { document_id: 14409, area_type: "range", locales: [{ lang: "fr", title: "Vanoise" }] },
+      { document_id: 14295, area_type: "admin_limits", locales: [{ lang: "fr", title: "Savoie" }] },
+    ],
+    author: { name: "NiFo73", user_id: 1706362 },
+  };
+
+  const OUTING_SYSTEMS =
+    "ski_rating, labande_global_rating, global_rating, engagement_rating, equipment_rating, ice_rating, " +
+    "rock_free_rating, via_ferrata_rating, hiking_rating, snowshoe_rating, mtb_up_rating, mtb_down_rating";
+
+  it("sends the AC6.2 filters and repeats them in the header", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([peclet], 192));
+
+    const result = await search({
+      area_id: 14409,
+      activity: "skitouring",
+      rating_system: "ski_rating",
+      rating_min: "3.1",
+      rating_max: "4.1",
+      condition_at_least: "good",
+      max_elevation_min: 3000,
+      max_elevation_max: 4000,
+      height_diff_up_min: 1000,
+      height_diff_up_max: 1500,
+    });
+
+    expect(mockSearchOutings).toHaveBeenCalledWith({
+      area_id: 14409,
+      activity: "skitouring",
+      rating: { system: "ski_rating", min: "3.1", max: "4.1" },
+      condition_at_least: "good",
+      elevation_max: { min: 3000, max: 4000 },
+      height_diff_up: { min: 1000, max: 1500 },
+      limit: 10,
+      offset: 0,
+    });
+    const lines = result.split("\n");
+    expect(lines.slice(0, 3)).toEqual([
+      "Found 192 outing(s), most recent first. Showing 1 from offset 0:",
+      "Filters: area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1, conditions good or better, " +
+        "max elevation 3000 → 4000m, elevation gain 1000 → 1500m",
+      "",
+    ]);
+    expect(lines[3]).toContain(
+      "Conditions: good | Max elevation: 3561m | Elevation gain: 1261m | Ski rating (Toponeige): 3.3",
+    );
+    expect(lines[3]).toMatch(/^- \[1913877\] Aiguille de Péclet : Versant W \(skitouring\) \| 2026-06-06 \| /);
+  });
+
+  it("sends one-sided ranges and describes them with from / up to (AC6.3)", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+
+    const result = await search({
+      rating_system: "global_rating",
+      rating_max: "AD",
+      max_elevation_min: 3000,
+      height_diff_up_max: 1500,
+    });
+
+    expect(mockSearchOutings).toHaveBeenCalledWith({
+      rating: { system: "global_rating", max: "AD" },
+      elevation_max: { min: 3000 },
+      height_diff_up: { max: 1500 },
+      limit: 10,
+      offset: 0,
+    });
+    expect(result).toBe(
+      "No outings found matching global rating up to AD, max elevation from 3000m, elevation gain up to 1500m.",
+    );
+  });
+
+  it("lists every filter in a fixed order", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([peclet], 3));
+
+    const result = await search({
+      waypoint_id: 37916,
+      route_id: 54085,
+      period_start: "03-01",
+      period_end: "05-31",
+      date_from: "2020-01-01",
+      height_diff_up_min: 1000,
+      max_elevation_max: 4000,
+      condition_at_least: "excellent",
+      rating_system: "labande_global_rating",
+      rating_min: "PD",
+      activity: "skitouring",
+      area_id: 14409,
+      query: "pourri",
+      user_id: 430052,
+    });
+
+    expect(result.split("\n")[1]).toBe(
+      'Filters: user 430052, query "pourri", area 14409, activity skitouring, Labande global rating from PD, ' +
+        "conditions excellent or better, max elevation up to 4000m, elevation gain from 1000m, dates from 2020-01-01, " +
+        "period 03-01 → 05-31 of every year, route 54085, waypoint 37916",
+    );
+  });
+
+  it.each(["excellent", "good", "average", "poor", "awful"] as const)(
+    "passes condition_at_least %s as given",
+    async (condition) => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+
+      const result = await search({ condition_at_least: condition });
+
+      expect(mockSearchOutings).toHaveBeenCalledWith({ condition_at_least: condition, limit: 10, offset: 0 });
+      expect(result).toBe(`No outings found matching conditions ${condition} or better.`);
+    },
+  );
+
+  // AC6.4: the same checks and messages as search_routes, before any request.
+  it.each<[string, z.input<typeof searchOutingsSchema>, string]>([
+    [
+      "an off-scale rating_min",
+      { rating_system: "global_rating", rating_min: "XX" },
+      'rating_min "XX" is not a valid global_rating value; valid values: F, F+, PD-, PD, PD+, AD-, AD, AD+, D-, D, D+, TD-, TD, TD+, ED-, ED, ED+, ED4, ED5, ED6, ED7',
+    ],
+    [
+      "an off-scale rating_max",
+      { rating_system: "snowshoe_rating", rating_max: "T2" },
+      'rating_max "T2" is not a valid snowshoe_rating value; valid values: R1, R2, R3, R4, R5',
+    ],
+    [
+      "reversed rating bounds",
+      { rating_system: "ski_rating", rating_min: "4.2", rating_max: "3.1" },
+      "rating_min must not be above rating_max",
+    ],
+    [
+      "rating_min without rating_system, listing the 12 outing systems",
+      { rating_min: "AD" },
+      `rating_min and rating_max need a rating_system, one of: ${OUTING_SYSTEMS}`,
+    ],
+    [
+      "rating_system without bounds",
+      { rating_system: "global_rating" },
+      "rating_system needs rating_min, rating_max or both",
+    ],
+    [
+      "reversed max elevation bounds",
+      { max_elevation_min: 4000, max_elevation_max: 3000 },
+      "max_elevation_min must not be above max_elevation_max",
+    ],
+    [
+      "reversed elevation gain bounds",
+      { height_diff_up_min: 1500, height_diff_up_max: 1000 },
+      "height_diff_up_min must not be above height_diff_up_max",
+    ],
+  ])("rejects %s before any request", async (_label, input, message) => {
+    await expect(search(input)).rejects.toThrow(new Error(message));
+    expect(mockSearchOutings).not.toHaveBeenCalled();
+  });
+
+  it("offers the 12 outing rating systems with their scales, and none of the 8 others", () => {
+    const description = searchOutingsSchema.shape.rating_system.description ?? "";
+
+    expect(searchOutingsSchema.shape.rating_system.unwrap().options).toEqual(OUTING_SYSTEMS.split(", "));
+    expect(description).toContain("ski_rating: 1.1, 1.2, 1.3, 2.1");
+    expect(description).toContain("mtb_down_rating: V1, V2, V3, V4, V5");
+    for (const excluded of ["labande_ski_rating", "ski_exposition", "risk_rating", "mixed_rating"]) {
+      expect(description).not.toContain(excluded);
+    }
+    expect(searchOutingsSchema.shape.condition_at_least.unwrap().options).toEqual([
+      "excellent",
+      "good",
+      "average",
+      "poor",
+      "awful",
+    ]);
+  });
+
+  // AC6.5: the filters read what the author reported for that day, not the route's grades.
+  it("says the filters are what the author reported and that outings without a value are excluded", () => {
+    const description = outingToolDefinitions.find((t) => t.name === "search_outings")?.description ?? "";
+
+    for (const phrase of [
+      "rating_system",
+      "condition_at_least",
+      "max_elevation_min / max_elevation_max",
+      "height_diff_up_min / height_diff_up_max",
+      "the ratings and conditions the outing's author reported for that day",
+      "outings without a value for a chosen filter are excluded",
+    ]) {
+      expect(description).toContain(phrase);
+    }
+  });
+
+  // AC6.6: search_user_outings stays user_id, limit and offset.
+  it("leaves search_user_outings without the new filters, dropping them unsent", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+
+    await handleSearchUserOutings(
+      searchUserOutingsSchema.parse({
+        user_id: 430052,
+        rating_system: "ski_rating",
+        rating_min: "3.1",
+        condition_at_least: "good",
+        max_elevation_min: 3000,
+        height_diff_up_min: 1000,
+      }),
+    );
+
+    expect(mockSearchOutings).toHaveBeenCalledWith({ user_id: 430052, limit: 10, offset: 0 });
   });
 });
 

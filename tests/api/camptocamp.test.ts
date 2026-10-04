@@ -21,6 +21,7 @@ import {
 } from "../../src/api/camptocamp.js";
 import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
 import { wellFormed } from "./well-formed.js";
+import type { ConditionRating } from "../../src/tools/enums.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -1632,8 +1633,8 @@ describe("searchOutings", () => {
   });
 
   // `ocond=excellent` alone matches every outing with a condition: the range always starts at excellent,
-  // and `excellent,excellent` returns the excellent outings only (548 in area 14409 skitouring, 2026-10-04).
-  it.each([
+  // and `excellent,excellent` returns the excellent outings only (live check in the contract tests).
+  it.each<[ConditionRating, string]>([
     ["excellent", "excellent,excellent"],
     ["good", "excellent,good"],
     ["average", "excellent,average"],

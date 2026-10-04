@@ -196,14 +196,50 @@ describe("search_outings field inputs", () => {
     ["a day that does not exist", { period_start: "02-30", period_end: "03-10" }, "period_start", PERIOD_MESSAGE],
     ["a period day without zero padding", { period_start: "06-01", period_end: "6-1" }, "period_end", PERIOD_MESSAGE],
     ["a full date as period", { period_start: "2020-06-01", period_end: "06-30" }, "period_start", PERIOD_MESSAGE],
+    [
+      "a date with words around it",
+      { date_from: "on 2026-09-01" },
+      "date_from",
+      "must be a real date in YYYY-MM-DD format",
+    ],
+    [
+      "an unknown condition",
+      { condition_at_least: "XX" },
+      "condition_at_least",
+      "must be one of: excellent, good, average, poor, awful",
+    ],
+    [
+      "a negative max elevation",
+      { max_elevation_min: -1 },
+      "max_elevation_min",
+      "Number must be greater than or equal to 0",
+    ],
   ])("rejects %s with the field and the rule", async (_label, args, field, message) => {
     const fetchMock = stubFetch();
     const client = await connect();
 
     const result = await client.callTool({ name: "search_outings", arguments: args });
 
-    // A malformed value fails both the format regex and the real-date refine, so the same line can appear twice.
-    expect(new Set(validationIssues(result, "search_outings"))).toEqual(new Set([`${message} at ${field}`]));
+    // One line per bad field: a malformed value fails the format check only, not also the real-date one.
+    expect(validationIssues(result, "search_outings")).toEqual([`${message} at ${field}`]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports each malformed date or period day once", async () => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "search_outings",
+      arguments: { date_from: "2026-9-1", date_to: "26-09-01", period_start: "6-1", period_end: "06-1" },
+    });
+
+    expect(validationIssues(result, "search_outings")).toEqual([
+      "must be a real date in YYYY-MM-DD format at date_from",
+      "must be a real date in YYYY-MM-DD format at date_to",
+      `${PERIOD_MESSAGE} at period_start`,
+      `${PERIOD_MESSAGE} at period_end`,
+    ]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -504,6 +540,123 @@ describe("search_waypoints and search_books type inputs", () => {
       pl: "fr",
       btyp: "topo",
       act: "skitouring",
+    });
+  });
+});
+
+const OUTING_RATING_SYSTEMS =
+  "ski_rating, labande_global_rating, global_rating, engagement_rating, equipment_rating, ice_rating, " +
+  "rock_free_rating, via_ferrata_rating, hiking_rating, snowshoe_rating, mtb_up_rating, mtb_down_rating";
+
+// S6 on #153: the outing filters on reported rating, conditions, max elevation and elevation gain.
+describe("search_outings rating, condition and elevation filters", () => {
+  // AC6.4: the API silently ignores these 8 route rating systems on /outings, so they are refused.
+  it.each([
+    "labande_ski_rating",
+    "ski_exposition",
+    "risk_rating",
+    "rock_required_rating",
+    "exposition_rock_rating",
+    "aid_rating",
+    "mixed_rating",
+    "hiking_mtb_exposition",
+  ])("rejects rating_system %s, listing the 12 outing systems, without calling Camptocamp", async (system) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "search_outings",
+      arguments: { area_id: 14409, rating_system: system, rating_min: "1" },
+    });
+
+    expect(validationIssues(result, "search_outings")).toEqual([
+      `must be one of: ${OUTING_RATING_SYSTEMS} at rating_system`,
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, Record<string, unknown>, string]>([
+    [
+      "an off-scale rating bound",
+      { rating_system: "ski_rating", rating_min: "S3" },
+      'Error: rating_min "S3" is not a valid ski_rating value; valid values: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6',
+    ],
+    [
+      "reversed rating bounds",
+      { rating_system: "hiking_rating", rating_min: "T4", rating_max: "T2" },
+      "Error: rating_min must not be above rating_max",
+    ],
+    [
+      "rating bounds without a rating_system",
+      { rating_max: "AD" },
+      `Error: rating_min and rating_max need a rating_system, one of: ${OUTING_RATING_SYSTEMS}`,
+    ],
+    [
+      "reversed max elevation bounds",
+      { max_elevation_min: 4000, max_elevation_max: 3000 },
+      "Error: max_elevation_min must not be above max_elevation_max",
+    ],
+  ])("rejects %s with its message, without calling Camptocamp", async (_label, args, message) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_outings", arguments: args });
+
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe(message);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends the filters of AC6.2 and the one-sided ranges of AC6.3 as Camptocamp search parameters", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH), jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    await client.callTool({
+      name: "search_outings",
+      arguments: {
+        area_id: 14409,
+        activity: "skitouring",
+        rating_system: "ski_rating",
+        rating_min: "3.1",
+        rating_max: "4.1",
+        condition_at_least: "good",
+        max_elevation_min: 3000,
+        max_elevation_max: 4000,
+        height_diff_up_min: 1000,
+        height_diff_up_max: 1500,
+      },
+    });
+    await client.callTool({
+      name: "search_outings",
+      arguments: {
+        rating_system: "global_rating",
+        rating_max: "AD",
+        max_elevation_min: 3000,
+        height_diff_up_max: 1500,
+      },
+    });
+
+    const [full, oneSided] = fetchMock.mock.calls.map(([url]) => new URL(url as string).searchParams);
+    expect(Object.fromEntries(full)).toEqual({
+      a: "14409",
+      act: "skitouring",
+      trat: "3.1,4.1",
+      ocond: "excellent,good",
+      oalt: "3000,4000",
+      odif: "1000,1500",
+      sort: "-date_end",
+      limit: "10",
+      offset: "0",
+      pl: "fr",
+    });
+    expect(Object.fromEntries(oneSided)).toEqual({
+      grat: ",AD",
+      oalt: "3000",
+      odif: ",1500",
+      sort: "-date_end",
+      limit: "10",
+      offset: "0",
+      pl: "fr",
     });
   });
 });

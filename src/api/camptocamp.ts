@@ -1,4 +1,5 @@
 import { getJson } from "./http.js";
+import type { ConditionRating } from "../tools/enums.js";
 import type {
   RouteSearchResponse,
   RouteDetail,
@@ -232,7 +233,7 @@ export interface OutingSearchParams {
   user_id?: number;
   period?: { start: string; end: string }; // MM-DD, start on or before end
   rating?: { system: OutingRatingField; min?: string; max?: string };
-  condition_at_least?: string; // excellent, good, average, poor or awful
+  condition_at_least?: ConditionRating;
   elevation_max?: { min?: number; max?: number };
   height_diff_up?: { min?: number; max?: number };
   limit?: number; // default DEFAULT_LIMIT
