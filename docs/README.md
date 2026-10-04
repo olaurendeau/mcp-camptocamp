@@ -11,6 +11,9 @@ The server runs on your machine and talks to its client over stdio. A client tha
 
 ## Clients
 
+- [Mistral Vibe Code](clients/mistral-vibe-code.md): the Vibe Code CLI and its VS Code extension, with the `config.toml` entry and per-tool permissions.
+- [Gemini CLI and Gemini Code Assist](clients/gemini-cli.md): `settings.json`, folder trust, and a policy rule that allows the read-only tools.
+
 Until your client has its own page here, use the [Claude Code command](getting-started.md#claude-code) or the [configuration for other MCP clients](getting-started.md#other-mcp-clients).
 
 ## Guides
