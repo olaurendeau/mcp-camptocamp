@@ -462,3 +462,56 @@ describe("search_routes field inputs", () => {
     expect(Object.fromEntries(second)).toEqual({ limit: "10", offset: "0", pl: "fr", w: "37916", act: "skitouring" });
   });
 });
+
+// AC9.2, AC9.3, R7: type and activity filters on search_waypoints and search_books.
+describe("search_waypoints and search_books type inputs", () => {
+  it.each<[string, Record<string, unknown>, string, string]>([
+    [
+      "search_waypoints",
+      { query: "pourri", waypoint_type: "refuge" },
+      "waypoint_type",
+      "must be one of: summit, pass, lake, waterfall, locality, bisse, canyon, access, climbing_outdoor, climbing_indoor, hut, gite, shelter, bivouac, camp_site, base_camp, local_product, paragliding_takeoff, paragliding_landing, cave, waterpoint, weather_station, webcam, virtual, slackline_spot, misc",
+    ],
+    [
+      "search_books",
+      { query: "vanoise", book_type: "nonsense" },
+      "book_type",
+      "must be one of: topo, environment, historical, biography, photos-art, novel, technics, tourism, magazine",
+    ],
+    ["search_books", { query: "vanoise", activity: "skiing" }, "activity", `must be one of: ${OUTING_ACTIVITY_LIST}`],
+  ])("%s rejects %j without calling Camptocamp", async (tool, args, field, message) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: tool, arguments: args });
+
+    expect(result.isError).toBe(true);
+    const text = resultText(result);
+    expect(text).toContain(`Invalid arguments for tool ${tool}`);
+    expect(text).toContain(`"${field}"`);
+    expect(text).toContain(message);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends wtyp, btyp and act as Camptocamp search parameters", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH), jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    await client.callTool({ name: "search_waypoints", arguments: { query: "pourri", waypoint_type: "hut" } });
+    await client.callTool({
+      name: "search_books",
+      arguments: { query: "vanoise", book_type: "topo", activity: "skitouring" },
+    });
+
+    const [waypoints, books] = fetchMock.mock.calls.map(([url]) => new URL(String(url)).searchParams);
+    expect(Object.fromEntries(waypoints)).toEqual({ q: "pourri", limit: "10", offset: "0", pl: "fr", wtyp: "hut" });
+    expect(Object.fromEntries(books)).toEqual({
+      q: "vanoise",
+      limit: "10",
+      offset: "0",
+      pl: "fr",
+      btyp: "topo",
+      act: "skitouring",
+    });
+  });
+});

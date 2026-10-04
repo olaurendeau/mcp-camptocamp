@@ -5,7 +5,7 @@ import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, isPresent, formatHeader, formatWaypointLine, formatAreasSection } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
-import { CUSTODIANSHIPS } from "./enums.js";
+import { CUSTODIANSHIPS, WAYPOINT_TYPES, enumValue } from "./enums.js";
 
 export const searchWaypointsSchema = z.object({
   query: searchQuery("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')", {
@@ -14,6 +14,12 @@ export const searchWaypointsSchema = z.object({
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   offset: searchOffset(),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)").optional(),
+  waypoint_type: enumValue(WAYPOINT_TYPES)
+    .optional()
+    .describe(
+      `Waypoint type, one of: ${WAYPOINT_TYPES.join(", ")} (hut = mountain hut, climbing_outdoor = crag, access = trailhead or parking). ` +
+        "Narrows a query or area_id; not a filter on its own",
+    ),
 });
 
 export const getWaypointSchema = z.object({
@@ -95,13 +101,14 @@ export async function handleSearchWaypoints(input: SearchWaypointsInput): Promis
   if (query === undefined && input.area_id === undefined) {
     throw new Error("search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.");
   }
-  const { limit, offset, area_id } = input;
+  const { limit, offset, area_id, waypoint_type } = input;
   assertResultWindow(offset, limit);
 
-  const response = await searchWaypoints({ query, limit, offset, area_id });
+  const response = await searchWaypoints({ query, limit, offset, area_id, waypoint_type });
   const filters: string[] = [];
   if (query !== undefined) filters.push(`query "${query}"`);
   if (area_id !== undefined) filters.push(`area ${area_id}`);
+  if (waypoint_type !== undefined) filters.push(`waypoint type ${waypoint_type}`);
   return formatSearchPage({
     kind: "waypoint",
     total: response.total,
@@ -122,7 +129,7 @@ export const waypointToolDefinitions = [
     name: "search_waypoints",
     title: "Search waypoints",
     description:
-      "Search for waypoints (summits, shelters, huts, bivouacs) on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching waypoints with basic info (ID, title, type, elevation), after a header giving the total, the offset and the filters. " +
+      "Search for waypoints (summits, shelters, huts, bivouacs) on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. waypoint_type narrows the search to one type (e.g. hut, summit, climbing_outdoor). Returns a list of matching waypoints with basic info (ID, title, type, elevation), after a header giving the total, the offset and the filters. " +
       PAGING_NOTE,
     inputSchema: searchWaypointsSchema,
     handler: handleSearchWaypoints,

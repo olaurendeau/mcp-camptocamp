@@ -23,6 +23,47 @@ export const ROUTE_TYPES = ["return_same_way", "loop", "loop_hut", "traverse", "
 
 export const ROUTE_CONFIGURATIONS = ["edge", "pillar", "face", "corridor", "goulotte", "glacier"] as const;
 
+export const WAYPOINT_TYPES = [
+  "summit",
+  "pass",
+  "lake",
+  "waterfall",
+  "locality",
+  "bisse",
+  "canyon",
+  "access",
+  "climbing_outdoor",
+  "climbing_indoor",
+  "hut",
+  "gite",
+  "shelter",
+  "bivouac",
+  "camp_site",
+  "base_camp",
+  "local_product",
+  "paragliding_takeoff",
+  "paragliding_landing",
+  "cave",
+  "waterpoint",
+  "weather_station",
+  "webcam",
+  "virtual",
+  "slackline_spot",
+  "misc",
+] as const;
+
+export const BOOK_TYPES = [
+  "topo",
+  "environment",
+  "historical",
+  "biography",
+  "photos-art",
+  "novel",
+  "technics",
+  "tourism",
+  "magazine",
+] as const;
+
 /** One value of `values`; anything else fails with "must be one of: <values>". */
 export function enumValue<T extends string>(values: readonly [T, ...T[]]) {
   return z.enum(values, { errorMap: () => ({ message: `must be one of: ${values.join(", ")}` }) });
