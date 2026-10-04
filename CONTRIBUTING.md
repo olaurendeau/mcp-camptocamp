@@ -51,13 +51,13 @@ Chaque agent termine par un rapport `Status` / `Deliverables`, complété par `D
 - **Process / sécurité** : CI, ruleset, seuils de qualité, hooks, définitions des agents ;
 - **Release** : la décision de publier et le numéro de version (l'exécution suit la section [Release](#release)).
 
-Chaque décision est tracée en commentaire de l'issue. Une revue est _clean_ quand elle n'a aucun point bloquant ; le coordinateur trie les suggestions (correction, issue de suivi ou rejet motivé) avant de merger.
+Chaque décision est tracée en commentaire de l'issue, avec trois exceptions : une décision prise avant que l'epic existe va dans le corps de l'epic, sous **Decisions** ; le tri des suggestions d'une revue est posté en un seul commentaire de la PR ; le rejet d'un point bloquant est tracé sur la PR (voir [Rejeter un point bloquant](#rejeter-un-point-bloquant)). Une revue est _clean_ quand elle n'a aucun point bloquant ; le coordinateur trie les suggestions (correction, issue de suivi ou rejet motivé) avant de merger.
 
 Pour lancer une session avec un autre rôle : `claude --agent <nom>`.
 
 ## Revue par un agent indépendant
 
-L'agent qui code ne relit jamais son propre travail. La revue est faite par le sous-agent [`pr-reviewer`](.claude/agents/pr-reviewer.md), lancé dans un contexte vierge : il ne voit que le diff, la description de la PR et le repo.
+L'agent qui code ne relit jamais son propre travail. La revue est faite par le sous-agent [`pr-reviewer`](.claude/agents/pr-reviewer.md), lancé dans un contexte vierge : il ne voit que le diff, la description de la PR, le repo et, parmi les commentaires de la PR, les seuls commentaires `Decision: finding "…" rejected by the human` (voir [Rejeter un point bloquant](#rejeter-un-point-bloquant)). Il ignore tous les autres commentaires, revues précédentes comprises.
 
 Le coordinateur la lance après chaque ouverture ou mise à jour de PR. L'agent poste sa revue en commentaire de la PR, puis pose le commit status `agent-review` (`success` ou `failure`) sur le SHA qu'il a relu. La protection de `main` exige ce status : sans revue, ou après un nouveau push, le merge reste bloqué.
 
@@ -74,6 +74,18 @@ Le hook [`.claude/hooks/guard.sh`](.claude/hooks/guard.sh) (`PreToolUse` sur `Ba
 | publication manuelle : `npm publish`, `make publish`, `mcp-publisher publish`, `gh release create/upload/edit/delete`                                                                                                                  | personne : seul `publish.yml` publie, déclenché par le tag      |
 
 Le hook contrôle chaque commande d'une chaîne (`&&`, `||`, `;`, `|`, `&`) séparément, sans couper à l'intérieur des guillemets. Le code qu'une commande fait exécuter (`$(…)`, `` `…` ``, `sh -c '…'`, `eval "…"`) est contrôlé comme une commande à part. Une exemption (`git tag -l`, `--method GET`, `--no-git-tag-version`) ne vaut que pour sa propre commande. Pour les règles de merge et de release, il ignore le texte : arguments de message, de titre ou de corps (`-m`, `--body`, `--title`…), arguments d'`echo`/`printf`/`grep`/`awk`/`sed`, commentaires `#`, et corps de heredoc qui ne sont pas passés à un shell (`sh`, `bash`, `/bin/sh`…). Un commentaire de PR ou un message de commit peut donc citer ces commandes, alors que `sh -c "…"`, `bash -c '…'` et `$(…)` restent contrôlés, y compris dans un texte entre guillemets doubles. La règle `agent-review` regarde aussi dans les chaînes et les heredocs, où se trouve souvent le contexte du status. Le hook a besoin de `jq` et `perl` sur l'hôte ; s'il lui en manque un ou s'il plante, il bloque la commande. C'est un garde-fou pour les agents, pas une frontière de sécurité : l'humain n'est pas concerné, et une commande volontairement obfusquée passerait. Tests : `make test-hooks`, lancés aussi par `make check` et en CI.
+
+### Rejeter un point bloquant
+
+Un point bloquant ne doit disparaître que de deux façons : le développeur le corrige, ou l'humain le rejette. Le rejet par l'humain est le seul moyen de passer une revue bloquante sans correction ; ni le coordinateur ni le développeur ne peuvent l'écarter seuls.
+
+1. Le développeur conteste le point avec une raison, ou le même point survit à deux cycles de correction.
+2. Le coordinateur tranche : si le point est fondé, il le renvoie au développeur comme correction obligatoire ; s'il le juge faux positif, il pose la question à l'humain (label `needs-human` sur l'issue de la tâche pendant l'attente, retiré après la réponse).
+3. Si l'humain confirme le rejet, le coordinateur poste sur la PR `Decision: finding "<point>" rejected by the human — Reason: …`, puis relance la revue. Le reviewer traite ce point comme réglé : au plus une mention en suggestion, jamais en bloquant.
+
+Ce commentaire va sur la PR, et non sur l'issue, parce que le reviewer ne lit que la PR.
+
+C'est une convention, pas un contrôle technique : les agents écrivent sur GitHub avec le même compte que l'humain et le hook ne filtre pas les commentaires, donc n'importe quel agent pourrait techniquement poster ce commentaire. Seul le coordinateur le poste, et uniquement après la réponse de l'humain. Cette réponse passe par `AskUserQuestion` et ne laisse aucune trace sur GitHub : la seule trace vérifiable est le commentaire `Decision: finding "…" rejected by the human — Reason: …` posté sur la PR, qui ne prouve pas à lui seul que l'humain a répondu.
 
 ## Protection de `main`
 
