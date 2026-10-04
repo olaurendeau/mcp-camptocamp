@@ -6,6 +6,7 @@ import { outingToolDefinitions } from "./tools/outings.js";
 import { areaToolDefinitions } from "./tools/areas.js";
 import { bookToolDefinitions } from "./tools/books.js";
 import { articleToolDefinitions } from "./tools/articles.js";
+import { VERSION } from "./version.js";
 
 export interface ToolDefinition {
   name: string;
@@ -35,7 +36,7 @@ const toolDefinitions: ToolDefinition[] = [
 ];
 
 export function createServer(): McpServer {
-  const server = new McpServer({ name: "mcp-camptocamp", version: "1.0.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "mcp-camptocamp", version: VERSION }, { instructions: INSTRUCTIONS });
 
   for (const tool of toolDefinitions) {
     server.registerTool(
