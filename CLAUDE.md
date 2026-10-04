@@ -23,6 +23,7 @@ src/
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
     ├── enums.ts          # Camptocamp's closed value lists: filters (activities, route types, configurations), CUSTODIANSHIPS meanings
     ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window; quote() escapes echoed user input (query, rating bounds) onto one line
+    ├── filters.ts        # Shared rating and range filters of search_routes and search_outings: inputs, checks, Filters text
     ├── text.ts           # formatUserText: rewrites image tags and internal links, delimits, demotes and caps user-written text
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
@@ -51,6 +52,7 @@ tests/
     ├── format.test.ts      # Shared formatting helper unit tests
     ├── ratings.test.ts     # Rating label order, Labande joining and rating scales
     ├── paging.test.ts      # Shared search paging unit tests
+    ├── filters.test.ts     # Shared rating and range filter checks and messages
     ├── text.test.ts        # formatUserText unit tests
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
@@ -125,7 +127,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_waypoint`        | Waypoint by ID (altitude, GPS, areas, hut details, access period, routes, books, recent outings)                 |
 | `search_user_outings` | Alias of `search_outings` by `user_id`: outings the user is listed on, written or not; newest first, paged       |
 | `get_outing`          | Outing by ID (ratings, conditions, weather, participants, linked accounts, routes; no author: see search lines)  |
-| `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, listed user; newest first, paged      |
+| `search_outings`      | Outings by keyword, area, activity, reported rating/conditions/elevation, dates, period, route, waypoint, user   |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                               |
 | `search_books`        | Search books by title only (author/ISBN unreliable), by `book_type` and `activity`; paged with `offset`          |
@@ -136,6 +138,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 Virtual waypoints (`waypoint_type` `virtual`) are groupings with no real location: no tool prints their elevation or coordinates.
 
 `search_routes` needs at least one filter (D5 on #58); any one is enough. Rating bounds are checked against the scale of `rating_system` (`ROUTE_RATING_SYSTEMS` in `src/tools/ratings.ts`) and list values against `src/tools/enums.ts` before any request, since Camptocamp silently ignores an unknown value (R7). The same goes for `waypoint_type` on `search_waypoints` (`WAYPOINT_TYPES`, 26 values; not a filter on its own, so a query or `area_id` is still required) and `book_type` / `activity` on `search_books` (`BOOK_TYPES`, 9 values; `ACTIVITIES`).
+
+`search_outings` also filters on what the outing's author reported for that day (S6 on #153): `rating_system` with `rating_min` / `rating_max` over the 12 systems of `OUTING_RATING_FIELDS` (the API ignores the 8 others on `/outings`, so the schema refuses them), `condition_at_least` (`CONDITION_RATINGS`, sent as `ocond=excellent,<v>`), `max_elevation_min` / `max_elevation_max` (`oalt`) and `height_diff_up_min` / `height_diff_up_max` (`odif`). Their checks and messages are those of `search_routes`, shared in `src/tools/filters.ts`; `search_user_outings` takes none of them.
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 

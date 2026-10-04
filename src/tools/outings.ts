@@ -2,8 +2,8 @@ import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
 import { ACTIVITIES, enumValue } from "./enums.js";
-import { getOuting, searchOutings } from "../api/camptocamp.js";
-import type { OutingDetail, OutingListResponse } from "../api/camptocamp.js";
+import { CONDITION_RATINGS, OUTING_RATING_FIELDS, getOuting, searchOutings } from "../api/camptocamp.js";
+import type { OutingDetail, OutingListResponse, OutingSearchParams } from "../api/camptocamp.js";
 import {
   pickLocale,
   pickTitle,
@@ -16,7 +16,8 @@ import {
   formatMalformed,
 } from "./format.js";
 import { isMalformed } from "../api/schemas.js";
-import { formatRatingLines } from "./ratings.js";
+import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
+import { describeRange, heightDiffUp, rangeFilter, ratingBound, ratingFilter, ratingScales } from "./filters.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const getOutingSchema = z.object({
@@ -31,20 +32,33 @@ function isRealDate(s: string): boolean {
 
 // Factories, not shared instances: a shared instance becomes a JSON Schema `$ref` to the first
 // field using it, and strict clients then show that field's description for the others.
+// The regex stays as the JSON Schema `pattern`; the real-date check only runs on a value that matches it,
+// so that a malformed value reports one issue, not the same line twice.
 const DATE_MESSAGE = "must be a real date in YYYY-MM-DD format";
+const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 const isoDate = () =>
   z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, DATE_MESSAGE)
-    .refine(isRealDate, DATE_MESSAGE);
+    .regex(DATE_FORMAT, DATE_MESSAGE)
+    .refine((s) => !DATE_FORMAT.test(s) || isRealDate(s), DATE_MESSAGE);
 
 // A day of the year for `period`, checked in 2020 (a leap year) like the API layer sends it.
 const PERIOD_DAY_MESSAGE = "must be a real day in MM-DD format (e.g. 06-01; 02-29 allowed)";
+const PERIOD_DAY_FORMAT = /^\d{2}-\d{2}$/;
 const periodDay = () =>
   z
     .string()
-    .regex(/^\d{2}-\d{2}$/, PERIOD_DAY_MESSAGE)
-    .refine((s) => isRealDate(`2020-${s}`), PERIOD_DAY_MESSAGE);
+    .regex(PERIOD_DAY_FORMAT, PERIOD_DAY_MESSAGE)
+    .refine((s) => !PERIOD_DAY_FORMAT.test(s) || isRealDate(`2020-${s}`), PERIOD_DAY_MESSAGE);
+
+function maxElevation(bound: string) {
+  return z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(`${bound} max elevation reached in metres, inclusive (outings without a max elevation are excluded)`);
+}
 
 export const searchOutingsSchema = z.object({
   query: searchQuery("Keyword matched against outing titles (e.g. 'cosmiques')", { allowBlank: true }).optional(),
@@ -52,6 +66,26 @@ export const searchOutingsSchema = z.object({
   activity: enumValue(ACTIVITIES)
     .optional()
     .describe(`Activity, one of: ${ACTIVITIES.join(", ")}`),
+  rating_system: enumValue(OUTING_RATING_FIELDS)
+    .optional()
+    .describe(
+      "Rating system to filter on, with rating_min and/or rating_max: the rating the outing's author reported for " +
+        "that day (inclusive bounds, one system per call; ski_rating is the Toponeige ski rating). Valid values per " +
+        `system, easiest first: ${ratingScales(OUTING_RATING_FIELDS)}. ` +
+        "Outings without a value for the chosen rating are excluded.",
+    ),
+  rating_min: ratingBound("Easiest rating to include, from the scale of rating_system (e.g. '3.1' for ski_rating)"),
+  rating_max: ratingBound("Hardest rating to include, from the scale of rating_system (e.g. 'AD' for global_rating)"),
+  condition_at_least: enumValue(CONDITION_RATINGS)
+    .optional()
+    .describe(
+      `Conditions the outing's author reported, this value or better; from best to worst: ${CONDITION_RATINGS.join(", ")} ` +
+        "(outings without reported conditions are excluded)",
+    ),
+  max_elevation_min: maxElevation("Lowest"),
+  max_elevation_max: maxElevation("Highest"),
+  height_diff_up_min: heightDiffUp("Lowest", "outings"),
+  height_diff_up_max: heightDiffUp("Highest", "outings"),
   date_from: isoDate()
     .optional()
     .describe("Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it"),
@@ -125,12 +159,24 @@ function formatOutingDetail(outing: OutingDetail): string {
   return lines.join("\n");
 }
 
-function describeFilters(params: SearchOutingsInput): string[] {
+// The Filters line: `area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1, conditions good or better`.
+function describeFilters(params: OutingSearchParams): string[] {
   const filters: string[] = [];
   if (params.user_id !== undefined) filters.push(`user ${params.user_id}`);
   if (params.query !== undefined) filters.push(`query ${quote(params.query)}`);
   if (params.area_id !== undefined) filters.push(`area ${params.area_id}`);
   if (params.activity !== undefined) filters.push(`activity ${params.activity}`);
+  if (params.rating !== undefined) {
+    const { system, min, max } = params.rating;
+    filters.push(`${ROUTE_RATING_SYSTEMS[system].label} ${describeRange(min, max)}`);
+  }
+  if (params.condition_at_least !== undefined) filters.push(`conditions ${params.condition_at_least} or better`);
+  if (params.elevation_max !== undefined) {
+    filters.push(`max elevation ${describeRange(params.elevation_max.min, params.elevation_max.max, "m")}`);
+  }
+  if (params.height_diff_up !== undefined) {
+    filters.push(`elevation gain ${describeRange(params.height_diff_up.min, params.height_diff_up.max, "m")}`);
+  }
   if (params.date_from !== undefined && params.date_to !== undefined) {
     filters.push(`dates ${params.date_from} → ${params.date_to}`);
   } else if (params.date_from !== undefined) {
@@ -138,8 +184,8 @@ function describeFilters(params: SearchOutingsInput): string[] {
   } else if (params.date_to !== undefined) {
     filters.push(`dates until ${params.date_to}`);
   }
-  if (params.period_start !== undefined && params.period_end !== undefined) {
-    filters.push(`period ${params.period_start} → ${params.period_end} of every year`);
+  if (params.period !== undefined) {
+    filters.push(`period ${params.period.start} → ${params.period.end} of every year`);
   }
   if (params.route_id !== undefined) filters.push(`route ${params.route_id}`);
   if (params.waypoint_id !== undefined) filters.push(`waypoint ${params.waypoint_id}`);
@@ -150,44 +196,79 @@ function describeFilters(params: SearchOutingsInput): string[] {
 // Camptocamp computes it with a 365.2425-day year, so a boundary day can drop out depending on the year.
 const PERIOD_NOTE = "Note: Camptocamp's period filter can miss outings on the first or last day of the range.";
 
-function formatOutingList(response: OutingListResponse, params: SearchOutingsInput): string {
+function formatOutingList(
+  response: OutingListResponse,
+  params: OutingSearchParams,
+  { limit, offset }: Pick<SearchOutingsInput, "limit" | "offset">,
+): string {
   return formatSearchPage({
     kind: "outing",
     total: response.total,
-    offset: params.offset,
-    limit: params.limit,
+    offset,
+    limit,
     lines: formatListItems(response.documents, formatOutingLine),
     filters: describeFilters(params),
-    notes: params.period_start !== undefined ? [PERIOD_NOTE] : [],
+    notes: params.period !== undefined ? [PERIOD_NOTE] : [],
     order: ", most recent first",
   });
 }
 
-// The SDK has already validated `input` against searchOutingsSchema and applied its defaults.
-export async function handleSearchOutings(input: SearchOutingsInput): Promise<string> {
-  const { query, ...rest } = input;
-  // A blank query counts as missing: the API treats `q=` like no `q` and returns every outing.
-  const params: SearchOutingsInput = query?.trim() ? { query, ...rest } : rest;
-
-  if (params.date_from !== undefined && params.date_to !== undefined && params.date_from > params.date_to) {
-    throw new Error(`date_from (${params.date_from}) must be on or before date_to (${params.date_to}).`);
-  }
-  const { period_start, period_end, ...filters } = params;
-  if ((period_start === undefined) !== (period_end === undefined)) {
+// The period of the input, after the checks the schema cannot make on one field.
+function periodFilter(start: string | undefined, end: string | undefined): OutingSearchParams["period"] {
+  if ((start === undefined) !== (end === undefined)) {
     throw new Error("period_start and period_end must be given together (MM-DD, e.g. 06-01 and 06-30).");
   }
-  if (period_start !== undefined && period_end !== undefined && period_start > period_end) {
+  if (start === undefined || end === undefined) return undefined;
+  if (start > end) {
     // Camptocamp returns no outing at all for a wrapping period.
-    throw new Error(
-      `period cannot wrap around the new year; make two calls (${period_start} → 12-31 and 01-01 → ${period_end})`,
-    );
+    throw new Error(`period cannot wrap around the new year; make two calls (${start} → 12-31 and 01-01 → ${end})`);
   }
-  assertResultWindow(params.offset, params.limit);
+  return { start, end };
+}
 
-  const period =
-    period_start !== undefined && period_end !== undefined ? { start: period_start, end: period_end } : undefined;
-  const response = await searchOutings(period ? { ...filters, period } : filters);
-  return formatOutingList(response, params);
+// The options for searchOutings, after every check that needs more than one field; only given filters are set.
+function outingSearchParams(input: SearchOutingsInput): OutingSearchParams {
+  const {
+    query,
+    rating_system,
+    rating_min,
+    rating_max,
+    max_elevation_min,
+    max_elevation_max,
+    height_diff_up_min,
+    height_diff_up_max,
+    period_start,
+    period_end,
+    ...rest
+  } = input;
+  if (rest.date_from !== undefined && rest.date_to !== undefined && rest.date_from > rest.date_to) {
+    throw new Error(`date_from (${rest.date_from}) must be on or before date_to (${rest.date_to}).`);
+  }
+  const period = periodFilter(period_start, period_end);
+  // R7: the API ignores an off-scale bound and the 8 route systems it has no outing parameter for.
+  const rating = ratingFilter({ rating_system, rating_min, rating_max }, OUTING_RATING_FIELDS);
+  const elevationMax = rangeFilter(max_elevation_min, max_elevation_max, ["max_elevation_min", "max_elevation_max"]);
+  const heightDiffUp = rangeFilter(height_diff_up_min, height_diff_up_max, [
+    "height_diff_up_min",
+    "height_diff_up_max",
+  ]);
+  assertResultWindow(rest.offset, rest.limit);
+  return {
+    // A blank query counts as missing: the API treats `q=` like no `q` and returns every outing.
+    ...(query?.trim() ? { query } : {}),
+    ...rest,
+    ...(rating !== undefined && { rating }),
+    ...(elevationMax !== undefined && { elevation_max: elevationMax }),
+    ...(heightDiffUp !== undefined && { height_diff_up: heightDiffUp }),
+    ...(period !== undefined && { period }),
+  };
+}
+
+// The SDK has already validated `input` against searchOutingsSchema and applied its defaults.
+export async function handleSearchOutings(input: SearchOutingsInput): Promise<string> {
+  const params = outingSearchParams(input);
+  const response = await searchOutings(params);
+  return formatOutingList(response, params, input);
 }
 
 // AC5.6: a thin alias, so its output is exactly that of search_outings for the same user.
@@ -205,7 +286,7 @@ export const outingToolDefinitions = [
     name: "search_user_outings",
     title: "List a user's outings",
     description:
-      "List a Camptocamp user's outings (trip reports), most recent first: outings this user is listed on as a participant, not only those they wrote. An alias of search_outings with only user_id (the number in the user's camptocamp.org profile URL), limit and offset, returning exactly what search_outings returns for that user_id. Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow. To filter a user's outings by area, activity, dates, period, route or waypoint, call search_outings with user_id. An unknown user ID yields no results, not an error.",
+      "List a Camptocamp user's outings (trip reports), most recent first: outings this user is listed on as a participant, not only those they wrote. An alias of search_outings with only user_id (the number in the user's camptocamp.org profile URL), limit and offset, returning exactly what search_outings returns for that user_id. Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow. To filter a user's outings by area, activity, rating, conditions, elevation, dates, period, route or waypoint, call search_outings with user_id. An unknown user ID yields no results, not an error.",
     inputSchema: searchUserOutingsSchema,
     handler: handleSearchUserOutings,
   },
@@ -222,7 +303,7 @@ export const outingToolDefinitions = [
     name: "search_outings",
     title: "Search outings",
     description:
-      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), period_start / period_end (MM-DD, both together; the same days in every year, e.g. 06-01 → 06-30 for all Junes; combine with date_from / date_to to limit the years; a period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range), route_id (from search_routes), waypoint_id (from search_waypoints), user_id (a Camptocamp user ID: outings this user is listed on as a participant, not only those they wrote). Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow — or 'Next page: offset=N (limit at most M)' near the window's end, where limit must be lowered to M — or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint/user ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text.",
+      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, rating_system with rating_min and/or rating_max (one of 12 grading systems per call, inclusive bounds checked against its scale), condition_at_least (excellent, good, average, poor or awful: that value or better), max_elevation_min / max_elevation_max and height_diff_up_min / height_diff_up_max (metres, inclusive) — the ratings and conditions the outing's author reported for that day, with the max elevation and elevation gain they reported; outings without a value for a chosen filter are excluded —, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), period_start / period_end (MM-DD, both together; the same days in every year, e.g. 06-01 → 06-30 for all Junes; combine with date_from / date_to to limit the years; a period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range), route_id (from search_routes), waypoint_id (from search_waypoints), user_id (a Camptocamp user ID: outings this user is listed on as a participant, not only those they wrote). Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow — or 'Next page: offset=N (limit at most M)' near the window's end, where limit must be lowered to M — or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint/user ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text.",
     inputSchema: searchOutingsSchema,
     handler: handleSearchOutings,
   },

@@ -17,6 +17,7 @@ import {
   ROUTE_RATING_PARAMS,
   OUTING_RATING_FIELDS,
   type OutingRatingField,
+  type ConditionRating,
   type RouteRatingField,
 } from "../../src/api/camptocamp.js";
 import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
@@ -1632,8 +1633,8 @@ describe("searchOutings", () => {
   });
 
   // `ocond=excellent` alone matches every outing with a condition: the range always starts at excellent,
-  // and `excellent,excellent` returns the excellent outings only (548 in area 14409 skitouring, 2026-10-04).
-  it.each([
+  // and `excellent,excellent` returns the excellent outings only (live check in the contract tests).
+  it.each<[ConditionRating, string]>([
     ["excellent", "excellent,excellent"],
     ["good", "excellent,good"],
     ["average", "excellent,average"],

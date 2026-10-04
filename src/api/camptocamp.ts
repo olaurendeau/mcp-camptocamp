@@ -112,6 +112,10 @@ export const OUTING_RATING_FIELDS = [
 ] as const satisfies readonly RouteRatingField[];
 export type OutingRatingField = (typeof OUTING_RATING_FIELDS)[number];
 
+// Outing conditions, best first (v6_common condition_ratings); `ocond` takes a range of them.
+export const CONDITION_RATINGS = ["excellent", "good", "average", "poor", "awful"] as const;
+export type ConditionRating = (typeof CONDITION_RATINGS)[number];
+
 export interface RouteSearchOptions extends KeywordOrAreaSearchOptions {
   waypoint_id?: number;
   activity?: string;
@@ -232,7 +236,7 @@ export interface OutingSearchParams {
   user_id?: number;
   period?: { start: string; end: string }; // MM-DD, start on or before end
   rating?: { system: OutingRatingField; min?: string; max?: string };
-  condition_at_least?: string; // excellent, good, average, poor or awful
+  condition_at_least?: ConditionRating;
   elevation_max?: { min?: number; max?: number };
   height_diff_up?: { min?: number; max?: number };
   limit?: number; // default DEFAULT_LIMIT

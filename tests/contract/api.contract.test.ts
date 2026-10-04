@@ -93,6 +93,9 @@ const mountBlancBooks = once(() => searchBooks({ query: "Mont Blanc" }));
 const allOutings = once(() => searchOutings());
 const outingsAtWaypoint37916 = once(() => searchOutings({ waypoint_id: 37916 }));
 const skitouringOutingsInVanoise = once(() => searchOutings({ area_id: VANOISE, activity: "skitouring" }));
+const goodSkitouringOutingsInVanoise = once(() =>
+  searchOutings({ area_id: VANOISE, activity: "skitouring", condition_at_least: "good" }),
+);
 
 describe("document details (AC8.2, AC8.3)", () => {
   it.each([
@@ -324,13 +327,25 @@ describe("search filters narrow live results", () => {
     });
 
     it("ocond: conditions good or better", async () => {
-      const result = await searchOutings({ ...base, condition_at_least: "good" });
+      const result = await goodSkitouringOutingsInVanoise();
 
       expectNarrows(result, await skitouringOutingsInVanoise());
       expectMostMatch(
         wellFormed(result.documents),
         (outing) => ["excellent", "good"].includes(outing.condition_rating ?? ""),
         "ocond=excellent,good",
+      );
+    });
+
+    // `ocond=excellent,excellent`: the range's two ends are the same value, so only excellent outings match.
+    it("ocond: conditions excellent, fewer than good or better", async () => {
+      const result = await searchOutings({ ...base, condition_at_least: "excellent" });
+
+      expectNarrows(result, await goodSkitouringOutingsInVanoise());
+      expectMostMatch(
+        wellFormed(result.documents),
+        (outing) => outing.condition_rating === "excellent",
+        "ocond=excellent,excellent",
       );
     });
 
