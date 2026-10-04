@@ -85,7 +85,7 @@ function searchResponseSchema<T extends z.ZodTypeAny>(document: T) {
   return z.object({ documents: z.array(document), total: z.number() });
 }
 
-// Items of GET /outings?sort=-date_end… (search_outings) and of a route or waypoint's
+// Items of GET /outings?sort=-date_end… (search_outings, search_user_outings) and of a route or waypoint's
 // associations.recent_outings; only range areas are listed, by area_type.
 export const outingListItemSchema = z.object({
   document_id: z.number(),
@@ -195,20 +195,6 @@ export const waypointDetailSchema = z.object({
 });
 
 // Outings
-
-// Items of GET /outings?u={user_id} (search_user_outings)
-export const outingSearchResultSchema = z.object({
-  document_id: z.number(),
-  locales: z.array(localeSchema),
-  activities: z.array(z.string()),
-  date_start: z.string().nullish(),
-  date_end: z.string().nullish(),
-  elevation_max: z.number().nullish(),
-  height_diff_up: z.number().nullish(),
-  ...ratingFields,
-  author: optionalAuthorSchema,
-});
-export const outingSearchResponseSchema = searchResponseSchema(outingSearchResultSchema);
 
 export const outingDetailSchema = z.object({
   document_id: z.number(),
@@ -332,8 +318,6 @@ export type RouteDetail = z.infer<typeof routeDetailSchema>;
 export type WaypointSearchResult = z.infer<typeof waypointSearchResultSchema>;
 export type WaypointSearchResponse = z.infer<typeof waypointSearchResponseSchema>;
 export type WaypointDetail = z.infer<typeof waypointDetailSchema>;
-export type OutingSearchResult = z.infer<typeof outingSearchResultSchema>;
-export type OutingSearchResponse = z.infer<typeof outingSearchResponseSchema>;
 export type OutingDetail = z.infer<typeof outingDetailSchema>;
 export type OutingListItem = z.infer<typeof outingListItemSchema>;
 export type OutingListResponse = z.infer<typeof outingListResponseSchema>;

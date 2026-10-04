@@ -3,7 +3,6 @@ import {
   routeDetailSchema,
   routeSearchResponseSchema,
   outingListItemSchema,
-  outingSearchResultSchema,
   outingDetailSchema,
   articleDetailSchema,
   bookDetailSchema,
@@ -77,7 +76,6 @@ describe("response schemas", () => {
 
     for (const malformed of [{ name: "o.laurendeau" }, { user_id: 430052 }, { ...author, user_id: "430052" }, "x"]) {
       expect(outingListItemSchema.parse({ ...item, author: malformed })).toEqual({ ...item, author: null });
-      expect(outingSearchResultSchema.parse({ ...item, author: malformed }).author).toBeNull();
       expect(outingDetailSchema.parse({ ...item, author: malformed }).author).toBeNull();
       expect(articleDetailSchema.parse({ document_id: 2, locales: [], author: malformed }).author).toBeNull();
     }
