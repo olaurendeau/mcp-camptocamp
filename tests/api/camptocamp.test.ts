@@ -18,13 +18,12 @@ import {
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-function makeResponse(data: unknown, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
+function makeResponse(data: unknown, status = 200, statusText = status === 200 ? "OK" : "Error") {
+  return new Response(JSON.stringify(data), {
     status,
-    statusText: status === 200 ? "OK" : "Error",
-    json: () => Promise.resolve(data),
-  };
+    statusText,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 beforeEach(() => {
@@ -349,12 +348,7 @@ describe("searchAreas", () => {
   });
 
   it("throws on a 500 response", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: "Error",
-      json: () => Promise.resolve({}),
-    });
+    mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
 
     await expect(searchAreas({ query: "ecrins" })).rejects.toThrow("Camptocamp API error: 500 Error");
   });
@@ -405,12 +399,9 @@ describe("getArea", () => {
   });
 
   it("throws on a 404 response", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-      json: () => Promise.resolve({ status: "error", errors: [{ name: "Not Found" }] }),
-    });
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({ status: "error", errors: [{ name: "Not Found" }] }, 404, "Not Found"),
+    );
 
     await expect(getArea(999999999)).rejects.toThrow("Camptocamp API error: 404");
   });
@@ -907,16 +898,13 @@ describe("getBook", () => {
 
   it("throws on a 404 response", async () => {
     // Status and body of the live GET /books/999999999?lang=fr response (2026-10-03).
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-      json: () =>
-        Promise.resolve({
-          status: "error",
-          errors: [{ location: "body", name: "Not Found", description: "document not found" }],
-        }),
-    });
+    mockFetch.mockResolvedValueOnce(
+      makeResponse(
+        { status: "error", errors: [{ location: "body", name: "Not Found", description: "document not found" }] },
+        404,
+        "Not Found",
+      ),
+    );
 
     await expect(getBook(999999999)).rejects.toThrow("Camptocamp API error: 404 Not Found");
   });
@@ -1185,16 +1173,13 @@ describe("getArticle", () => {
 
   it("throws on a 404 response", async () => {
     // Status and body of the live GET /articles/999999999?lang=fr response (2026-10-03).
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-      json: () =>
-        Promise.resolve({
-          status: "error",
-          errors: [{ location: "body", name: "Not Found", description: "document not found" }],
-        }),
-    });
+    mockFetch.mockResolvedValueOnce(
+      makeResponse(
+        { status: "error", errors: [{ location: "body", name: "Not Found", description: "document not found" }] },
+        404,
+        "Not Found",
+      ),
+    );
 
     await expect(getArticle(999999999)).rejects.toThrow("Camptocamp API error: 404 Not Found");
   });

@@ -1,6 +1,7 @@
 import { afterEach, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createServer } from "../../src/server.js";
 
 afterEach(() => {
@@ -25,10 +26,10 @@ export function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   });
 }
 
-/** Connects an MCP client to createServer() over a linked in-memory transport pair. */
-export async function connect(): Promise<Client> {
+/** Connects an MCP client to `server` (default createServer()) over a linked in-memory transport pair. */
+export async function connect(server: McpServer = createServer()): Promise<Client> {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.0" });
-  await Promise.all([createServer().connect(serverTransport), client.connect(clientTransport)]);
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   return client;
 }
