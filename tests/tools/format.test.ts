@@ -117,8 +117,11 @@ describe("joinList", () => {
 });
 
 describe("formatHeader", () => {
-  it("writes a level-1 heading with the document ID", () => {
-    expect(formatHeader("Écrins", 14403)).toBe("# Écrins (ID: 14403)");
+  it("writes a level-1 heading with the document ID, then the camptocamp.org URL", () => {
+    expect(formatHeader("Écrins", 14403, "areas")).toEqual([
+      "# Écrins (ID: 14403)",
+      "**URL**: https://www.camptocamp.org/areas/14403",
+    ]);
   });
 });
 

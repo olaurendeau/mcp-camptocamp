@@ -57,7 +57,7 @@ function formatWaypointDetail(waypoint: WaypointDetail): string {
   const locale = pickLocale(waypoint.locales);
   const lines: string[] = [];
 
-  lines.push(formatHeader(pickTitle(waypoint.locales), waypoint.document_id));
+  lines.push(...formatHeader(pickTitle(waypoint.locales), waypoint.document_id, "waypoints"));
   lines.push(`\n**Type**: ${waypoint.waypoint_type}`);
 
   if (waypoint.elevation) lines.push(`**Elevation**: ${waypoint.elevation}m`);
@@ -108,7 +108,7 @@ export const waypointToolDefinitions = [
     name: "get_waypoint",
     title: "Get waypoint details",
     description:
-      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, description, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings.",
+      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, description, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source.",
     inputSchema: getWaypointSchema,
     handler: handleGetWaypoint,
   },

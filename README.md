@@ -22,6 +22,8 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | `search_articles`     | Recherche d'articles par mot-clé (matériel, technique, environnement, récits…) ; collab/perso         |
 | `get_article`         | Détail d'un article par ID (texte, auteur, type, itinéraires, points, sorties, livres liés)           |
 
+Chaque outil `get_*` commence par le titre et l'ID du document, suivis de son lien camptocamp.org (`**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>`) à citer comme source.
+
 ## Installation
 
 ### npm (recommandé)
