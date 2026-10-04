@@ -6,6 +6,9 @@ export const BASE_URL = "https://api.camptocamp.org";
 const ERROR_PREFIX = "Camptocamp API error:";
 const MAX_REASON_LENGTH = 200;
 const TIMEOUT_MS = 15_000;
+const TIMED_OUT = `request timed out after ${TIMEOUT_MS / 1000} s`;
+const MAX_BODY_BYTES = 10 * 1024 * 1024; // the largest known response, area 14067, is about 1.1 MB
+const TOO_LARGE = "too large (over 10 MiB)";
 const HEADERS = {
   "User-Agent": `mcp-camptocamp/${VERSION} (+https://github.com/olaurendeau/mcp-camptocamp)`,
   Accept: "application/json",
@@ -20,6 +23,11 @@ export interface JsonRequest<S extends z.ZodTypeAny> {
   document?: { type: DocumentType; id: number }; // the requested document, named in HTTP error messages
 }
 
+// An HTTP error status, with a message already final: it says why the error body was not used, timeout included.
+class HttpStatusError extends Error {}
+
+class BodyTooLargeError extends Error {}
+
 // The only place that calls the Camptocamp API: every endpoint goes through here.
 // A global setTimeout (not AbortSignal.timeout, which fake timers cannot drive) aborts the request
 // after 15 s; it covers the fetch, the body read and its validation.
@@ -30,8 +38,8 @@ export async function getJson<S extends z.ZodTypeAny>(request: JsonRequest<S>): 
     return await fetchJson(request, controller.signal);
   } catch (error) {
     // Once our timer has fired, whatever failed (fetch, body read) failed because of it
-    if (controller.signal.aborted) {
-      throw new Error(`${ERROR_PREFIX} request timed out after ${TIMEOUT_MS / 1000} s`);
+    if (controller.signal.aborted && !(error instanceof HttpStatusError)) {
+      throw new Error(`${ERROR_PREFIX} ${TIMED_OUT}`);
     }
     throw error;
   } finally {
@@ -54,9 +62,39 @@ async function fetchJson<S extends z.ZodTypeAny>(
     throw new Error(`${ERROR_PREFIX} network error (${networkErrorDetail(error)})`);
   }
   if (!response.ok) {
-    throw new Error(await httpErrorMessage(response, document));
+    throw new HttpStatusError(await httpErrorMessage(response, document, signal));
   }
-  return parseBody(await response.text(), schema);
+  let text: string;
+  try {
+    text = await readCappedBody(response);
+  } catch (error) {
+    throw error instanceof BodyTooLargeError ? new Error(`${ERROR_PREFIX} response ${TOO_LARGE}`) : error;
+  }
+  return parseBody(text, schema);
+}
+
+// Reads at most MAX_BODY_BYTES: a larger Content-Length is refused without reading the body, and a body
+// streamed without one (gzip/chunked, like area 14067) is cancelled as soon as its byte count goes over.
+async function readCappedBody(response: Response): Promise<string> {
+  if (Number(response.headers.get("content-length")) > MAX_BODY_BYTES) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new BodyTooLargeError();
+  }
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder(); // UTF-8; `stream: true` keeps a character split across chunks whole
+  let text = "";
+  let bytes = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text + decoder.decode();
+    bytes += value.byteLength;
+    if (bytes > MAX_BODY_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      throw new BodyTooLargeError();
+    }
+    text += decoder.decode(value, { stream: true });
+  }
 }
 
 // A 200 body that is not JSON or not the expected shape is an error here, rather than a
@@ -88,21 +126,33 @@ function networkErrorDetail(error: unknown): string {
   return error.message;
 }
 
-// `<prefix> <status> <statusText>[ (<type> <id>)][: <API reason>]`; the reason comes only from a JSON
-// `errors[].description` body, never from raw body text (some error bodies are HTML pages).
-async function httpErrorMessage(response: Response, document: JsonRequest<z.ZodTypeAny>["document"]): Promise<string> {
+// `<prefix> <status> <statusText>[ (<type> <id>)][: <reason>]`; the reason comes only from a JSON
+// `errors[].description` body, never from raw body text (some error bodies are HTML pages), or says why
+// the body could not be read (timeout, over the cap) so the status is never lost.
+async function httpErrorMessage(
+  response: Response,
+  document: JsonRequest<z.ZodTypeAny>["document"],
+  signal: AbortSignal,
+): Promise<string> {
   const status = [String(response.status), response.statusText].filter(Boolean).join(" ");
   const documentPart = document ? ` (${document.type} ${document.id})` : "";
-  const reason = await readErrorReason(response);
+  let reason: string | undefined;
+  try {
+    reason = errorReason(await readCappedBody(response));
+  } catch (error) {
+    if (signal.aborted) reason = `${TIMED_OUT} while reading the error body`;
+    else if (error instanceof BodyTooLargeError) reason = `error body ${TOO_LARGE}`;
+    // otherwise unreadable: the status line alone
+  }
   return `${ERROR_PREFIX} ${status}${documentPart}${reason ? `: ${reason}` : ""}`;
 }
 
-async function readErrorReason(response: Response): Promise<string | undefined> {
+function errorReason(text: string): string | undefined {
   let body: unknown;
   try {
-    body = JSON.parse(await response.text());
+    body = JSON.parse(text);
   } catch {
-    return undefined; // unreadable, empty or not JSON
+    return undefined; // empty or not JSON
   }
   if (typeof body !== "object" || body === null || !("errors" in body) || !Array.isArray(body.errors)) {
     return undefined;

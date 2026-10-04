@@ -124,12 +124,12 @@ describe("getJson HTTP error messages", () => {
   });
 
   it("gives only the status line when the error body cannot be read", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 502,
-      statusText: "Bad Gateway",
-      text: () => Promise.reject(new TypeError("terminated")),
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new TypeError("terminated"));
+      },
     });
+    mockFetch.mockResolvedValueOnce(new Response(body, { status: 502, statusText: "Bad Gateway" }));
 
     await expect(getJson({ path: "/routes", schema: anySchema })).rejects.toThrow(
       new Error("Camptocamp API error: 502 Bad Gateway"),
@@ -234,6 +234,139 @@ describe("getJson response validation", () => {
   });
 });
 
+const MiB = 1024 * 1024;
+const TOO_LARGE = new Error("Camptocamp API error: response too large (over 10 MiB)");
+
+/** A body that produces nothing until read: a pull spy shows whether it was read. */
+function lazyBody(pull: (controller: ReadableStreamDefaultController<Uint8Array>) => void) {
+  const pullSpy = vi.fn(pull);
+  const cancelSpy = vi.fn();
+  // highWaterMark 0: the stream does not pull ahead on its own, only when the reader asks
+  const stream = new ReadableStream<Uint8Array>({ pull: pullSpy, cancel: cancelSpy }, { highWaterMark: 0 });
+  return { stream, pullSpy, cancelSpy };
+}
+
+/** A 20 MiB body streamed lazily in 1 MiB chunks, like a gzip/chunked response without Content-Length. */
+function twentyMiBInChunks() {
+  let sent = 0;
+  return lazyBody((controller) => {
+    if (sent === 20) {
+      controller.close();
+      return;
+    }
+    sent += 1;
+    controller.enqueue(new Uint8Array(MiB).fill(0x20));
+  });
+}
+
+/** A JSON body of exactly `bytes` bytes: {"x":"aaa…"}. */
+function jsonOfSize(bytes: number): string {
+  return `{"x":"${"a".repeat(bytes - '{"x":""}'.length)}"}`;
+}
+
+describe("getJson response size cap", () => {
+  it("rejects a Content-Length over 10 MiB without reading the body", async () => {
+    const { stream, pullSpy, cancelSpy } = lazyBody((controller) => controller.close());
+    mockFetch.mockResolvedValueOnce(
+      new Response(stream, { status: 200, statusText: "OK", headers: { "Content-Length": String(20 * MiB) } }),
+    );
+
+    await expect(getJson({ path: "/areas/14067", schema: anySchema })).rejects.toThrow(TOO_LARGE);
+
+    expect(pullSpy).not.toHaveBeenCalled();
+    expect(cancelSpy).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a streamed body without Content-Length once it goes over 10 MiB and cancels the reader", async () => {
+    const { stream, pullSpy, cancelSpy } = twentyMiBInChunks();
+    mockFetch.mockResolvedValueOnce(new Response(stream, { status: 200, statusText: "OK" }));
+
+    await expect(getJson({ path: "/areas/14067", schema: anySchema })).rejects.toThrow(TOO_LARGE);
+
+    expect(pullSpy).toHaveBeenCalledTimes(11);
+    expect(cancelSpy).toHaveBeenCalledOnce();
+  });
+
+  it("counts the bytes read, not the Content-Length announced", async () => {
+    const { stream, cancelSpy } = twentyMiBInChunks();
+    mockFetch.mockResolvedValueOnce(
+      new Response(stream, { status: 200, statusText: "OK", headers: { "Content-Length": "1000" } }),
+    );
+
+    await expect(getJson({ path: "/areas/14067", schema: anySchema })).rejects.toThrow(TOO_LARGE);
+
+    expect(cancelSpy).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a body one byte over 10 MiB", async () => {
+    mockFetch.mockResolvedValueOnce(new Response(jsonOfSize(10 * MiB + 1), { status: 200, statusText: "OK" }));
+
+    await expect(getJson({ path: "/areas/14067", schema: anySchema })).rejects.toThrow(TOO_LARGE);
+  });
+
+  it("parses a body of exactly 10 MiB with the matching Content-Length", async () => {
+    const body = jsonOfSize(10 * MiB);
+    mockFetch.mockResolvedValueOnce(
+      new Response(body, { status: 200, statusText: "OK", headers: { "Content-Length": String(10 * MiB) } }),
+    );
+
+    const result = await getJson({ path: "/areas/14067", schema: z.object({ x: z.string() }) });
+
+    expect(result.x).toHaveLength(10 * MiB - '{"x":""}'.length);
+  });
+
+  it("decodes UTF-8 characters split across chunks", async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify({ title: "Aiguille du Goûter 𝄞" }));
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+        controller.close();
+      },
+    });
+    mockFetch.mockResolvedValueOnce(new Response(body, { status: 200, statusText: "OK" }));
+
+    await expect(getJson({ path: "/waypoints/1", schema: anySchema })).resolves.toEqual({
+      title: "Aiguille du Goûter 𝄞",
+    });
+  });
+
+  it("reads a response without a body as an empty one", async () => {
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 200, statusText: "OK" }));
+
+    await expect(getJson({ path: "/routes", schema: anySchema })).rejects.toThrow(
+      new Error("Camptocamp API error: unexpected response (not JSON)"),
+    );
+  });
+
+  it("keeps the status of an error whose Content-Length is over 10 MiB, without reading the body", async () => {
+    const { stream, pullSpy, cancelSpy } = lazyBody((controller) => controller.close());
+    mockFetch.mockResolvedValueOnce(
+      new Response(stream, {
+        status: 500,
+        statusText: "Internal Server Error",
+        headers: { "Content-Length": String(20 * MiB) },
+      }),
+    );
+
+    await expect(getJson({ path: "/routes", schema: anySchema })).rejects.toThrow(
+      new Error("Camptocamp API error: 500 Internal Server Error: error body too large (over 10 MiB)"),
+    );
+    expect(pullSpy).not.toHaveBeenCalled();
+    expect(cancelSpy).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the status of an error whose streamed body goes over 10 MiB and cancels the reader", async () => {
+    const { stream, pullSpy, cancelSpy } = twentyMiBInChunks();
+    mockFetch.mockResolvedValueOnce(new Response(stream, { status: 404, statusText: "Not Found" }));
+
+    await expect(getJson({ path: "/routes/1", document: { type: "route", id: 1 }, schema: anySchema })).rejects.toThrow(
+      new Error("Camptocamp API error: 404 Not Found (route 1): error body too large (over 10 MiB)"),
+    );
+    expect(pullSpy).toHaveBeenCalledTimes(11);
+    expect(cancelSpy).toHaveBeenCalledOnce();
+  });
+});
+
 describe("getJson request headers", () => {
   it("sends the User-Agent with the package.json version and asks for JSON", async () => {
     const packageVersion = (
@@ -292,11 +425,17 @@ describe("getJson timeout", () => {
     await outcome;
   });
 
-  it("covers reading an error body", async () => {
+  it("covers reading an error body and keeps its status", async () => {
     mockFetch.mockImplementationOnce((_url: string, init: RequestInit) =>
-      Promise.resolve(responseStalledUntilAbort(init, { status: 500, statusText: "Internal Server Error" })),
+      Promise.resolve(responseStalledUntilAbort(init, { status: 404, statusText: "Not Found" })),
     );
-    const outcome = expect(getJson({ path: "/routes", schema: anySchema })).rejects.toThrow(TIMED_OUT);
+    const outcome = expect(
+      getJson({ path: "/routes/1", document: { type: "route", id: 1 }, schema: anySchema }),
+    ).rejects.toThrow(
+      new Error(
+        "Camptocamp API error: 404 Not Found (route 1): request timed out after 15 s while reading the error body",
+      ),
+    );
 
     await vi.advanceTimersByTimeAsync(15_000);
 
@@ -323,6 +462,14 @@ describe("getJson timeout", () => {
     mockFetch.mockRejectedValueOnce(new TypeError("fetch failed", { cause: { code: "ECONNRESET" } }));
 
     await expect(getJson({ path: "/routes", schema: anySchema })).rejects.toThrow("network error (ECONNRESET)");
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("clears the timer after a body over 10 MiB", async () => {
+    mockFetch.mockResolvedValueOnce(new Response(twentyMiBInChunks().stream, { status: 200, statusText: "OK" }));
+
+    await expect(getJson({ path: "/routes", schema: anySchema })).rejects.toThrow(TOO_LARGE);
 
     expect(vi.getTimerCount()).toBe(0);
   });
