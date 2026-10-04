@@ -33,6 +33,22 @@ const TOOL_NAMES = [
   "get_article",
 ];
 
+const TOOL_TITLES: Record<string, string> = {
+  search_routes: "Search routes",
+  get_route: "Get route details",
+  search_waypoints: "Search waypoints",
+  get_waypoint: "Get waypoint details",
+  search_user_outings: "List a user's outings",
+  get_outing: "Get outing details",
+  search_outings: "Search outings",
+  search_areas: "Search areas",
+  get_area: "Get area details",
+  search_books: "Search books",
+  get_book: "Get book details",
+  search_articles: "Search articles",
+  get_article: "Get article details",
+};
+
 describe("tool registration", () => {
   it("lists exactly the 13 documented tools", async () => {
     const client = await connect();
@@ -51,12 +67,40 @@ describe("tool registration", () => {
     }
   });
 
+  it("gives each tool its title and read-only, idempotent, open-world annotations", async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+
+    const titles = Object.fromEntries(tools.map((tool) => [tool.name, tool.title]));
+    expect(titles).toEqual(TOOL_TITLES);
+    for (const tool of tools) {
+      expect(tool.annotations, tool.name).toEqual({
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      });
+    }
+  });
+
   it("keeps the input JSON Schema of every tool", async () => {
     const client = await connect();
     const { tools } = await client.listTools();
 
     const schemas = Object.fromEntries(tools.map((tool) => [tool.name, tool.inputSchema]));
     expect(schemas).toMatchSnapshot();
+  });
+});
+
+describe("server instructions", () => {
+  it("explain the area_id workflow and the French-first text in under 600 characters", async () => {
+    const client = await connect();
+    const instructions = client.getInstructions() ?? "";
+
+    expect(instructions.length).toBeGreaterThan(0);
+    expect(instructions.length).toBeLessThan(600);
+    expect(instructions).toContain("search_areas");
+    expect(instructions).toContain("area_id");
+    expect(instructions).toContain("French");
   });
 });
 

@@ -281,6 +281,7 @@ export async function handleGetOuting(input: GetOutingInput): Promise<string> {
 export const outingToolDefinitions = [
   {
     name: "search_user_outings",
+    title: "List a user's outings",
     description:
       "List outings (trip reports) published by a Camptocamp user. Returns outings with ID, title, activities, date, elevation, and rating. Use the user_id from the Camptocamp profile URL (e.g. u=430052).",
     inputSchema: searchUserOutingsSchema,
@@ -288,6 +289,7 @@ export const outingToolDefinitions = [
   },
   {
     name: "get_outing",
+    title: "Get outing details",
     description:
       "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including description, conditions, weather, participants, and associated routes.",
     inputSchema: getOutingSchema,
@@ -295,6 +297,7 @@ export const outingToolDefinitions = [
   },
   {
     name: "search_outings",
+    title: "Search outings",
     description:
       "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), route_id (from search_routes), waypoint_id (from search_waypoints). Each result shows ID, title, activities, dates, condition rating, difficulty ratings, max elevation, elevation gain, mountain ranges and author. Use offset to page (offset + limit ≤ 10,000). An unknown area/route/waypoint ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text.",
     inputSchema: searchOutingsSchema,
