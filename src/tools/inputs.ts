@@ -25,3 +25,14 @@ export function searchQuery(description: string, { allowBlank }: { allowBlank: b
   if (allowBlank) return query.describe(description);
   return query.refine((s) => s.trim() !== "", "must not be blank").describe(description);
 }
+
+/** Results to skip in a search, for paging; handlers check offset + limit with `assertResultWindow`. */
+export function searchOffset() {
+  return z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .default(0)
+    .describe("Number of results to skip, for paging (offset + limit ≤ 10,000)");
+}

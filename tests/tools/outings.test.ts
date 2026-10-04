@@ -417,8 +417,9 @@ describe("handleSearchOutings", () => {
       expect(lines[0]).toBe("Found 644 outing(s), most recent first. Showing 10 from offset 0:");
       expect(lines[1]).toBe("Filters: area 14409, activity skitouring, dates 2026-01-01 → 2026-03-31");
       expect(lines[2]).toBe("");
-      expect(lines.slice(3)).toHaveLength(10);
+      expect(lines.slice(3, 13).every((line) => line.startsWith("- ["))).toBe(true);
       expect(lines[3]).toMatch(/^- \[1890001\] /);
+      expect(lines.slice(13)).toEqual(["", "Next page: offset=10"]);
     });
 
     it("lists query, dates, route and waypoint filters in a fixed order", async () => {
@@ -444,6 +445,63 @@ describe("handleSearchOutings", () => {
       const result = await search({ date_to: "2026-01-01" });
 
       expect(result.split("\n")[1]).toBe("Filters: dates until 2026-01-01");
+    });
+  });
+
+  // R6 / AC9.4: the output tells how to fetch the next page, within Camptocamp's 10,000-result window.
+  describe("paging footer", () => {
+    const page = (n: number, first: number): OutingListItem[] =>
+      Array.from({ length: n }, (_, i) => ({ ...cosmiques, document_id: first + i }));
+
+    it("ends with the next page offset when more outings follow", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse(page(10, 1938400), 23));
+
+      const result = await search({ route_id: 53884 });
+
+      expect(result.split("\n").at(-1)).toBe("Next page: offset=10");
+    });
+
+    it("has no footer on the last page", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse(page(3, 1938420), 23));
+
+      const result = await search({ route_id: 53884, offset: 20 });
+
+      expect(result.split("\n").at(-1)).toMatch(/^- \[1938422\] /);
+      expect(result).not.toContain("Next page");
+    });
+
+    it("gives the last offset that still fits in the 10,000-result window", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse(page(10, 1), 346652));
+
+      const result = await search({ offset: 9980 });
+
+      expect(result.split("\n").at(-1)).toBe("Next page: offset=9990");
+    });
+
+    it("caps the next page limit near the end of the 10,000-result window", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse(page(10, 1), 346652));
+
+      const result = await search({ offset: 9985 });
+
+      expect(result.split("\n").at(-1)).toBe("Next page: offset=9995 (limit at most 5)");
+    });
+
+    it("points past the 10,000-result window once the next offset reaches it", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse(page(10, 1), 346652));
+
+      const result = await search({ offset: 9990 });
+
+      expect(result.split("\n").at(-1)).toBe(
+        "More results exist beyond Camptocamp's 10,000-result window; narrow the filters.",
+      );
+    });
+
+    it("keeps the most-recent-first header on a page past the end", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([], 23));
+
+      const result = await search({ route_id: 53884, offset: 30 });
+
+      expect(result).toBe("Found 23 outing(s), most recent first. Showing 0 from offset 30:\nFilters: route 53884");
     });
   });
 
@@ -616,7 +674,7 @@ describe("outingToolDefinitions", () => {
     expect(outingToolDefinitions.map((t) => t.name)).toEqual(["search_user_outings", "get_outing", "search_outings"]);
   });
 
-  it("describes ordering, date overlap and where IDs come from", () => {
+  it("describes ordering, date overlap, paging and where IDs come from", () => {
     const description = outingToolDefinitions.find((t) => t.name === "search_outings")?.description ?? "";
 
     for (const phrase of [
@@ -626,6 +684,8 @@ describe("outingToolDefinitions", () => {
       "search_routes",
       "search_waypoints",
       "get_outing",
+      "Next page: offset=N",
+      "10,000-result window",
     ]) {
       expect(description).toContain(phrase);
     }
