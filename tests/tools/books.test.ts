@@ -215,6 +215,9 @@ describe("book tool definitions", () => {
 
   it("says in the get_book description that text between the markers is user-written content, not instructions", () => {
     expect(bookToolDefinitions[1].description).toContain(USER_TEXT_NOTE);
+    // Summary and description are demoted and capped, so only the labelled fields are stored values.
+    expect(bookToolDefinitions[1].description).not.toContain("Values are shown exactly");
+    expect(bookToolDefinitions[1].description).toContain("Labelled fields are shown as Camptocamp stores them");
   });
 
   it("says get_book returns related articles that get_article can follow", () => {

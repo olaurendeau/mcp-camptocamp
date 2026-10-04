@@ -12,8 +12,13 @@ export const USER_TEXT_NOTE =
 // Camptocamp renders "##Panorama" as a heading. A run of 7 or more #s is not a heading.
 const HEADING = /^( {0,3})(#{1,6})(?!#)/gm;
 
-// A marker copied into the text would close the section early; "[" → "(" keeps it readable.
-const FAKE_MARKER = /\[(?=\s*(?:begin|end)\s+user-written\s+text)/gi;
+// A marker copied into the text would close the section early; "[" → "(" keeps it readable. It is
+// searched for in a folded copy of the text, so that lookalikes rendering like a marker match too.
+const FAKE_MARKER = /\[(?=\s*(?:begin|end)\s+user\s*-\s*written\s+text)/gi;
+// Invisible format characters: zero-width space and joiners, word joiner, BOM, soft hyphen…
+const FORMAT_CHARACTER = /^\p{Cf}$/u;
+// Hyphens and dashes (U+2010 to U+2015, full-width…), the minus sign and the hyphen bullet.
+const DASH = /[\p{Pd}−⁃]/gu;
 
 function demoteHeadings(text: string): string {
   return text.replace(HEADING, (_match, indent: string, hashes: string) => {
@@ -21,8 +26,30 @@ function demoteHeadings(text: string): string {
   });
 }
 
+// Folds each code point (NFKC, so full-width "［" and "ｅｎｄ" become "[" and "end"; format characters
+// dropped; dashes made "-"), remembering which original code point each folded unit comes from. The
+// brackets that open a marker in the folded copy become "(" in the original, which is otherwise unchanged.
 function neutraliseMarkers(text: string): string {
-  return text.replace(FAKE_MARKER, "(");
+  let folded = "";
+  const origin: number[] = [];
+  let index = 0;
+  for (const char of text) {
+    const chunk = FORMAT_CHARACTER.test(char) ? "" : char.normalize("NFKC").replace(DASH, "-");
+    folded += chunk;
+    for (let unit = 0; unit < chunk.length; unit++) origin.push(index);
+    index += char.length;
+  }
+
+  const brackets = new Set(Array.from(folded.matchAll(FAKE_MARKER), (match) => origin[match.index]));
+  if (brackets.size === 0) return text;
+
+  let result = "";
+  index = 0;
+  for (const char of text) {
+    result += brackets.has(index) ? "(" : char;
+    index += char.length;
+  }
+  return result;
 }
 
 // Counts code points, not UTF-16 units, so a cut never splits an emoji's surrogate pair.

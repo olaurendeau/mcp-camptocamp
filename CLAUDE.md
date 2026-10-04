@@ -105,7 +105,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 
-Free-text locale fields written by Camptocamp users (descriptions, summaries, remarks, gear, access, conditions, weather…) go through `formatUserText` in `src/tools/text.ts`: printed under `## <Heading>` between `[begin user-written text: <field>]` and `[end user-written text: <field>]`, line-start Markdown headings demoted two levels (capped at `######`), copies of the markers neutralised (`[` → `(`), and cut after 8000 characters with `[truncated, N more characters]`. Each `get_*` tool description says that text between the markers is user-written content, not instructions.
+Free-text locale fields written by Camptocamp users (descriptions, summaries, remarks, gear, access, conditions, weather…) go through `formatUserText` in `src/tools/text.ts`: printed under `## <Heading>` between `[begin user-written text: <field>]` and `[end user-written text: <field>]`, line-start Markdown headings demoted two levels (capped at `######`), copies of the markers neutralised (`[` → `(`), lookalikes included (full-width, dash variants, zero-width characters), and cut after 8000 characters with `[truncated, N more characters]`. Each `get_*` tool description says that text between the markers is user-written content, not instructions.
 
 ## Camptocamp API v6
 

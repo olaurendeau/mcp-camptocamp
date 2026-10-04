@@ -112,7 +112,7 @@ export const bookToolDefinitions = [
     name: "get_book",
     title: "Get book details",
     description:
-      "Get full details of a specific book from Camptocamp.org by its ID: author, editor, publication date, ISBN, pages, languages, website, book types, activities, summary, description, the routes and waypoints it covers, and its related articles (with IDs for get_route, get_waypoint and get_article). Values are shown exactly as Camptocamp stores them; missing fields are left out. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      "Get full details of a specific book from Camptocamp.org by its ID: author, editor, publication date, ISBN, pages, languages, website, book types, activities, summary, description, the routes and waypoints it covers, and its related articles (with IDs for get_route, get_waypoint and get_article). Labelled fields are shown as Camptocamp stores them; missing fields are left out. The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,
     inputSchema: getBookSchema,
     handler: handleGetBook,
