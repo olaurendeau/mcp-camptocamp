@@ -119,10 +119,12 @@ Then start Claude Desktop again. If npx still fails, check that npm is installed
 | ------------------- | ------------------------------------------------------------------ | ---------------------------------------------------- |
 | Claude Code         | `/mcp`                                                             | `claude mcp list`                                    |
 | Codex CLI           | `/mcp`                                                             | `codex mcp list`                                     |
-| ChatGPT desktop app | Settings > MCP servers, or `/mcp` in the composer                  | none documented                                      |
+| ChatGPT desktop app | Settings > MCP servers, or `/mcp` in the composer                  | `codex mcp list`, if Codex CLI is installed (\*)     |
 | Gemini CLI          | `/mcp`                                                             | `gemini mcp list`                                    |
 | Mistral Vibe Code   | `/mcp`, or `/mcp camptocamp` for its tools                         | none documented                                      |
 | Claude Desktop      | "Add files, connectors, and more" > Connectors > Manage connectors | the [logs](#claude-desktop-does-not-show-the-server) |
+
+(\*) The ChatGPT desktop app, Codex CLI and the Codex IDE extension share one MCP configuration (`~/.codex/config.toml` by default), so `codex mcp list` shows the servers added in the app ([OpenAI docs](https://learn.chatgpt.com/docs/extend/mcp)).
 
 ## Sources
 

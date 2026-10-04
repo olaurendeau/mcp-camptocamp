@@ -12,6 +12,7 @@ import {
   fencedBlocks,
   headingSlugs,
   inlineCodeSpans,
+  jsonBlocks,
   links,
   listMarkdownFiles,
   slugify,
@@ -169,6 +170,48 @@ describe("docs checks fail on bad fixtures", () => {
     expect(problems[0]).toMatch(/^json block at line 3: /);
   });
 
+  it("an invalid JSON or jsonc block, whatever the case of its language", () => {
+    const text = [fence + "JSON", "{a: 1}", fence, fence + "jsonc", '{"a": 1 // one', "", fence].join("\n");
+    const problems = checkJsonBlocks(text);
+
+    expect(problems).toHaveLength(2);
+    expect(problems[0]).toMatch(/^json block at line 2: /);
+    expect(problems[1]).toMatch(/^json block at line 5: /);
+  });
+
+  it("parses a jsonc block once its comments are removed, but not comments inside strings", () => {
+    const text = [
+      fence + "JSONC",
+      "// settings.json",
+      "{",
+      '  "url": "https://example.com/a//b", /* inline */',
+      '  "quote": "a \\" // still a string", // trailing',
+      "  /* block",
+      "     comment */",
+      '  "n": 1',
+      "}",
+      fence,
+    ].join("\n");
+
+    expect(checkJsonBlocks(text)).toEqual([]);
+    expect(jsonBlocks(text).map((block) => block.value)).toEqual([
+      { url: "https://example.com/a//b", quote: 'a " // still a string', n: 1 },
+    ]);
+  });
+
+  it("checks mcpServers in jsonc and upper-case JSON blocks too", () => {
+    const jsonc = ["// comment", JSON.stringify({ mcpServers: { other: { command: "npx", args: [] } } })].join("\n");
+    const upper = JSON.stringify({
+      mcpServers: { camptocamp: { command: "npx", args: ["@olaurendeau/mcp-camptocamp"] } },
+    });
+    const text = [fence + "jsonc", jsonc, fence, fence + "JSON", upper, fence].join("\n");
+
+    expect(checkMcpServers(text)).toEqual([
+      'mcpServers at line 2: expected the single key "camptocamp", got "other"',
+      "mcpServers at line 6: camptocamp must run npx -y @olaurendeau/mcp-camptocamp or docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest",
+    ]);
+  });
+
   it("an mcpServers block with another server name", () => {
     const block = {
       mcpServers: { "camptocamp-server": { command: "npx", args: ["-y", "@olaurendeau/mcp-camptocamp"] } },
@@ -236,6 +279,33 @@ describe("docs checks fail on bad fixtures", () => {
       'Node.js 18: engines.node in package.json is ">=22"',
     ]);
     expect(checkNodeVersion("Install Node.js 22 or later; check with `node --version`.", ">=22")).toEqual([]);
+  });
+
+  it("every other way of naming a Node version", () => {
+    const text = [
+      "Needs Node >= 20, node@20, Node>=20 or Node v20.",
+      "Tested on Node.js versions 18 and 20, Node.js version 24, Node 22 or 24, node:20-alpine.",
+      "Install [Node.js](https://nodejs.org/en/download) 20 or later.",
+    ].join("\n");
+
+    expect(checkNodeVersion(text, ">=22")).toEqual([
+      'Node >= 20: engines.node in package.json is ">=22"',
+      'node@20: engines.node in package.json is ">=22"',
+      'Node>=20: engines.node in package.json is ">=22"',
+      'Node v20: engines.node in package.json is ">=22"',
+      'Node.js versions 18 and 20: engines.node in package.json is ">=22"',
+      'Node.js version 24: engines.node in package.json is ">=22"',
+      'Node 22 or 24: engines.node in package.json is ">=22"',
+      'node:20: engines.node in package.json is ">=22"',
+      'Node.js](https://nodejs.org/en/download) 20: engines.node in package.json is ">=22"',
+    ]);
+  });
+
+  it('accepts versions below the minimum after the phrase "older Node.js versions", and only those', () => {
+    expect(checkNodeVersion("With the older Node.js versions 18 and 20, npx ran v1.2.0.", ">=22")).toEqual([]);
+    expect(checkNodeVersion("With the older Node.js versions 20 and 22, npx ran v1.2.0.", ">=22")).toEqual([
+      'older Node.js versions 20 and 22: "older Node.js versions" must name versions below 22',
+    ]);
   });
 
   it("an engines.node it cannot read", () => {

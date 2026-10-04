@@ -153,16 +153,57 @@ export function checkLinks(file: string, text: string): string[] {
   });
 }
 
-/** Problems with the ```json blocks of `text` that do not parse. */
-export function checkJsonBlocks(text: string): string[] {
-  return fencedBlocks(text, "json").flatMap((block) => {
-    try {
-      JSON.parse(block.content);
-      return [];
-    } catch (error) {
-      return [`json block at line ${block.line}: ${(error as Error).message}`];
+/** `source` without its `//` and `/* *\/` comments; comment markers inside JSON strings are kept. */
+function stripJsonComments(source: string): string {
+  let output = "";
+  let index = 0;
+  while (index < source.length) {
+    const char = source[index];
+    if (char === '"') {
+      const end = /^"(?:[^"\\\n]|\\.)*"?/.exec(source.slice(index))?.[0] ?? char;
+      output += end;
+      index += end.length;
+    } else if (source.startsWith("//", index)) {
+      const end = source.indexOf("\n", index);
+      index = end === -1 ? source.length : end;
+    } else if (source.startsWith("/*", index)) {
+      const end = source.indexOf("*/", index + 2);
+      output += " ";
+      index = end === -1 ? source.length : end + 2;
+    } else {
+      output += char;
+      index += 1;
     }
-  });
+  }
+  return output;
+}
+
+export interface JsonBlock extends FencedBlock {
+  /** The parsed value, when the block parses. */
+  value?: unknown;
+  /** The parse error, when it does not. */
+  error?: string;
+}
+
+/** The ```json and ```jsonc blocks of `text` (any case), parsed; a jsonc block loses its comments first. */
+export function jsonBlocks(text: string): JsonBlock[] {
+  return fencedBlocks(text)
+    .filter((block) => /^jsonc?$/i.test(block.lang))
+    .map((block) => {
+      const source = block.lang.toLowerCase() === "jsonc" ? stripJsonComments(block.content) : block.content;
+      try {
+        return { ...block, value: JSON.parse(source) as unknown };
+      } catch (error) {
+        return { ...block, error: (error as Error).message };
+      }
+    });
+}
+
+/** Problems with the json and jsonc blocks of `text` that do not parse. */
+export function checkJsonBlocks(text: string): string[] {
+  return jsonBlocks(text).flatMap((block) =>
+    block.error === undefined ? [] : [`json block at line ${block.line}: ${block.error}`],
+  );
 }
 
 const NPX_ARGS = ["-y", "@olaurendeau/mcp-camptocamp"];
@@ -177,16 +218,11 @@ function mcpServersIn(value: unknown): unknown[] {
   return entries.flatMap(([key, child]) => [...(key === "mcpServers" ? [child] : []), ...mcpServersIn(child)]);
 }
 
-/** Problems with the `mcpServers` objects of the json blocks of `text`: another server name, another command. */
+/** Problems with the `mcpServers` objects of the json and jsonc blocks of `text`: another server name, another command. */
 export function checkMcpServers(text: string): string[] {
-  return fencedBlocks(text, "json").flatMap((block) => {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(block.content);
-    } catch {
-      return []; // reported by checkJsonBlocks
-    }
-    return mcpServersIn(parsed).flatMap((servers) => {
+  // Blocks that do not parse are reported by checkJsonBlocks.
+  return jsonBlocks(text).flatMap((block) => {
+    return mcpServersIn(block.value).flatMap((servers) => {
       const where = `mcpServers at line ${block.line}`;
       const names = typeof servers === "object" && servers !== null ? Object.keys(servers) : [];
       if (names.length !== 1 || names[0] !== "camptocamp") {
@@ -221,15 +257,33 @@ export function checkNames(text: string): string[] {
     .map((token) => `unexpected name "${token}"`);
 }
 
-/** Problems with the `Node NN` / `Node.js NN` mentions of `text` whose major version is not the `>=NN` of `engines`. */
+/**
+ * A Node.js version mention: `Node 22`, `Node.js v22`, `Node >= 22`, `node@22`, `node:22-alpine`,
+ * `[Node.js](url) 22`, `Node.js versions 18 and 20`, `Node 22 or 24`… Group 1 is an optional "older " before it.
+ */
+const NODE_VERSION =
+  /\b(older\s+)?node(?:\.js)?(?:\]\([^)]*\))?(?:\s+versions?)?(?:\s*>=?\s*|\s+v?|@|:)(\d+(?:\s*(?:,|and|or)\s*\d+)*)/gi;
+/** The one phrase allowed to name versions other than the minimum, all below it: a statement about unsupported ones. */
+const OLDER_VERSIONS = "older Node.js versions ";
+
+/** Problems with the Node.js version mentions of `text` that name a major version other than the `>=NN` of `engines`. */
 export function checkNodeVersion(text: string, engines: string): string[] {
-  const minimum = /^>=(\d+)$/.exec(engines);
-  if (!minimum) {
+  const minimumMatch = /^>=(\d+)$/.exec(engines);
+  if (!minimumMatch) {
     throw new Error(`Unsupported engines.node "${engines}"`);
   }
-  return [...text.matchAll(/\bNode(?:\.js)? v?(\d+)/gi)]
-    .filter(([, major]) => major !== minimum[1])
-    .map(([mention]) => `${mention}: engines.node in package.json is "${engines}"`);
+  const minimum = Number(minimumMatch[1]);
+  return [...text.matchAll(NODE_VERSION)].flatMap(([mention, , list]) => {
+    const majors = list.split(/\s*(?:,|and|or)\s*/i).map(Number);
+    if (mention.startsWith(OLDER_VERSIONS)) {
+      return majors.every((major) => major < minimum)
+        ? []
+        : [`${mention}: "${OLDER_VERSIONS.trim()}" must name versions below ${minimum}`];
+    }
+    return majors.every((major) => major === minimum)
+      ? []
+      : [`${mention.replace(/^older\s+/i, "")}: engines.node in package.json is "${engines}"`];
+  });
 }
 
 /** Problems with the `## Sources` section and the `Last verified` line a client or SDK page ends with. */

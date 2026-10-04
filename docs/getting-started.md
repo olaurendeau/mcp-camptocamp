@@ -56,7 +56,7 @@ With npx, run the server once in a terminal:
 npx -y @olaurendeau/mcp-camptocamp
 ```
 
-Once the download is done, the server prints nothing and waits for a client on its standard input. Press Ctrl+C to stop it.
+Once the download is done, the server itself prints nothing and waits for a client on its standard input. Press Ctrl+C to stop it. The first run can also print `npm notice` lines on stderr, for example about a newer npm version: they come from npm, not from the server, and are harmless.
 
 If a client still times out, raise its startup timeout: see [Troubleshooting](troubleshooting.md#the-server-times-out-on-its-first-start).
 
