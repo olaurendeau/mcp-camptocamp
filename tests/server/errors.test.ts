@@ -178,16 +178,73 @@ describe("malformed 200 responses", () => {
     expect(text).toBe("Error: Camptocamp API error: unexpected response (locales: Required)");
   });
 
-  it("reports a search document whose activities is not an array", async () => {
-    stubFetch(jsonResponse({ documents: [{ ...GAMMA_SEARCH_DOCUMENT, activities: "mountain_climbing" }], total: 1 }));
+  // AC4.4 on #153: only list items are tolerated; the lists themselves and the top-level fields stay strict.
+  it("reports a search response whose documents is not an array", async () => {
+    stubFetch(jsonResponse({ documents: { 0: GAMMA_SEARCH_DOCUMENT }, total: 1 }));
     const client = await connect();
 
     const text = await callForText(client, "search_routes", { query: "gamma" });
 
     expectUnexpected(text);
-    expect(text).toBe(
-      "Error: Camptocamp API error: unexpected response (documents.0.activities: Expected array, received string)",
+    expect(text).toBe("Error: Camptocamp API error: unexpected response (documents: Expected array, received object)");
+  });
+
+  it("reports a route without its document_id, even when a list item is malformed too", async () => {
+    stubFetch(
+      jsonResponse({ ...ROUTE_53914, document_id: undefined, areas: [{ document_id: 14403, area_type: "range" }] }),
     );
+    const client = await connect();
+
+    const text = await callForText(client, "get_route", { id: 53914 });
+
+    expectUnexpected(text);
+    expect(text).toBe("Error: Camptocamp API error: unexpected response (document_id: Required)");
+  });
+
+  it("reports a route whose associated waypoints is not an array", async () => {
+    stubFetch(jsonResponse({ ...ROUTE_53914, associations: { waypoints: "37916" } }));
+    const client = await connect();
+
+    const text = await callForText(client, "get_route", { id: 53914 });
+
+    expectUnexpected(text);
+    expect(text).toBe(
+      "Error: Camptocamp API error: unexpected response (associations.waypoints: Expected array, received string)",
+    );
+  });
+});
+
+// AC4.1–AC4.3 on #153: a malformed list item is one placeholder line, the rest of the response is shown.
+describe("malformed list items", () => {
+  it("print a placeholder line in search_routes instead of failing it, with the total unchanged", async () => {
+    stubFetch(
+      jsonResponse({
+        documents: [{ ...GAMMA_SEARCH_DOCUMENT, activities: "mountain_climbing" }, { locales: [] }],
+        total: 2,
+      }),
+    );
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_routes", arguments: { query: "gamma" } });
+
+    expect(result.isError).toBeFalsy();
+    const lines = (result.content as Array<{ type: string; text: string }>)[0].text.split("\n");
+    expect(lines[0]).toBe("Found 2 route(s). Showing 2 from offset 0:");
+    expect(lines).toContain("- [57842] (not shown: Camptocamp sent this item in an unexpected format)");
+    expect(lines).toContain("- (not shown: Camptocamp sent an item in an unexpected format)");
+  });
+
+  it("print a placeholder line in get_route, which keeps its ratings and description", async () => {
+    stubFetch(jsonResponse({ ...ROUTE_53914, areas: [{ document_id: 14403, area_type: "range" }] }));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_route", arguments: { id: 53914 } });
+
+    expect(result.isError).toBeFalsy();
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    expect(text).toContain("**Global rating**: TD");
+    expect(text).toContain("Belle voie.");
+    expect(text).toContain("\n## Areas\n- [14403] (not shown: Camptocamp sent this item in an unexpected format)");
   });
 });
 

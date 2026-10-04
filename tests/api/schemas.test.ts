@@ -1,11 +1,19 @@
 import { describe, it, expect } from "vitest";
+import type { z } from "zod";
 import {
   routeDetailSchema,
   routeSearchResponseSchema,
   outingListItemSchema,
   outingDetailSchema,
+  outingListResponseSchema,
   articleDetailSchema,
+  articleSearchResponseSchema,
+  areaSearchResponseSchema,
   bookDetailSchema,
+  bookSearchResponseSchema,
+  waypointDetailSchema,
+  waypointSearchResponseSchema,
+  isMalformed,
 } from "../../src/api/schemas.js";
 
 // Trimmed real GET /routes/53914: unset values come as null, and the API sends many untyped fields.
@@ -113,5 +121,95 @@ describe("response schemas", () => {
     expect(routeDetailSchema.safeParse({ ...route53914, activities: undefined }).success).toBe(false);
     expect(routeSearchResponseSchema.safeParse({ documents: [] }).success).toBe(false);
     expect(routeDetailSchema.safeParse({ ...route53914, locales: [{ lang: "fr", title: null }] }).success).toBe(false);
+  });
+});
+
+// AC4.3 on #153: every list whose items get their own line, at its path in the response.
+const route = { document_id: 54085, locales: [], activities: ["skitouring"] };
+const waypoint = { document_id: 104151, locales: [], waypoint_type: "hut" };
+const outing = { document_id: 1757161, locales: [], activities: ["skitouring"] };
+const book = { document_id: 14643, locales: [] };
+const article = { document_id: 469577, locales: [] };
+const LISTS: Array<[string, z.ZodTypeAny, object, string]> = [
+  ...["waypoints", "routes", "books", "articles", "recent_outings.documents"].map(
+    (list) => ["route", routeDetailSchema, route, `associations.${list}`] as [string, z.ZodTypeAny, object, string],
+  ),
+  ["route", routeDetailSchema, route, "areas"],
+  ...["all_routes.documents", "books", "recent_outings.documents"].map(
+    (list) =>
+      ["waypoint", waypointDetailSchema, waypoint, `associations.${list}`] as [string, z.ZodTypeAny, object, string],
+  ),
+  ["waypoint", waypointDetailSchema, waypoint, "areas"],
+  ["outing", outingDetailSchema, outing, "associations.routes"],
+  ["outing", outingDetailSchema, outing, "associations.users"],
+  ...["routes", "waypoints", "articles"].map(
+    (list) => ["book", bookDetailSchema, book, `associations.${list}`] as [string, z.ZodTypeAny, object, string],
+  ),
+  ...["routes", "waypoints", "articles", "outings", "books"].map(
+    (list) =>
+      ["article", articleDetailSchema, article, `associations.${list}`] as [string, z.ZodTypeAny, object, string],
+  ),
+  ["route search", routeSearchResponseSchema, {}, "documents"],
+  ["waypoint search", waypointSearchResponseSchema, {}, "documents"],
+  ["outing search", outingListResponseSchema, {}, "documents"],
+  ["area search", areaSearchResponseSchema, {}, "documents"],
+  ["book search", bookSearchResponseSchema, {}, "documents"],
+  ["article search", articleSearchResponseSchema, {}, "documents"],
+];
+
+// The document `base` with `value` at `path`; a `documents` list comes with its total, as the API sends it.
+function withList(base: object, path: string, value: unknown): object {
+  const nest = ([key, ...rest]: string[]): object =>
+    rest.length > 0 ? { [key]: nest(rest) } : { [key]: value, ...(key === "documents" && { total: 64 }) };
+  return { ...base, ...nest(path.split(".")) };
+}
+
+function valueAt(parsed: unknown, path: string): unknown {
+  return path.split(".").reduce<unknown>((value, key) => (value as Record<string, unknown>)[key], parsed);
+}
+
+describe("lists of a response (#129)", () => {
+  // Every item schema requires a locale title, so the first item is malformed in every list; its ID is readable.
+  const items = [{ document_id: 104151, locales: [{ lang: "fr", title: null }] }, { document_id: "104151" }, null];
+
+  it.each(LISTS)("%s %s: a malformed item becomes a placeholder, keeping a readable ID", (_, schema, base, path) => {
+    const parsed: unknown = schema.parse(withList(base, path, items));
+
+    expect(valueAt(parsed, path)).toEqual([
+      { malformed: true, document_id: 104151 },
+      { malformed: true },
+      { malformed: true },
+    ]);
+    if (path.endsWith("documents")) expect(valueAt(parsed, path.replace(/documents$/, "total"))).toBe(64);
+  });
+
+  it.each(LISTS)("%s %s: a list that is not an array still fails the response", (_, schema, base, path) => {
+    const result = schema.safeParse(withList(base, path, { 0: items[0] }));
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path.join(".")).toBe(path);
+  });
+
+  it("keeps a top-level field strict: a document without its document_id still fails", () => {
+    const noId = { ...route, document_id: undefined };
+
+    expect(routeDetailSchema.safeParse(withList(noId, "associations.waypoints", items)).success).toBe(false);
+  });
+
+  it("only reads a positive integer document_id", () => {
+    const parsed = routeSearchResponseSchema.parse({
+      documents: [{ document_id: 1.5 }, { document_id: -3 }, { document_id: Number.MAX_SAFE_INTEGER + 2 }, [], 7],
+      total: 5,
+    });
+
+    expect(parsed.documents).toEqual(Array.from({ length: 5 }, () => ({ malformed: true })));
+  });
+
+  it("parses a well-formed item as before, never as malformed", () => {
+    const item = { document_id: 37916, locales: [{ lang: "fr", title: "Mont Pourri" }], waypoint_type: "summit" };
+    const parsed = waypointSearchResponseSchema.parse({ documents: [{ ...item, malformed: true }], total: 1 });
+
+    expect(parsed.documents).toEqual([item]);
+    expect(parsed.documents.map(isMalformed)).toEqual([false]);
   });
 });
