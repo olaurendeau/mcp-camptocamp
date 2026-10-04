@@ -232,6 +232,192 @@ check deny  coordinator 'gh api repos/o/r/statuses/abc --field=state=success --f
 check deny  developer   'gh api -X PUT "repos/o/r/pulls/$N/merge"'
 check allow developer   'gh api repos/o/r/pulls/7/merge'
 
+# Quoted strings and substitutions are not cut apart: a | or ; inside them does not split the command
+check allow coordinator 'gh api repos/o/r/commits/abc/statuses -F per_page=100 --jq ".[] | select(.context==\"agent-review\") | .state" --method GET'
+check allow coordinator "gh api repos/o/r/commits/abc/statuses -F per_page=100 --jq '.[] | select(.context==\"agent-review\")' --method GET"
+check deny  developer   "gh api \"repos/o/r/statuses/\$(gh pr view 7 --json commits --jq '.commits | last | .oid')\" -f state=success -f context=agent-review"
+check deny  developer   'gh api repos/o/r/statuses/$(git rev-parse HEAD | head -c 40) -f state=success -f context=agent-review'
+check deny  developer   'gh api repos/o/r/statuses/`git rev-parse HEAD | head -c 40` -f state=success -f context=agent-review'
+check allow pr-reviewer "gh api \"repos/o/r/statuses/\$(gh pr view 7 --json commits --jq '.commits | last | .oid')\" -f state=success -f context=agent-review -f description='ok; no blocker | 2 suggestions'"
+check deny  developer   'out="$(gh pr merge 7 --squash | tail -1)"'
+check deny  developer   'echo "$(gh pr merge 7 --squash)"'
+check deny  developer   'bash -c "gh api repos/o/r/commits/abc/statuses --method GET && gh api repos/o/r/statuses/abc -f state=success -f context=agent-review"'
+check deny  developer   "sh -c 'npm version 1.1.0 --no-git-tag-version && npm version patch'"
+check deny  developer   'eval "gh pr merge 7"'
+check allow developer   "docker compose run --rm dev sh -c 'npm ci && npm run check'"
+check allow developer   'gh pr create --title "chore: x" --body "$(cat <<'"'"'EOF'"'"'
+Agents never run `npm publish` or `gh pr merge`; it is "human only".
+
+Closes #8
+EOF
+)"'
+
+# A lone & (background) separates commands; redirections with & do not
+check deny  developer   'git tag -l & git tag v1.1.0'
+check deny  developer   'npm version 1.1.0 --no-git-tag-version & npm version patch'
+check deny  developer   'gh api repos/o/r/commits/abc/statuses --method GET & gh api repos/o/r/statuses/abc -f state=success -f context=agent-review'
+check allow developer   'make check > /tmp/check.log 2>&1 &'
+check allow developer   'npm test &> /tmp/test.log; git tag -l'
+
+# A heredoc fed to a shell given by its path is shell code
+check deny  developer   "$(lines '/bin/sh -s <<EOF' 'gh pr merge 7 --squash' 'EOF')"
+check deny  developer   "$(lines '/usr/bin/env bash <<EOF' 'gh pr merge 7 --squash' 'EOF')"
+check deny  developer   "$(lines '/bin/bash <<'"'"'EOF'"'"'' 'npm publish' 'EOF')"
+
+# curl writes with -d/--data (POST by default)
+check deny  developer   "curl -H \"Authorization: token \$T\" https://api.github.com/repos/o/r/statuses/abc -d '{\"state\":\"success\",\"context\":\"agent-review\"}'"
+check deny  coordinator 'curl --data @status.json https://api.github.com/repos/o/r/statuses/abc # agent-review'
+check deny  developer   "curl --request POST https://api.github.com/repos/o/r/statuses/abc --json '{\"context\":\"agent-review\"}'"
+check allow pr-reviewer "curl https://api.github.com/repos/o/r/statuses/abc -d '{\"state\":\"success\",\"context\":\"agent-review\"}'"
+check allow coordinator 'curl -s https://api.github.com/repos/o/r/commits/abc/statuses | jq ".[] | select(.context==\"agent-review\")"'
+
+# awk and sed patterns are text, like grep
+check allow pr-reviewer "awk '/npm publish/' Makefile"
+check allow pr-reviewer "sed -n '/gh pr merge/p' CONTRIBUTING.md"
+check allow pr-reviewer "awk -F: '/git tag v1.1.0/ {print \$1}' notes.txt"
+check deny  developer   "awk '{print}' notes.txt && gh pr merge 7"
+
+# Tags through the REST API: creating one (POST …/git/refs) is the coordinator's, like git push origin vX.Y.Z
+TAG_API_CREATE=(
+  'gh api repos/{owner}/{repo}/git/refs -f ref=refs/tags/v1.0.5 -f sha=abc'
+  'gh api -X POST repos/o/r/git/refs -f ref=refs/tags/v1.0.5 -f sha=abc'
+  "$(lines 'gh api repos/o/r/git/refs --input - <<EOF' '{"ref":"refs/tags/v1.0.5","sha":"abc"}' 'EOF')"
+  "curl -H \"Authorization: token \$T\" https://api.github.com/repos/o/r/git/refs -d '{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}'"
+  # The ref may not appear in the command at all: only a branch (refs/heads/) is free for every role.
+  'gh api repos/o/r/git/refs --input ref.json'
+  'curl -X POST https://api.github.com/repos/o/r/git/refs -d @ref.json'
+  "gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { ref { name } } }'"
+  "gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \$name, oid: \"abc\"}) { ref { name } } }' -f name=v1.0.5"
+)
+for cmd in "${TAG_API_CREATE[@]}"; do
+  check allow coordinator "$cmd"
+  for role in developer pr-reviewer ""; do
+    check deny "$role" "$cmd"
+  done
+done
+
+# Moving or deleting a tag through the REST API, and writing releases: nobody (they trigger publish.yml)
+for role in coordinator developer pr-reviewer ""; do
+  check deny  "$role" 'gh api -X PATCH repos/o/r/git/refs/tags/v1.0.4 -f sha=abc -F force=true'
+  check deny  "$role" 'gh api --method PATCH repos/o/r/git/refs/tags/v1.0.4 --input body.json'
+  check deny  "$role" "curl --request PATCH https://api.github.com/repos/o/r/git/refs/tags/v1.0.4 -d '{\"sha\":\"abc\",\"force\":true}'"
+  check deny  "$role" 'gh api --method DELETE repos/o/r/git/refs/tags/v1.0.4'
+  check deny  "$role" 'gh api -X DELETE "repos/o/r/git/refs/tags/v1.0.4"'
+  check deny  "$role" 'curl -X DELETE https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
+  check deny  "$role" 'gh api repos/{owner}/{repo}/releases -f tag_name=v1.0.5'
+  check deny  "$role" 'gh api -X PATCH repos/o/r/releases/123 -f draft=false'
+  check deny  "$role" 'gh api -X DELETE repos/o/r/releases/123'
+  check deny  "$role" 'curl -X POST https://api.github.com/repos/o/r/releases -d @release.json'
+  check allow "$role" 'gh api repos/o/r/git/refs/tags'
+  check allow "$role" 'gh api repos/o/r/git/refs/tags -F per_page=100 --method GET'
+  check allow "$role" 'gh api repos/o/r/releases --jq ".[0].tag_name"'
+  check allow "$role" 'gh api repos/o/r/releases/latest'
+  # Branches stay free through the API
+  check allow "$role" 'gh api repos/o/r/git/refs -f ref=refs/heads/feat/x -f sha=abc'
+  check allow "$role" 'gh api -X PATCH repos/o/r/git/refs/heads/feat/x -f sha=abc -F force=true'
+  check allow "$role" 'gh api -X DELETE repos/o/r/git/refs/heads/feat/old-tool'
+  check allow "$role" "gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \"refs/heads/feat/x\", oid: \"abc\"}) { ref { name } } }'"
+  check allow "$role" "gh api graphql -f query='query { repository(owner: \"o\", name: \"r\") { refs(refPrefix: \"refs/tags/\", first: 5) { nodes { name } } } }'"
+done
+# A ref the command does not name is not known to be a branch: updating or deleting it may move a tag
+check deny  coordinator 'gh api -X PATCH "repos/o/r/git/refs/$REF" -f sha=abc -F force=true'
+check deny  coordinator 'gh api -X DELETE "repos/o/r/git/refs/$REF"'
+for role in developer pr-reviewer ""; do
+  check deny "$role" "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { ref { name } } }'"
+  check deny "$role" "gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+done
+
+# make with options or other targets before publish
+for role in coordinator developer pr-reviewer ""; do
+  check deny  "$role" 'make -C /repo publish'
+  check deny  "$role" 'make publish-prep publish'
+done
+
+# push.followTags: only enabling it is refused
+for role in coordinator developer pr-reviewer ""; do
+  check allow "$role" 'git config --get push.followTags'
+  check allow "$role" 'git config --unset push.followTags'
+  check allow "$role" 'git config push.followTags'
+  check allow "$role" 'git config push.followTags false'
+  check allow "$role" 'git -c push.followTags=false push origin feat/new-tool'
+  check deny  "$role" 'git -c push.followTags push origin feat/new-tool'
+  check deny  "$role" 'git -c push.FollowTags=1 push origin feat/new-tool'
+  check deny  "$role" 'git config --global push.followTags yes'
+  check deny  "$role" "git config set push.followTags 'true'"
+  check deny  "$role" 'git config push.followTags ON'
+done
+
+# npm/pnpm/yarn: an option may take the next word as its value, unless that word is a subcommand
+# that reads (npm --json view version views the version, it does not bump it)
+for role in coordinator developer pr-reviewer ""; do
+  check allow "$role" 'npm --json view version'
+  check allow "$role" 'npm --silent view @olaurendeau/mcp-camptocamp version'
+  check allow "$role" 'npm --json info @olaurendeau/mcp-camptocamp version'
+  check allow "$role" 'npm --silent run version'
+  check deny  "$role" 'npm --otp 123456 publish'
+  check deny  "$role" 'npm --access public publish'
+  check deny  "$role" 'npm --tag next publish'
+  check deny  "$role" 'pnpm --reporter silent publish'
+  check deny  "$role" 'npm --tag next version patch'
+  check deny  "$role" 'npm --tag next version 1.2.0'
+  check deny  "$role" 'npm --otp 1 version patch'
+done
+check allow developer   'npm --tag next version 1.2.0 --no-git-tag-version'
+check deny  developer   'npm --registry https://r.example version patch'
+check deny  developer   'npm --loglevel silent version 1.1.0'
+check deny  developer   'npm --json version patch'
+check deny  coordinator 'npm --json version 1.1.0 --no-git-tag-version'
+
+# The tag-listing exemption covers the listing command only
+for role in developer pr-reviewer ""; do
+  check deny  "$role" 'git push origin v1.1.0 # git tag --list'
+  check deny  "$role" 'git push origin v1.1.0 $(git tag -l)'
+  check deny  "$role" 'git push origin v1.1.0 $(git tag -l )'
+  check deny  "$role" 'git tag v1.1.0 `git tag -l`'
+  check deny  "$role" 'git push origin v1.1.0 "$(git tag --list)"'
+  check deny  "$role" 'git push origin v1.1.0 git tag -l'
+  check deny  "$role" 'bash -c "git push origin v1.1.0 && git tag -l"'
+  check deny  "$role" 'git tag -a -l v1.1.0'
+  check allow "$role" "latest=\$(git tag -l 'v*' --sort=-v:refname | head -1)"
+  check allow "$role" 'git tag -l v1.* | tail -1'
+  check allow "$role" '(git tag -l v1.*)'
+  check allow "$role" 'echo done # then git push origin v1.1.0'
+done
+
+# Global options with a value separated by a space
+for role in developer pr-reviewer ""; do
+  check deny  "$role" 'git --git-dir /repo/.git push origin v1.1.0'
+  check deny  "$role" 'git --work-tree /repo tag v1.1.0'
+  check deny  "$role" 'git --namespace ns push origin v1.1.0'
+  check deny  "$role" 'git --git-dir /r/.git --work-tree /r tag -a v1.1.0 -m release'
+done
+for role in coordinator developer pr-reviewer ""; do
+  check deny  "$role" 'git --git-dir /repo/.git push --tags'
+  check deny  "$role" 'git --work-tree /repo --namespace ns push origin --follow-tags'
+done
+check allow coordinator 'git --git-dir /r/.git --work-tree /r tag -a v1.1.0 -m release'
+
+# Everyday commands stay allowed for every role
+for role in coordinator developer pr-reviewer ""; do
+  check allow "$role" 'git -C /repo push -u origin feat/new-tool'
+  check allow "$role" 'git push --force-with-lease origin feat/new-tool'
+  check allow "$role" 'git -C "/my repo" diff origin/main...HEAD'
+  check allow "$role" 'git --no-pager -C /repo log v1.0.4..HEAD'
+  check allow "$role" 'git -C /repo tag --list'
+  check allow "$role" "git tag -l 'v*' --sort=-v:refname | head -1"
+  check allow "$role" 'make -C . check'
+  check allow "$role" 'make check && docker compose down -v'
+  check allow "$role" 'npm --prefix . view @olaurendeau/mcp-camptocamp version'
+  check allow "$role" 'npm --prefix . run test'
+  check allow "$role" 'gh pr view 5 --json mergeStateStatus'
+  check allow "$role" "$READ"
+  check allow "$role" "$(lines 'git commit -F - <<EOF' 'chore: note that gh pr merge and npm publish are restricted' 'EOF')"
+  check allow "$role" 'gh pr checks 217 --watch --interval 30'
+  check allow "$role" 'gh pr comment 217 --body-file /tmp/review.md'
+  check allow "$role" 'docker compose run --rm dev sh -c "npm ci && npm run check"'
+  check allow "$role" 'git -C /repo status --short'
+done
+
 if [ "$failures" -gt 0 ]; then
   echo "$failures of $total guard test(s) failed"
   exit 1

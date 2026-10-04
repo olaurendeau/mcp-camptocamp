@@ -5,6 +5,8 @@
 # - version bump (npm version)       → developer only, with --no-git-tag-version
 # - version tags (git tag/push vX.Y) → coordinator only, one named tag at a time
 # - bulk tag push (--tags/--follow-tags/--mirror/glob), moving or deleting a version tag → nobody
+# - tag creation through the REST API (POST …/git/refs) → coordinator only
+# - moving or deleting a tag, or writing a release, through the REST API → nobody
 # - manual publication               → nobody (publish.yml publishes from the tag)
 # The human decides when to release and which version; agents only carry it out.
 # A guardrail for agents, not a security boundary: the human and obfuscated commands bypass it.
@@ -27,58 +29,160 @@ deny() {
 }
 
 # Remove what is text rather than command, so PR comments and commit messages may quote commands:
-# heredoc bodies (unless fed to a shell), message/body/title arguments, and echo/printf/grep arguments.
-# Everything else stays, including `sh -c "…"`, `bash -c '…'` and `$(…)`, which the shell runs.
+# heredoc bodies (unless fed to a shell), message/body/title arguments, echo/printf/grep/awk/sed
+# arguments, and # comments.
 # Then split into one simple command per line, so each rule and its exemptions see one command at a time.
-segments=$(perl -0777 -pe '
+# The split follows the shell: it never cuts inside quotes, and the code the shell runs from a command
+# ($(…), `…`, <(…), sh -c '…', eval "…") becomes its own command, replaced by $() or "" in the outer one.
+segments=$(perl -e '
+  local $/; $_ = <STDIN>;
   s/\\\n//g;
   s{^([^\n]*?)(?<!<)<<(?!<)-?[ \t]*([\x27"]?)(\w+)\2([^\n]*)\n.*?^[ \t]*\3[ \t]*$}{
     my ($whole, $line) = ($&, "$1$4");
-    $line =~ /(?:^|[\s|;&(])(?:ba|z|da)?sh(?:\s|$)/ ? $whole : $line
+    $line =~ /(?:^|[\s|;&(\/])(?:ba|z|da|k)?sh(?:\s|$)/ ? $whole : $line
   }gsme;
+  # A double-quoted text still runs its $(…) and `…`, so it stays and the split below extracts them.
   my $q = qr/"(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27/s;
-  s/((?:^|\s)(?:-[a-zA-Z]*m|--message|--body|-b|--title|-t|--notes)(?:\s+|=)?)$q/$1""/g;
-  s/((?:^|[;&|(]|\s)(?:echo|printf|grep|egrep|rg)(?:\s+-[-\w]+)*\s+)$q/$1""/g;
-  s/&&|\|\||[;|\n]/\n/g;
+  my $text = sub { my ($opt, $str) = @_; $str =~ /^"(?:[^\\]|\\.)*?(?:\$\(|`)/s ? "$opt$str" : "$opt\"\"" };
+  s/((?:^|\s)(?:-[a-zA-Z]*m|--message|--body|-b|--title|-t|--notes)(?:\s+|=)?)($q)/$text->($1, $2)/ge;
+  s/((?:^|[;&|(`]|\s)(?:echo|printf|grep|egrep|fgrep|rg|awk|gawk|sed)(?:\s+-\S+)*\s+)($q)/$text->($1, $2)/ge;
+
+  my @out;
+  my $runs_code = qr/(?:^|[\s\/])(?:(?:ba|z|da|k)?sh(?:\s+-[-a-zA-Z]+)*\s+-[a-zA-Z]*c[a-zA-Z]*|eval)\s+\z/;
+  # Index of the ) closing a substitution whose content starts at $i.
+  sub closing {
+    my ($s, $i) = @_;
+    my $depth = 1;
+    while ($i < length $s) {
+      my $c = substr($s, $i, 1);
+      if ($c eq "\\") { $i += 2; next }
+      if ($c eq "\x27") { my $j = index($s, "\x27", $i + 1); return length $s if $j < 0; $i = $j + 1; next }
+      if ($c eq "\"") { $i++; while ($i < length $s && substr($s, $i, 1) ne "\"") { $i += substr($s, $i, 1) eq "\\" ? 2 : 1 } $i++; next }
+      $depth++ if $c eq "(";
+      return $i if $c eq ")" && --$depth == 0;
+      $i++;
+    }
+    return length $s;
+  }
+  # Index of the backtick closing the one before $i.
+  sub backtick {
+    my ($s, $i) = @_;
+    $i += substr($s, $i, 1) eq "\\" ? 2 : 1 while $i < length $s && substr($s, $i, 1) ne "`";
+    return $i;
+  }
+  sub split_cmd {
+    my ($s) = @_;
+    my ($cur, $i, $n) = ("", 0, length $s);
+    my $flush = sub { (my $c = $cur) =~ s/\n/ /g; push @out, $c if $c =~ /\S/; $cur = "" };
+    while ($i < $n) {
+      my $c = substr($s, $i, 1);
+      my $next = substr($s, $i + 1, 1);
+      if ($c eq "\\") { $cur .= substr($s, $i, 2); $i += 2 }
+      elsif ($c eq "\x27") {
+        my $j = index($s, "\x27", $i + 1); $j = $n if $j < 0;
+        if ($cur =~ $runs_code) { split_cmd(substr($s, $i + 1, $j - $i - 1)); $cur .= "\"\"" }
+        else { $cur .= substr($s, $i, $j - $i + 1) }
+        $i = $j + 1;
+      }
+      elsif ($c eq "\"") {
+        my $str = "";
+        $i++;
+        while ($i < $n && substr($s, $i, 1) ne "\"") {
+          my $d = substr($s, $i, 1);
+          if ($d eq "\\") { $str .= substr($s, $i, 2); $i += 2 }
+          elsif ($d eq "\$" && substr($s, $i + 1, 1) eq "(") { my $e = closing($s, $i + 2); split_cmd(substr($s, $i + 2, $e - $i - 2)); $str .= "\$()"; $i = $e + 1 }
+          elsif ($d eq "`") { my $e = backtick($s, $i + 1); split_cmd(substr($s, $i + 1, $e - $i - 1)); $str .= "\$()"; $i = $e + 1 }
+          else { $str .= $d; $i++ }
+        }
+        $i++;
+        if ($cur =~ $runs_code) { split_cmd($str); $cur .= "\"\"" } else { $cur .= "\"$str\"" }
+      }
+      elsif (($c eq "\$" || $c eq "<" || $c eq ">") && $next eq "(") {
+        my $e = closing($s, $i + 2); split_cmd(substr($s, $i + 2, $e - $i - 2)); $cur .= "\$()"; $i = $e + 1;
+      }
+      elsif ($c eq "`") { my $e = backtick($s, $i + 1); split_cmd(substr($s, $i + 1, $e - $i - 1)); $cur .= "\$()"; $i = $e + 1 }
+      elsif ($c eq "#" && $cur =~ /(?:^|[\s;&|(])\z/) { $i++ while $i < $n && substr($s, $i, 1) ne "\n" }
+      elsif ($c eq "&" && ($cur =~ /[<>]\z/ || $next eq ">")) { $cur .= $c; $i++ }
+      elsif ($c =~ /[;&|\n]/) { $flush->(); $i++ }
+      else { $cur .= $c; $i++ }
+    }
+    $flush->();
+  }
+  split_cmd($_);
+  print "$_\n" for @out;
 ' <<<"$raw")
 
 # Global options may sit between the program and its subcommand (git -C <path> push, git -c k=v tag,
-# npm --prefix . version, make -C . publish), and their value may be quoted.
+# npm --otp 123456 publish, make -C . publish), and their value may be quoted.
+# Any npm/pnpm/yarn option may take the next word as its value. For the version bump (a Perl regex),
+# that word must not be a subcommand that reads, so `npm --json view version` views the version.
 value='("[^"]*"|'\''[^'\'']*'\''|[^-[:space:]][^[:space:]]*)'
 git='git([[:space:]]+((-C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix)[[:space:]]+'"$value"'|-[^[:space:]]*))*[[:space:]]+'
 pkg='(npm|pnpm|yarn)([[:space:]]+-[^[:space:]]*([[:space:]]+'"$value"')?)*[[:space:]]+'
+reads='view|info|show|v|run|run-script'
+# The start of a command: subshell or group, keywords, variable assignments, a path to the program.
+start='^[[:space:](){!]*(([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*|if|then|elif|else|do|while|until|time|command|env)[[:space:]]+)*([^[:space:]]*/)?'
 
 publish="${pkg}publish"
 publish+='|make[[:space:]](.*[[:space:]])?publish([[:space:]]|$)'
 publish+='|mcp-publisher[[:space:]]+publish'
 publish+='|gh[[:space:]].*release[[:space:]]+(create|upload|edit|delete)'
-bump="${pkg}version"
+bump='(?:npm|pnpm|yarn)(?:\s+-\S*(?:\s+(?!(?:'"$reads"')(?:\s|$))(?:"[^"]*"|\x27[^\x27]*\x27|[^-\s]\S*))?)*\s+version'
 no_git_tag='[[:space:]]--no-git-tag-version([[:space:]"'\'']|$)'
 git_tag='[[:space:]]--git-tag-version|--no-git-tag-version[[:space:]]+["'\'']?(true|false)(["'\''[:space:]]|$)'
 tag_create="${git}"'tag[[:space:]].*v[0-9]'
 # A + before the tag (+v1.0.4, '+v1.0.4', +refs/tags/…) force-moves it: tag_push matches it, push_force refuses it.
 tag_push="${git}"'push[[:space:]].*(refs/tags/|[[:space:]:]["'\'']?\+?["'\'']?v[0-9]+\.[0-9])'
 # Only list-mode options may precede -l, so `git tag -a -l v1.1.0` stays a creation.
-tag_list="${git}"'tag([[:space:]]+(-n[0-9]*|-i|--ignore-case|--(sort|format|column|no-column|color|contains|no-contains|merged|no-merged|points-at)(=[^[:space:]]*)?))*[[:space:]]+(-l|--list)([[:space:]]|$)'
-# --mirror force-pushes every ref, a glob refspec (refs/tags/*) every matching one, push.followTags is --follow-tags.
+# Anchored to the start of the command, so a listing only exempts itself.
+tag_list="${start}${git}"'tag([[:space:]]+(-n[0-9]*|-i|--ignore-case|--(sort|format|column|no-column|color|contains|no-contains|merged|no-merged|points-at)(=[^[:space:]]*)?))*[[:space:]]+(-l|--list)([[:space:]]|$)'
+# --mirror force-pushes every ref, a glob refspec (refs/tags/*) every matching one.
 tag_bulk="${git}"'push[[:space:]](.*(--tags|--follow-tags|--mirror)([[:space:]]|$)|.*\*)'
-tag_bulk+='|git[[:space:]].*[pP][uU][sS][hH]\.[fF][oO][lL][lL][oO][wW][tT][aA][gG][sS]'
+# push.followTags turns every push into --follow-tags: refuse turning it on (case-insensitive match),
+# by value (=true, `config … true/yes/on/1`) or as a bare `-c push.followTags`; reading or disabling it is fine.
+truthy='["'\'']?(true|yes|on|[0-9]*[1-9])(["'\''[:space:]]|$)'
+follow_tags='git[[:space:]].*(push\.followtags(=|["'\'']?[[:space:]]+)'"$truthy"'|-c[[:space:]]+["'\'']?push\.followtags["'\'']?([[:space:]]|$))'
 tag_force='[[:space:]](-[a-zA-Z]*[fd][a-zA-Z]*|--force|--delete)([[:space:]]|$)'
 push_force='[[:space:]](-[a-zA-Z]*[fd][a-zA-Z]*|--force|--force-with-lease|--force-if-includes|--delete)([[:space:]=]|$)'
 push_force+='|[[:space:]]["'\'']?[:+]'
 merge='gh[[:space:]].*pr[[:space:]]+merge'
 api_merge='pulls/[^[:space:]/]+/merge'
-write='[[:space:]](-f|-F|--field|--raw-field|--input)([[:space:]]|=)|(-X|--method)[[:space:]=]*(POST|PUT|PATCH)'
-get='(-X|--method)[[:space:]=]*GET'
+method='(-X|--method|--request)[[:space:]=]*'
+# gh api writes with -f/-F/--input, curl with -d/--data/--json/--form: both default to POST.
+write='[[:space:]](-f|-F|--field|--raw-field|--input|-d|--data[-a-z]*|--json|--form)([[:space:]=@"'\'']|$)|'"$method"'(POST|PUT|PATCH)'
+get="${method}GET"
+api_refs='git/refs([/"'\''[:space:]?]|$)'
+api_releases='/releases([/"'\''[:space:]?]|$)'
+ref_mutation='(create|update|delete)Refs?[[:space:]]*\('
 
 has() { grep -Eq -- "$2" <<<"$1"; }
+has_i() { grep -Eiq -- "$2" <<<"$1"; }
+has_p() { perl -e 'exit($ARGV[0] =~ /$ARGV[1]/ ? 0 : 1)' -- "$1" "$2"; }
+# An API call that changes something: POST/PUT/PATCH/DELETE, and not forced back to GET.
+api_writes() { { has "$1" "$write" || has "$1" "${method}DELETE"; } && ! has "$1" "$get"; }
+# The command names only branches. The ref may sit in a field, a JSON heredoc or the path, so look in the raw command.
+branch_only() { grep -q 'refs/heads/' <<<"$raw" && ! grep -q 'refs/tags' <<<"$raw"; }
 
 while IFS= read -r seg; do
-  if has "$seg" "$publish"; then
-    deny "Manual publication (npm/pnpm/yarn publish, make publish, mcp-publisher publish, gh release create/upload/edit/delete) is blocked for every agent. Publication happens only through publish.yml, triggered by the coordinator pushing tag vX.Y.Z on main."
+  if has "$seg" "$publish" || { has "$seg" "$api_releases" && api_writes "$seg"; }; then
+    deny "Manual publication (npm/pnpm/yarn publish, make publish, mcp-publisher publish, gh release create/upload/edit/delete, writes to …/releases through the API) is blocked for every agent. Publication happens only through publish.yml, triggered by the coordinator pushing tag vX.Y.Z on main."
   fi
 
-  if has "$seg" "$bump"; then
+  # Any ref write through the API that is not known to target a branch (refs/heads/) may be a tag.
+  # Creating one (POST …/git/refs) is a tag push; updating or deleting one (PATCH/DELETE …/git/refs/…) moves it.
+  if has "$seg" "$api_refs" && api_writes "$seg" && ! branch_only; then
+    if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$seg" 'git/refs/tags/'; then
+      deny "No agent moves or deletes a tag through the API (PATCH/DELETE on …/git/refs/… other than refs/heads/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
+    fi
+    if [ "$agent" != "coordinator" ]; then
+      deny "Only the coordinator creates version tags (POST …/git/refs or git push origin vX.Y.Z), on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
+    fi
+  fi
+  if [ "$agent" != "coordinator" ] && has "$seg" 'graphql' && grep -Eq "$ref_mutation" <<<"$raw" && ! branch_only; then
+    deny "Only the coordinator writes tag refs (GraphQL createRef/updateRef/deleteRef outside refs/heads/). Report to the coordinator instead."
+  fi
+
+  if has_p "$seg" "$bump"; then
     if [ "$agent" != "developer" ]; then
       deny "Only a developer bumps the version, in a bump PR for a release the human asked for. Ask the coordinator to dispatch a developer."
     fi
@@ -87,19 +191,19 @@ while IFS= read -r seg; do
     fi
   fi
 
-  if has "$seg" "$tag_bulk"; then
-    deny "Push one named tag (git push origin vX.Y.Z), never --tags, --follow-tags, --mirror, a glob refspec or push.followTags: worktrees share tag refs, so a bulk push can publish tags nobody asked for."
+  if has "$seg" "$tag_bulk" || has_i "$seg" "$follow_tags"; then
+    deny "Push one named tag (git push origin vX.Y.Z), never --tags, --follow-tags, --mirror, a glob refspec or push.followTags enabled: worktrees share tag refs, so a bulk push can publish tags nobody asked for."
   fi
 
   if { has "$seg" "$tag_create" && has "$seg" "$tag_force"; } || { has "$seg" "$tag_push" && has "$seg" "$push_force"; }; then
     deny "No agent moves or deletes a version tag (tag -f/-d, forced or +refspec push, deletion push): re-pushing a tag republishes an already-released version through publish.yml. Report it to the human."
   fi
 
-  if [ "$agent" != "coordinator" ] && { has "$seg" "$tag_create" || has "$seg" "$tag_push"; } && ! has "$seg" "$tag_list"; then
+  if [ "$agent" != "coordinator" ] && { has "$seg" "$tag_push" || { has "$seg" "$tag_create" && ! has "$seg" "$tag_list"; }; }; then
     deny "Only the coordinator creates and pushes version tags, on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
   fi
 
-  if [ "$agent" != "coordinator" ] && { has "$seg" "$merge" || { has "$seg" "$api_merge" && has "$seg" '(-X|--method)[[:space:]=]*PUT'; }; }; then
+  if [ "$agent" != "coordinator" ] && { has "$seg" "$merge" || { has "$seg" "$api_merge" && has "$seg" "${method}PUT"; }; }; then
     deny "Only the coordinator merges PRs, once agent-review is success on the head SHA. Report the PR to the coordinator instead."
   fi
 
