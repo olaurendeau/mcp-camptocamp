@@ -48,7 +48,7 @@ Chaque cotation d'itinéraire ou de sortie est nommée par son système, jamais 
 
 ### npm (recommandé)
 
-Prérequis : [Node.js](https://nodejs.org/) 18+
+Prérequis : [Node.js](https://nodejs.org/) 22+ (la CI teste Node 22 et 24)
 
 **Claude Desktop** — ajouter dans la configuration :
 
@@ -129,11 +129,11 @@ La publication est automatisée : le tag `vX.Y.Z` déclenche le workflow `publis
 
 ## Stack technique
 
-- **Runtime** : Node.js 22 + TypeScript
+- **Runtime** : Node.js 22+ (CI sur 22 et 24) + TypeScript
 - **MCP SDK** : `@modelcontextprotocol/sdk`
 - **Transport** : stdio
 - **Tests** : Vitest
-- **Docker** : image multi-stage (`node:22-alpine`)
+- **Docker** : image multi-stage (`node:22-alpine`), multi-arch (amd64, arm64), exécutée par un utilisateur non-root (`node`)
 
 ## Licence
 
