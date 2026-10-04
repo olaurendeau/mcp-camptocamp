@@ -208,7 +208,8 @@ describe("searches (AC8.2, AC8.3)", () => {
     ).toEqual(["en"]);
   });
 
-  // AC5.2, AC5.3: `pl=<lang>` returns the requested language instead of fr (route 54085 has fr, de, en and it).
+  // AC5.2, AC5.3: `pl=<lang>` returns the requested language instead of fr (route 54085 had a de locale on
+  // 2026-10-04).
   it("route 54085 comes back from a de search with its single de locale", async () => {
     const result = await searchRoutes({ query: "Glacier du Geay", lang: "de" });
     const route = wellFormed(result.documents).find((document) => document.document_id === 54085);

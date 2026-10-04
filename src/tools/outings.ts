@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
 import { ACTIVITIES, enumValue } from "./enums.js";
+import type { Lang } from "./enums.js";
 import { CONDITION_RATINGS, OUTING_RATING_FIELDS, getOuting, searchOutings } from "../api/camptocamp.js";
 import type { OutingDetail, OutingListResponse, OutingSearchParams } from "../api/camptocamp.js";
 import {
@@ -14,6 +15,8 @@ import {
   formatOutingLine,
   formatListItems,
   formatMalformed,
+  formatLanguageLine,
+  MALFORMED_ITEM_NOTE,
 } from "./format.js";
 import { isMalformed } from "../api/schemas.js";
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
@@ -22,6 +25,7 @@ import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const getOutingSchema = z.object({
   id: documentId("Outing ID from Camptocamp"),
+  lang: langInput(),
 });
 
 // The API answers 500 to impossible dates such as 2026-02-30, and ignores malformed ones.
@@ -116,11 +120,21 @@ export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
 export type GetOutingInput = z.infer<typeof getOutingSchema>;
 export type SearchOutingsInput = z.infer<typeof searchOutingsSchema>;
 
-function formatOutingDetail(outing: OutingDetail): string {
-  const locale = pickLocale(outing.locales);
+// An account in the inline participants line. A malformed one keeps the "(user ID: N)" of the others, since
+// "[N]" elsewhere is a document ID (review of #188); without a readable ID it is the bare placeholder.
+function formatAccount(user: NonNullable<NonNullable<OutingDetail["associations"]>["users"]>[number]): string {
+  if (!isMalformed(user)) return `${user.name} (user ID: ${user.document_id})`;
+  return user.document_id === undefined
+    ? formatMalformed(user)
+    : `(user ID: ${user.document_id}, ${MALFORMED_ITEM_NOTE})`;
+}
+
+function formatOutingDetail(outing: OutingDetail, lang?: Lang): string {
+  const locale = pickLocale(outing.locales, lang);
   const lines: string[] = [];
 
-  lines.push(...formatHeader(pickTitle(outing.locales), outing.document_id, "outings"));
+  lines.push(...formatHeader(pickTitle(outing.locales, lang), outing.document_id, "outings"));
+  lines.push(...formatLanguageLine(outing.locales, lang));
 
   lines.push(`\n**Activities**: ${outing.activities.join(", ")}`);
 
@@ -129,11 +143,7 @@ function formatOutingDetail(outing: OutingDetail): string {
   if (isPresent(outing.participant_count)) lines.push(`**Participants**: ${outing.participant_count}`);
   const users = outing.associations?.users;
   if (users && users.length > 0) {
-    // An inline list: a malformed account is its placeholder without the "- " of a list line.
-    const accounts = users.map((user) =>
-      isMalformed(user) ? formatMalformed(user) : `${user.name} (user ID: ${user.document_id})`,
-    );
-    lines.push(`**Participants with a Camptocamp account**: ${accounts.join(", ")}`);
+    lines.push(`**Participants with a Camptocamp account**: ${users.map(formatAccount).join(", ")}`);
   }
 
   lines.push(...formatRatingLines(outing));
@@ -153,7 +163,7 @@ function formatOutingDetail(outing: OutingDetail): string {
 
   const routes = outing.associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...formatListItems(routes, formatAssociatedRouteLine));
+    lines.push("\n## Associated routes", ...formatListItems(routes, (route) => formatAssociatedRouteLine(route, lang)));
   }
 
   return lines.join("\n");
@@ -278,7 +288,7 @@ export async function handleSearchUserOutings(input: SearchUserOutingsInput): Pr
 
 export async function handleGetOuting(input: GetOutingInput): Promise<string> {
   const outing = await getOuting(input.id);
-  return formatOutingDetail(outing);
+  return formatOutingDetail(outing, input.lang);
 }
 
 export const outingToolDefinitions = [
@@ -295,7 +305,7 @@ export const outingToolDefinitions = [
     title: "Get outing details",
     description:
       "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including every rating labelled by its grading system (e.g. 'Ski rating (Toponeige)', 'Labande', 'Global rating'), description, conditions, weather, participants, and associated routes (named '<summit> : <route title>', followed by their ratings). The second line is the document's camptocamp.org URL, to cite as the source. The outing detail does not carry its author: search_outings result lines end with 'Author: <name>'. 'Participants with a Camptocamp account' lists the Camptocamp accounts linked to the outing, with their user IDs. " +
-      USER_TEXT_NOTE,
+      `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${USER_TEXT_NOTE}`,
     inputSchema: getOutingSchema,
     handler: handleGetOuting,
   },

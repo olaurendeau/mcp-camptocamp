@@ -15,10 +15,11 @@ import type {
   WaypointAssociation,
 } from "../api/schemas.js";
 import { formatRatingParts } from "./ratings.js";
+import type { Lang } from "./enums.js";
 
 // Locale fallback order after the requested language: the API's own `pl` fallback (#141 on #153). Only
 // [it, en] → en was observed live (route 675555 has [it, en] and a `pl=fr` search returns en).
-const LANG_ORDER = ["fr", "en", "it", "de", "es", "ca", "eu", "sl", "zh"];
+export const LANG_ORDER = ["fr", "en", "it", "de", "es", "ca", "eu", "sl", "zh"] as const satisfies readonly Lang[];
 
 // Detail endpoints return every locale in no useful order (book 373877: it, fr, en; article 716039:
 // en before fr), so pick the one a `pl=<lang>` search would return: the requested language, then
@@ -48,11 +49,14 @@ export function formatLanguageLine(locales: { lang: string }[], lang = "fr"): st
 // A list as tolerantArray parses it: each item is well-formed or a MalformedItem.
 export type ListOf<T> = readonly (T | MalformedItem)[];
 
+// Why a malformed item with a readable ID is not shown.
+export const MALFORMED_ITEM_NOTE = "not shown: Camptocamp sent this item in an unexpected format";
+
 // The placeholder of a malformed item, without the "- " of a list line (#129, decision D2 on #153).
 export function formatMalformed(item: MalformedItem): string {
   return item.document_id === undefined
     ? "(not shown: Camptocamp sent an item in an unexpected format)"
-    : `[${item.document_id}] (not shown: Camptocamp sent this item in an unexpected format)`;
+    : `[${item.document_id}] (${MALFORMED_ITEM_NOTE})`;
 }
 
 // One line per item, in API order: `format` for a well-formed item, a placeholder line for a malformed one,

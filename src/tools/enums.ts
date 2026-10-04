@@ -64,6 +64,10 @@ export const BOOK_TYPES = [
   "magazine",
 ] as const;
 
+// The languages of Camptocamp documents, defined with the API client that sends them as `pl`.
+export { LANGS } from "../api/camptocamp.js";
+export type { Lang } from "../api/camptocamp.js";
+
 /** One value of `values`; anything else fails with "must be one of: <values>". */
 export function enumValue<T extends string>(values: readonly [T, ...T[]]) {
   return z.enum(values, { errorMap: () => ({ message: `must be one of: ${values.join(", ")}` }) });

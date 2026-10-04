@@ -1215,3 +1215,33 @@ describe("malformed list items", () => {
     expect(lines).toContain("- (not shown: Camptocamp sent an item in an unexpected format)");
   });
 });
+
+describe("get_book lang", () => {
+  it("prints the requested language's title, text and route names, with no Language line", async () => {
+    mockGetBook.mockResolvedValueOnce(BOOK_373877);
+
+    const result = await handleGetBook({ id: 373877, lang: "it" });
+
+    expect(result.split("\n").slice(0, 3)).toEqual([
+      "# Monte Bianco Classico & Plaisir (ID: 373877)",
+      "**URL**: https://www.camptocamp.org/books/373877",
+      "",
+    ]);
+    expect(result).toContain("Con prefazione di Patrick Gabarrou.");
+    expect(result).toContain("\n## Associated routes\n- [53781] Monte Bianco : Monte Bianco via Bossesgrat");
+    expect(result).not.toContain("**Language**:");
+  });
+
+  it("names the language shown after the URL line when the requested one is missing", async () => {
+    mockGetBook.mockResolvedValueOnce(BOOK_373877);
+
+    const result = await handleGetBook({ id: 373877, lang: "de" });
+
+    expect(result.split("\n").slice(0, 3)).toEqual([
+      "# Mont Blanc Classique & Plaisir (ID: 373877)",
+      "**URL**: https://www.camptocamp.org/books/373877",
+      "**Language**: fr (no de version; available: it, fr, en)",
+    ]);
+    expect(result).toContain("\n## Associated routes\n- [53781] Mont Blanc : Bossesgrat");
+  });
+});

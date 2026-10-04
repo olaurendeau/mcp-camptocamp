@@ -323,6 +323,51 @@ describe("handleGetArea", () => {
   });
 });
 
+describe("get_area lang", () => {
+  // Area 14274 of GET /areas/14274 (2026-10-04): nine locales, zh first; only fr has a description.
+  const france: AreaDetail = {
+    document_id: 14274,
+    area_type: "country",
+    locales: [
+      { lang: "zh", title: "法国", summary: null, description: "" },
+      { lang: "sl", title: "Francija", summary: null, description: "" },
+      { lang: "fr", title: "France", summary: null, description: "## Ski de randonnée\n### Alpes" },
+      { lang: "ca", title: "França", summary: null, description: "" },
+      { lang: "de", title: "Frankreich", summary: null, description: "" },
+      { lang: "en", title: "France", summary: null, description: "" },
+      { lang: "es", title: "Francia", summary: null, description: "" },
+      { lang: "eu", title: "France", summary: null, description: "" },
+      { lang: "it", title: "Francia", summary: null, description: "" },
+    ],
+  };
+
+  it("heads the area with its title in the requested language (AC5.7)", async () => {
+    mockGetArea.mockResolvedValueOnce(france);
+
+    const result = await handleGetArea({ id: 14274, lang: "zh" });
+
+    expect(result.split("\n").slice(0, 4)).toEqual([
+      "# 法国 (ID: 14274)",
+      "**URL**: https://www.camptocamp.org/areas/14274",
+      "",
+      "**Type**: country",
+    ]);
+  });
+
+  it("names the language shown after the URL line when the requested one is missing", async () => {
+    mockGetArea.mockResolvedValueOnce(ecrinsDetail);
+
+    const result = await handleGetArea({ id: 14403, lang: "de" });
+
+    expect(result.split("\n").slice(0, 3)).toEqual([
+      "# Écrins (ID: 14403)",
+      "**URL**: https://www.camptocamp.org/areas/14403",
+      "**Language**: fr (no de version; available: fr)",
+    ]);
+    expect(result).toContain(ecrinsSummary);
+  });
+});
+
 describe("schemas", () => {
   it("rejects an unknown area_type and accepts the three valid ones", () => {
     expect(searchAreasSchema.safeParse({ query: "ecrins", area_type: "massif" }).success).toBe(false);
