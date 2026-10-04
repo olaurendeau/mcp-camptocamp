@@ -875,7 +875,7 @@ describe("searchOutings", () => {
     const params = calledUrl().searchParams;
     expect(params.get("limit")).toBe("25");
     expect(params.get("offset")).toBe("50");
-    for (const name of ["q", "a", "act", "date", "r", "w"]) {
+    for (const name of ["q", "a", "act", "date", "period", "r", "w", "u"]) {
       expect(params.has(name)).toBe(false);
     }
   });
@@ -912,6 +912,54 @@ describe("searchOutings", () => {
     await searchOutings({ date_to: "2026-01-01" });
 
     expect(calledUrl().searchParams.get("date")).toBe("0001-01-01,2026-01-01");
+  });
+
+  // AC5.1: Camptocamp matches `period` on month and day in every year; 2020 is a leap year, so 02-29 is valid.
+  it("sends a period as a 2020 date range", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ waypoint_id: 37916, period: { start: "06-01", end: "06-30" } });
+
+    const params = calledUrl().searchParams;
+    expect(params.get("period")).toBe("2020-06-01,2020-06-30");
+    expect(params.get("w")).toBe("37916");
+    expect(params.has("date")).toBe(false);
+  });
+
+  it("sends 02-29 as the leap day of 2020", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ period: { start: "02-01", end: "02-29" } });
+
+    expect(calledUrl().searchParams.get("period")).toBe("2020-02-01,2020-02-29");
+  });
+
+  // AC5.3: the period and the date range are two independent filters.
+  it("sends both period and date when both are given", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({
+      waypoint_id: 37916,
+      period: { start: "06-01", end: "06-30" },
+      date_from: "2015-01-01",
+      date_to: "2020-12-31",
+    });
+
+    const params = calledUrl().searchParams;
+    expect(params.get("period")).toBe("2020-06-01,2020-06-30");
+    expect(params.get("date")).toBe("2015-01-01,2020-12-31");
+  });
+
+  // AC5.5
+  it("sends user_id as u", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ user_id: 430052, activity: "rock_climbing" });
+
+    const params = calledUrl().searchParams;
+    expect(params.get("u")).toBe("430052");
+    expect(params.get("act")).toBe("rock_climbing");
+    expect(params.has("period")).toBe(false);
   });
 
   it("throws on non-OK response", async () => {

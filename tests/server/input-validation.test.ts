@@ -40,6 +40,7 @@ const ID_FIELDS: IdField[] = [
   { tool: "search_outings", field: "area_id", args: (area_id) => ({ area_id }), response: EMPTY_SEARCH },
   { tool: "search_outings", field: "route_id", args: (route_id) => ({ route_id }), response: EMPTY_SEARCH },
   { tool: "search_outings", field: "waypoint_id", args: (waypoint_id) => ({ waypoint_id }), response: EMPTY_SEARCH },
+  { tool: "search_outings", field: "user_id", args: (user_id) => ({ user_id }), response: EMPTY_SEARCH },
 ];
 
 const CASES = ID_FIELDS.map((f) => [`${f.tool} ${f.field}`, f] as const);
@@ -169,6 +170,8 @@ describe("search query inputs", () => {
 const OUTING_ACTIVITY_LIST =
   "skitouring, snow_ice_mixed, mountain_climbing, rock_climbing, ice_climbing, hiking, snowshoeing, paragliding, mountain_biking, via_ferrata, slacklining";
 
+const PERIOD_MESSAGE = "must be a real day in MM-DD format (e.g. 06-01; 02-29 allowed)";
+
 // D2: the SDK reports search_outings field rules, naming the field.
 describe("search_outings field inputs", () => {
   it.each<[string, Record<string, unknown>, string, string]>([
@@ -180,6 +183,9 @@ describe("search_outings field inputs", () => {
     ],
     ["a malformed date", { date_to: "2026-9-1" }, "date_to", "must be a real date in YYYY-MM-DD format"],
     ["an unknown activity", { activity: "skiing" }, "activity", `must be one of: ${OUTING_ACTIVITY_LIST}`],
+    ["a day that does not exist", { period_start: "02-30", period_end: "03-10" }, "period_start", PERIOD_MESSAGE],
+    ["a period day without zero padding", { period_start: "06-01", period_end: "6-1" }, "period_end", PERIOD_MESSAGE],
+    ["a full date as period", { period_start: "2020-06-01", period_end: "06-30" }, "period_start", PERIOD_MESSAGE],
   ])("rejects %s with the field and the rule", async (_label, args, field, message) => {
     const fetchMock = stubFetch();
     const client = await connect();
@@ -201,6 +207,7 @@ describe("search_outings field inputs", () => {
     ["a non-integer offset", { offset: 1.5 }, "offset"],
     ["a negative route_id", { route_id: -1 }, "route_id"],
     ["a non-integer area_id", { area_id: 1.5 }, "area_id"],
+    ["a negative user_id", { user_id: -1 }, "user_id"],
   ])("rejects %s naming the field without calling Camptocamp", async (_label, args, field) => {
     const fetchMock = stubFetch();
     const client = await connect();
@@ -243,6 +250,18 @@ describe("cross-field rules", () => {
       "Error: offset + limit must not exceed 10000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.",
     ],
     [
+      "search_outings",
+      "period_start without period_end",
+      { period_start: "06-01" },
+      "Error: period_start and period_end must be given together (MM-DD, e.g. 06-01 and 06-30).",
+    ],
+    [
+      "search_outings",
+      "a period wrapping around the new year",
+      { period_start: "12-20", period_end: "01-10" },
+      "Error: period cannot wrap around the new year; make two calls (12-20 → 12-31 and 01-01 → 01-10)",
+    ],
+    [
       "search_routes",
       "neither query nor area_id",
       {},
@@ -268,6 +287,7 @@ describe("cross-field rules", () => {
   it.each<[string, Record<string, unknown>]>([
     ["offset + limit of exactly 10,000", { offset: 9990, limit: 10 }],
     ["equal date_from and date_to", { date_from: "2026-08-10", date_to: "2026-08-10" }],
+    ["the leap day as a one-day period", { period_start: "02-29", period_end: "02-29" }],
   ])("search_outings accepts %s", async (_label, args) => {
     const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
     const client = await connect();
@@ -276,5 +296,19 @@ describe("cross-field rules", () => {
 
     expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("search_outings sends a period and a user_id through MCP", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    await client.callTool({
+      name: "search_outings",
+      arguments: { user_id: 430052, period_start: "06-01", period_end: "06-30" },
+    });
+
+    const params = new URL(String(fetchMock.mock.calls[0][0])).searchParams;
+    expect(params.get("period")).toBe("2020-06-01,2020-06-30");
+    expect(params.get("u")).toBe("430052");
   });
 });

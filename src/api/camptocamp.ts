@@ -199,6 +199,10 @@ export async function getArea(id: number): Promise<AreaDetail> {
 const DATE_MIN = "0001-01-01";
 const DATE_MAX = "9999-12-31";
 
+// `period` matches month and day in every year, given as dates of one year: 2020, a leap year, so
+// that 02-29 exists. A range wrapping around the new year (12-20 → 01-10) matches nothing.
+const PERIOD_YEAR = "2020";
+
 export interface OutingSearchParams {
   query?: string;
   area_id?: number;
@@ -207,6 +211,8 @@ export interface OutingSearchParams {
   date_to?: string;
   route_id?: number;
   waypoint_id?: number;
+  user_id?: number;
+  period?: { start: string; end: string }; // MM-DD, start on or before end
   limit?: number; // default DEFAULT_LIMIT
   offset?: number; // default 0
 }
@@ -220,8 +226,12 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
   if (params.date_from !== undefined || params.date_to !== undefined) {
     search.set("date", `${params.date_from ?? DATE_MIN},${params.date_to ?? DATE_MAX}`);
   }
+  if (params.period !== undefined) {
+    search.set("period", `${PERIOD_YEAR}-${params.period.start},${PERIOD_YEAR}-${params.period.end}`);
+  }
   if (params.route_id !== undefined) search.set("r", String(params.route_id));
   if (params.waypoint_id !== undefined) search.set("w", String(params.waypoint_id));
+  if (params.user_id !== undefined) search.set("u", String(params.user_id));
   search.set("sort", "-date_end");
   search.set("limit", String(params.limit ?? DEFAULT_LIMIT));
   search.set("offset", String(params.offset ?? 0));
