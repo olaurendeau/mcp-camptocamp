@@ -11,7 +11,10 @@ The server runs on your machine and talks to its client over stdio. A client tha
 
 ## Clients
 
-Until your client has its own page here, use the [Claude Code command](getting-started.md#claude-code) or the [configuration for other MCP clients](getting-started.md#other-mcp-clients).
+- [Claude Desktop](clients/claude-desktop.md): the `claude_desktop_config.json` entry, checking the connectors, and tool approval.
+- [Claude Code](clients/claude-code.md): the `claude mcp add` command, scopes, the allow rule that stops permission prompts, and Claude Code's limits.
+
+For a client without its own page here, use the [configuration for other MCP clients](getting-started.md#other-mcp-clients).
 
 ## Guides
 

@@ -83,6 +83,8 @@ In a JSON configuration, `args` is `["run", "--rm", "-i", "ghcr.io/olaurendeau/m
    - Windows: `%APPDATA%\Claude\logs`. List them with `type "%APPDATA%\Claude\logs\mcp*.log"`.
 4. Run the server's command in a terminal (the [smoke test](getting-started.md#smoke-test)) to see its errors.
 
+The [Claude Desktop page](clients/claude-desktop.md) has the full setup.
+
 ## Windows: ENOENT and `${APPDATA}` in the Claude Desktop logs
 
 **Symptom:** the server fails to load, and its log shows an `ENOENT` error with `${APPDATA}` in a path.
@@ -111,7 +113,7 @@ Then start Claude Desktop again. If npx still fails, check that npm is installed
 
 **Cause:** Claude Code warns when an MCP tool's output exceeds 10,000 tokens, and by default caps it at 25,000 tokens.
 
-**Fix:** ask for fewer results per call (the search tools take a `limit`), or raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable, for example `MAX_MCP_OUTPUT_TOKENS=50000 claude`. The warning threshold cannot be changed.
+**Fix:** ask for fewer results per call (the search tools take a `limit`), or raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable, for example `MAX_MCP_OUTPUT_TOKENS=50000 claude`. The warning threshold cannot be changed. See [Claude Code's limits](clients/claude-code.md#limits).
 
 ## Check that a client sees the server
 
