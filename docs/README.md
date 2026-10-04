@@ -19,4 +19,4 @@ Guides on using the tools with an LLM are listed here as they are written.
 
 ## Tool reference
 
-Until the tool reference pages are written, the [project README](../README.md) describes the 13 tools.
+- [Tool reference](tools/README.md): one page per tool, with its purpose, its inputs generated from the registered schema, and the tools to call before or after it.
