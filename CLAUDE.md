@@ -21,7 +21,7 @@ src/
     ├── format.ts         # Shared formatting: pickLocale, joinList, formatHeader, route/waypoint/book/outing lines, recent outings, areas section, dates, isPresent (0 and false are printed)
     ├── inputs.ts         # Shared zod inputs: bounded document IDs, 200-char queries
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
-    ├── enums.ts          # Camptocamp's closed filter value lists (activities, route types, configurations)
+    ├── enums.ts          # Camptocamp's closed value lists: filters (activities, route types, configurations), CUSTODIANSHIPS meanings
     ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
     ├── text.ts           # formatUserText: rewrites image tags and internal links, delimits, demotes and caps user-written text
     ├── routes.ts         # Tools: search_routes, get_route
@@ -117,21 +117,21 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 ## MCP Tools
 
-| Tool                  | Description                                                                                          |
-| --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`  |
-| `get_route`           | Route detail by ID (summit : title, text, ratings, elevation, areas, books, waypoints, outings…)     |
-| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
-| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
-| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings        |
-| `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings) |
-| `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged |
-| `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`              |
-| `get_area`            | Get area detail by ID (type, summary, description)                                                   |
-| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable           |
-| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)    |
-| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type          |
-| `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)           |
+| Tool                  | Description                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`              |
+| `get_route`           | Route detail by ID (summit : title, text, ratings, elevation, areas, books, waypoints, outings…)                 |
+| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`; paged with `offset`                         |
+| `get_waypoint`        | Waypoint by ID (altitude, GPS, areas; huts: capacity, custodianship, phones, website, access period)             |
+| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings                    |
+| `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings)             |
+| `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged             |
+| `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
+| `get_area`            | Get area detail by ID (type, summary, description)                                                               |
+| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable; paged with `offset`  |
+| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)                |
+| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type; paged with `offset` |
+| `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)                       |
 
 `search_routes` needs at least one filter (D5 on #58); any one is enough. Rating bounds are checked against the scale of `rating_system` (`ROUTE_RATING_SYSTEMS` in `src/tools/ratings.ts`) and list values against `src/tools/enums.ts` before any request, since Camptocamp silently ignores an unknown value (R7).
 
@@ -154,15 +154,15 @@ Locale: searches send `pl=fr`, which returns one locale per document, French whe
   - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
 - `GET /routes/{id}`
   - `associations`: `waypoints` (the one matching `main_waypoint_id` is marked), `routes`, `books`, `articles`, and `recent_outings {documents, total}` (the latest 10, shaped like `/outings` list items); `images` and `xreports` are not read.
-- `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}]` (at least one of `q` and `a`)
+- `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}][&offset={n}]` (at least one of `q` and `a`)
 - `GET /waypoints/{id}`
 - `GET /outings?u={user_id}&limit=10&pl=fr`
 - `GET /outings/{id}`
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]`
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
-- `GET /areas?q={query}&limit=10&pl=fr[&atyp={type}]`
+- `GET /areas?q={query}&limit=10&pl=fr[&atyp={type}][&offset={n}]`
 - `GET /areas/{id}`
-- `GET /books?q={query}&limit=10&pl=fr`
+- `GET /books?q={query}&limit=10&pl=fr[&offset={n}]`
 - `GET /books/{id}`
-- `GET /articles?q={query}&limit=10&pl=fr`
+- `GET /articles?q={query}&limit=10&pl=fr[&offset={n}]`
 - `GET /articles/{id}`

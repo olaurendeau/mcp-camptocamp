@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { documentId, searchQuery } from "./inputs.js";
+import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
 import { searchArticles, getArticle } from "../api/camptocamp.js";
-import type { ArticleSearchResponse, ArticleDetail } from "../api/camptocamp.js";
+import type { ArticleSearchResult, ArticleDetail } from "../api/camptocamp.js";
 import {
   pickLocale,
   pickTitle,
@@ -16,6 +17,7 @@ import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 export const searchArticlesSchema = z.object({
   query: searchQuery("Search query (e.g. 'crampons', 'avalanche', 'rappel')", { allowBlank: false }),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
+  offset: searchOffset(),
 });
 
 export const getArticleSchema = z.object({
@@ -27,25 +29,14 @@ export type GetArticleInput = z.infer<typeof getArticleSchema>;
 
 type Associations = NonNullable<ArticleDetail["associations"]>;
 
-function formatArticleSearchResult(response: ArticleSearchResponse): string {
-  if (response.documents.length === 0) {
-    return "No articles found.";
-  }
-
-  const lines: string[] = [`Found ${response.total} article(s). Showing ${response.documents.length}:\n`];
-
-  for (const article of response.documents) {
-    const title = pickTitle(article.locales);
-    const categories = joinList(article.categories);
-    const activities = joinList(article.activities);
-    const parts = [`- [${article.document_id}] ${title}`];
-    if (article.article_type) parts.push(`Type: ${article.article_type}`);
-    if (categories) parts.push(`Categories: ${categories}`);
-    if (activities) parts.push(`Activities: ${activities}`);
-    lines.push(parts.join(" | "));
-  }
-
-  return lines.join("\n");
+function formatArticleSearchLine(article: ArticleSearchResult): string {
+  const categories = joinList(article.categories);
+  const activities = joinList(article.activities);
+  const parts = [`- [${article.document_id}] ${pickTitle(article.locales)}`];
+  if (article.article_type) parts.push(`Type: ${article.article_type}`);
+  if (categories) parts.push(`Categories: ${categories}`);
+  if (activities) parts.push(`Activities: ${activities}`);
+  return parts.join(" | ");
 }
 
 function formatArticleDetail(article: ArticleDetail): string {
@@ -99,8 +90,18 @@ function formatArticleDetail(article: ArticleDetail): string {
 }
 
 export async function handleSearchArticles(input: SearchArticlesInput): Promise<string> {
+  const { query, limit, offset } = input;
+  assertResultWindow(offset, limit);
+
   const response = await searchArticles(input);
-  return formatArticleSearchResult(response);
+  return formatSearchPage({
+    kind: "article",
+    total: response.total,
+    offset,
+    limit,
+    lines: response.documents.map(formatArticleSearchLine),
+    filters: [`query "${query}"`],
+  });
 }
 
 export async function handleGetArticle(input: GetArticleInput): Promise<string> {
@@ -113,7 +114,8 @@ export const articleToolDefinitions = [
     name: "search_articles",
     title: "Search articles",
     description:
-      "Search Camptocamp.org articles by keyword. Articles cover gear, climbing and mountaineering techniques, mountain environment (avalanches, snow, weather), stories, and topoguide supplements (route lists, useful links). Each result shows article_type: `collab` (community-edited reference) or `personal` (one author's view, not community consensus), plus categories and activities. Use get_article for the full text and linked routes, waypoints, articles, outings and books.",
+      "Search Camptocamp.org articles by keyword. Articles cover gear, climbing and mountaineering techniques, mountain environment (avalanches, snow, weather), stories, and topoguide supplements (route lists, useful links). Each result shows article_type: `collab` (community-edited reference) or `personal` (one author's view, not community consensus), plus categories and activities. A header gives the total, the offset and the filters. Use get_article for the full text and linked routes, waypoints, articles, outings and books. " +
+      PAGING_NOTE,
     inputSchema: searchArticlesSchema,
     handler: handleSearchArticles,
   },

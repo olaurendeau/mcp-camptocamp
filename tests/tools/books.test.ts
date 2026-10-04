@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { z } from "zod";
 import {
   handleSearchBooks,
   handleGetBook,
@@ -25,6 +26,11 @@ function expectNoPlaceholder(text: string) {
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+/** Calls the handler as the MCP server does: with input parsed by the tool schema, defaults applied. */
+function search(input: z.input<typeof searchBooksSchema>): Promise<string> {
+  return handleSearchBooks(searchBooksSchema.parse(input));
+}
 
 // The live GET /books?q=mont blanc&limit=2&lang=fr response (2026-10-03), complete.
 const MONT_BLANC_SEARCH = {
@@ -145,14 +151,72 @@ const FINALE_CLIMBING_SEARCH = {
   total: 1,
 };
 
+// AC9.1, AC9.4: R6 paging.
+describe("search_books paging", () => {
+  // The live GET /books?q=mont blanc&limit=2&offset=2&pl=fr response (2026-10-04), complete.
+  const MONT_BLANC_PAGE_2 = {
+    documents: [
+      {
+        document_id: 14746,
+        version: 2,
+        locales: [{ version: 2, lang: "fr", title: "Hugo et le Mont Blanc", summary: null }],
+        quality: "medium",
+        author: "Colette Cosnier",
+        activities: null,
+        book_types: ["novel"],
+        available_langs: ["fr"],
+        protected: false,
+        type: "b",
+      },
+      {
+        document_id: 256887,
+        version: 1,
+        locales: [{ version: 1, lang: "fr", title: "Le pays du Mont Blanc", summary: null }],
+        quality: "medium",
+        author: "Michel Delamette",
+        activities: null,
+        book_types: ["topo", "environment"],
+        available_langs: ["fr"],
+        protected: false,
+        type: "b",
+      },
+    ],
+    total: 79,
+  };
+
+  it("sends the offset, names the query and points to the next page", async () => {
+    mockSearchBooks.mockResolvedValueOnce(MONT_BLANC_PAGE_2);
+
+    const result = await search({ query: "mont blanc", offset: 2, limit: 2 });
+
+    expect(mockSearchBooks).toHaveBeenCalledWith({ query: "mont blanc", limit: 2, offset: 2 });
+    expect(result.split("\n")).toEqual([
+      "Found 79 book(s). Showing 2 from offset 2:",
+      'Filters: query "mont blanc"',
+      "",
+      "- [14746] Hugo et le Mont Blanc | Author: Colette Cosnier | Types: novel",
+      "- [256887] Le pays du Mont Blanc | Author: Michel Delamette | Types: topo, environment",
+      "",
+      "Next page: offset=4",
+    ]);
+  });
+
+  it("refuses offset + limit above 10,000 without calling the API", async () => {
+    await expect(search({ query: "mont blanc", offset: 9995, limit: 10 })).rejects.toThrow(
+      "offset + limit must not exceed 10000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.",
+    );
+    expect(mockSearchBooks).not.toHaveBeenCalled();
+  });
+});
+
 describe("handleSearchBooks", () => {
-  it("forwards query and limit and prints the total header", async () => {
+  it("forwards query, limit and offset and prints the total header", async () => {
     mockSearchBooks.mockResolvedValueOnce(MONT_BLANC_SEARCH);
 
-    const result = await handleSearchBooks({ query: "mont blanc", limit: 2 });
+    const result = await search({ query: "mont blanc", limit: 2 });
 
-    expect(mockSearchBooks).toHaveBeenCalledWith({ query: "mont blanc", limit: 2 });
-    expect(result.startsWith("Found 79 book(s). Showing 2:")).toBe(true);
+    expect(mockSearchBooks).toHaveBeenCalledWith({ query: "mont blanc", limit: 2, offset: 0 });
+    expect(result.startsWith("Found 79 book(s). Showing 2 from offset 0:")).toBe(true);
     expect(result).toContain(
       "- [373877] Mont Blanc Classique & Plaisir | Author: Marco Romelli | Types: topo | Activities: mountain_climbing, snow_ice_mixed",
     );
@@ -162,7 +226,7 @@ describe("handleSearchBooks", () => {
   it("writes one line with the fr title, author, raw types and activities", async () => {
     mockSearchBooks.mockResolvedValueOnce({ documents: [BOOK_14592_SEARCH_DOC], total: 15 });
 
-    const result = await handleSearchBooks({ query: "100 plus belles courses", limit: 10 });
+    const result = await search({ query: "100 plus belles courses", limit: 10 });
 
     expect(result).toContain(
       "- [14592] Le massif du Mont-Blanc - Les 100 plus belles courses | Author: Gaston Rébuffat | Types: topo | Activities: mountain_climbing, snow_ice_mixed",
@@ -172,7 +236,7 @@ describe("handleSearchBooks", () => {
   it("lists every book type in API order", async () => {
     mockSearchBooks.mockResolvedValueOnce(CRIS_DU_VOLCAN_SEARCH);
 
-    const result = await handleSearchBooks({ query: "Les Cris du Volcan", limit: 10 });
+    const result = await search({ query: "Les Cris du Volcan", limit: 10 });
 
     expect(result).toContain("Types: historical, photos-art, novel");
   });
@@ -180,7 +244,7 @@ describe("handleSearchBooks", () => {
   it("leaves out a null author and null activities", async () => {
     mockSearchBooks.mockResolvedValueOnce(OVER_THE_TOP_SEARCH);
 
-    const result = await handleSearchBooks({ query: "Over The Top", limit: 10 });
+    const result = await search({ query: "Over The Top", limit: 10 });
 
     expect(result).toContain("- [314584] Over The Top : Humorous Mountaineering Tales | Types: historical, biography");
     expect(result).not.toContain("Author:");
@@ -190,19 +254,19 @@ describe("handleSearchBooks", () => {
 
   it("falls back to the first locale, then to Untitled", async () => {
     mockSearchBooks.mockResolvedValueOnce(FINALE_CLIMBING_SEARCH);
-    expect(await handleSearchBooks({ query: "Finale Climbing", limit: 10 })).toContain("- [1049839] Finale Climbing");
+    expect(await search({ query: "Finale Climbing", limit: 10 })).toContain("- [1049839] Finale Climbing");
 
     // No sampled book has empty locales: this is the 1049839 document with `locales` emptied.
     const noLocale = { ...FINALE_CLIMBING_SEARCH.documents[0], locales: [] };
     mockSearchBooks.mockResolvedValueOnce({ documents: [noLocale], total: 1 });
-    expect(await handleSearchBooks({ query: "Finale Climbing", limit: 10 })).toContain("- [1049839] Untitled");
+    expect(await search({ query: "Finale Climbing", limit: 10 })).toContain("- [1049839] Untitled");
   });
 
-  it("returns exactly 'No books found.' for an empty result", async () => {
+  it("returns exactly 'No books found matching <filters>.' for an empty result", async () => {
     // The live GET /books?q=9782207220108&limit=10&lang=fr response (2026-10-03): an ISBN matches nothing.
     mockSearchBooks.mockResolvedValueOnce({ documents: [], total: 0 });
 
-    expect(await handleSearchBooks({ query: "9782207220108", limit: 10 })).toBe("No books found.");
+    expect(await search({ query: "9782207220108", limit: 10 })).toBe('No books found matching query "9782207220108".');
   });
 });
 
@@ -233,7 +297,7 @@ describe("book tool definitions", () => {
   });
 
   it("bounds limit to 1-50 with a default of 10", () => {
-    expect(searchBooksSchema.parse({ query: "vallot" })).toEqual({ query: "vallot", limit: 10 });
+    expect(searchBooksSchema.parse({ query: "vallot" })).toEqual({ query: "vallot", limit: 10, offset: 0 });
     expect(searchBooksSchema.safeParse({ query: "vallot", limit: 0 }).success).toBe(false);
     expect(searchBooksSchema.safeParse({ query: "vallot", limit: 51 }).success).toBe(false);
     expect(searchBooksSchema.safeParse({ limit: 10 }).success).toBe(false);

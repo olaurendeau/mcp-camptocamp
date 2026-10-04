@@ -391,6 +391,43 @@ describe("searchWaypoints", () => {
   });
 });
 
+// AC9.1: the four keyword searches page with `offset`, sent only when given.
+describe("offset on searchWaypoints, searchAreas, searchBooks and searchArticles", () => {
+  const searches: Array<[string, (offset?: number) => Promise<unknown>, string]> = [
+    ["searchWaypoints", (offset) => searchWaypoints({ query: "pourri", limit: 2, offset }), "/waypoints"],
+    ["searchAreas", (offset) => searchAreas({ query: "valais", limit: 2, offset }), "/areas"],
+    ["searchBooks", (offset) => searchBooks({ query: "mont blanc", limit: 2, offset }), "/books"],
+    ["searchArticles", (offset) => searchArticles({ query: "crampons", limit: 2, offset }), "/articles"],
+  ];
+
+  it.each(searches)("%s sends offset", async (_name, call, path) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await call(2);
+
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.pathname).toBe(path);
+    expect(url.searchParams.get("offset")).toBe("2");
+    expect(url.searchParams.get("limit")).toBe("2");
+  });
+
+  it.each(searches)("%s sends no offset when none is given", async (_name, call) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await call();
+
+    expect(new URL(mockFetch.mock.calls[0][0] as string).searchParams.has("offset")).toBe(false);
+  });
+
+  it("searchWaypoints sends offset 0", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchWaypoints({ area_id: 14403, offset: 0 });
+
+    expect(new URL(mockFetch.mock.calls[0][0] as string).searchParams.get("offset")).toBe("0");
+  });
+});
+
 describe("getWaypoint", () => {
   it("fetches waypoint by ID", async () => {
     const mockData = {
@@ -411,6 +448,81 @@ describe("getWaypoint", () => {
     expect(result.document_id).toBe(321);
     expect(result.elevation).toBe(3835);
     expect(result.geometry?.geom).toContain("Point");
+  });
+
+  it("keeps the hut fields, the summary and the access period", async () => {
+    // Trimmed from the live GET /waypoints/273946?lang=fr response (2026-10-04): description and access cut
+    // to 80 characters, areas, associations, maps and maps_info dropped; the summary set to show it survives.
+    const mockData = {
+      document_id: 273946,
+      version: 4,
+      locales: [
+        {
+          version: 7,
+          lang: "fr",
+          title: "Refuge du Lac Blanc",
+          description: "Le Refuge du Lac Blanc est niché sur le plateau de Praz Bouchet, entouré de plus",
+          summary: "Refuge gardé en été.",
+          access: "Depuis Termignon la Vanoise, prendre la route de Bellecombe (D126) ou la navette",
+          access_period: "De début juin à fin septembre",
+          external_resources: null,
+          topic_id: 212047,
+        },
+      ],
+      geometry: { version: 3, geom: '{"type": "Point", "coordinates": [758908.605978137, 5671856.762174786]}' },
+      quality: "fine",
+      waypoint_type: "hut",
+      elevation: 2300,
+      capacity: 0,
+      capacity_staffed: 18,
+      url: "https://www.refugedulacblanc-vanoise.com",
+      phone: "+33 (0)6 82 38 11 98",
+      phone_custodian: "+33 (0)6 45 98 77 26",
+      custodianship: "accessible_when_wardened",
+      matress_unstaffed: false,
+      blanket_unstaffed: false,
+      gas_unstaffed: false,
+      heating_unstaffed: false,
+      available_langs: ["fr"],
+      protected: false,
+      type: "w",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getWaypoint(273946);
+
+    expect(result.capacity).toBe(0);
+    expect(result.capacity_staffed).toBe(18);
+    expect(result.custodianship).toBe("accessible_when_wardened");
+    expect(result.phone).toBe("+33 (0)6 82 38 11 98");
+    expect(result.phone_custodian).toBe("+33 (0)6 45 98 77 26");
+    expect(result.url).toBe("https://www.refugedulacblanc-vanoise.com");
+    expect(result.locales[0].summary).toBe("Refuge gardé en été.");
+    expect(result.locales[0].access_period).toBe("De début juin à fin septembre");
+  });
+
+  it("accepts null hut fields, as a summit or a bivouac sends them", async () => {
+    // Trimmed from the live GET /waypoints/1810808?lang=fr response (2026-10-04): a bivouac with every hut
+    // field null.
+    const mockData = {
+      document_id: 1810808,
+      locales: [{ lang: "fr", title: "Bivouac du col de la Temple", summary: null, access_period: null }],
+      waypoint_type: "bivouac",
+      elevation: 3321,
+      capacity: null,
+      capacity_staffed: null,
+      custodianship: null,
+      phone: null,
+      phone_custodian: null,
+      url: null,
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getWaypoint(1810808);
+
+    expect(result.capacity).toBeNull();
+    expect(result.custodianship).toBeNull();
+    expect(result.locales[0].access_period).toBeNull();
   });
 
   it("throws on non-OK response", async () => {

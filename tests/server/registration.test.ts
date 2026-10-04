@@ -6,6 +6,7 @@ import { outingToolDefinitions } from "../../src/tools/outings.js";
 import { areaToolDefinitions } from "../../src/tools/areas.js";
 import { bookToolDefinitions } from "../../src/tools/books.js";
 import { articleToolDefinitions } from "../../src/tools/articles.js";
+import { PAGING_NOTE } from "../../src/tools/paging.js";
 
 const definitions = [
   ...routeToolDefinitions,
@@ -66,6 +67,19 @@ describe("tool registration", () => {
       expect(tool?.description, definition.name).toBe(definition.description);
     }
   });
+
+  // AC9.1, AC-X1: the paged searches explain offset and the next-page footer.
+  it.each(["search_waypoints", "search_areas", "search_books", "search_articles"])(
+    "explains paging in the %s description",
+    async (name) => {
+      const client = await connect();
+      const { tools } = await client.listTools();
+
+      const tool = tools.find((t) => t.name === name);
+      expect(tool?.description).toContain(PAGING_NOTE);
+      expect(tool?.inputSchema.properties).toHaveProperty("offset");
+    },
+  );
 
   it("gives each tool its title and read-only, idempotent, open-world annotations", async () => {
     const client = await connect();
