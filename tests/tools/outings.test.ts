@@ -502,6 +502,136 @@ describe("handleSearchOutings", () => {
     });
   });
 
+  // S5: outings in the same days of every year (AC5.1–AC5.4), and by user (AC5.5).
+  describe("period and user", () => {
+    const PERIOD_NOTE = "Note: Camptocamp's period filter can miss outings on the first or last day of the range.";
+    // A June outing at waypoint 37916, trimmed from the live period search (2026-10-04).
+    const june: OutingListItem = {
+      ...cosmiques,
+      document_id: 1610921,
+      date_start: "2024-06-12",
+      date_end: "2024-06-12",
+      areas: null,
+      author: null,
+    };
+
+    it("sends the period as given to the API, alongside the other filters", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([june], 66));
+
+      await search({ waypoint_id: 37916, period_start: "06-01", period_end: "06-30" });
+
+      expect(mockSearchOutings).toHaveBeenCalledWith({
+        waypoint_id: 37916,
+        period: { start: "06-01", end: "06-30" },
+        limit: 10,
+        offset: 0,
+      });
+    });
+
+    it("prints the period filter and the boundary-day note in the header (D1)", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([june], 66));
+
+      const result = await search({ waypoint_id: 37916, period_start: "06-01", period_end: "06-30" });
+
+      expect(result.split("\n").slice(0, 4)).toEqual([
+        "Found 66 outing(s), most recent first. Showing 1 from offset 0:",
+        "Filters: period 06-01 → 06-30 of every year, waypoint 37916",
+        PERIOD_NOTE,
+        "",
+      ]);
+    });
+
+    it("accepts a one-day period and the leap day", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+
+      await search({ period_start: "02-29", period_end: "02-29" });
+
+      expect(mockSearchOutings).toHaveBeenCalledWith({
+        period: { start: "02-29", end: "02-29" },
+        limit: 10,
+        offset: 0,
+      });
+    });
+
+    it("combines the period with a date range (AC5.3)", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([june], 13));
+
+      const result = await search({
+        waypoint_id: 37916,
+        period_start: "06-01",
+        period_end: "06-30",
+        date_from: "2015-01-01",
+        date_to: "2020-12-31",
+      });
+
+      expect(mockSearchOutings).toHaveBeenCalledWith({
+        waypoint_id: 37916,
+        period: { start: "06-01", end: "06-30" },
+        date_from: "2015-01-01",
+        date_to: "2020-12-31",
+        limit: 10,
+        offset: 0,
+      });
+      expect(result.split("\n")[1]).toBe(
+        "Filters: dates 2015-01-01 → 2020-12-31, period 06-01 → 06-30 of every year, waypoint 37916",
+      );
+    });
+
+    it.each<[string, Record<string, string>]>([
+      ["period_start without period_end", { period_start: "06-01" }],
+      ["period_end without period_start", { period_end: "06-30" }],
+    ])("rejects %s without calling the API", async (_label, period) => {
+      await expect(search(period)).rejects.toThrow(
+        "period_start and period_end must be given together (MM-DD, e.g. 06-01 and 06-30).",
+      );
+      expect(mockSearchOutings).not.toHaveBeenCalled();
+    });
+
+    it("rejects a period wrapping around the new year with the two calls to make (AC5.2)", async () => {
+      await expect(search({ period_start: "12-20", period_end: "01-10" })).rejects.toThrow(
+        "period cannot wrap around the new year; make two calls (12-20 → 12-31 and 01-01 → 01-10)",
+      );
+      expect(mockSearchOutings).not.toHaveBeenCalled();
+    });
+
+    it("sends user_id and lists the user first among the filters (AC5.5)", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([cosmiques], 23));
+      const input = {
+        user_id: 430052,
+        activity: "rock_climbing" as const,
+        date_from: "2025-01-01",
+        date_to: "2025-12-31",
+      };
+
+      const result = await search(input);
+
+      expect(mockSearchOutings).toHaveBeenCalledWith({ ...input, limit: 10, offset: 0 });
+      expect(result.split("\n").slice(0, 3)).toEqual([
+        "Found 23 outing(s), most recent first. Showing 1 from offset 0:",
+        "Filters: user 430052, activity rock_climbing, dates 2025-01-01 → 2025-12-31",
+        "",
+      ]);
+      expect(result).not.toContain("Note:");
+    });
+
+    // The period filter can drop boundary days, so "nothing found" is not stated as a plain fact.
+    it("keeps the boundary-day note when nothing matches the period", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+
+      const result = await search({ waypoint_id: 37916, period_start: "07-14", period_end: "07-14" });
+
+      expect(result).toBe(
+        `No outings found matching period 07-14 → 07-14 of every year, waypoint 37916.\n${PERIOD_NOTE}`,
+      );
+    });
+
+    it("names the user when nothing matches", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+
+      expect(await search({ user_id: 430052 })).toBe("No outings found matching user 430052.");
+    });
+  });
+
   // R6 / AC9.4: the output tells how to fetch the next page, within Camptocamp's 10,000-result window.
   describe("paging footer", () => {
     const page = (n: number, first: number): OutingListItem[] =>
@@ -728,7 +858,7 @@ describe("outingToolDefinitions", () => {
     expect(outingToolDefinitions.map((t) => t.name)).toEqual(["search_user_outings", "get_outing", "search_outings"]);
   });
 
-  it("describes ordering, date overlap, paging and where IDs come from", () => {
+  it("describes ordering, date overlap, period, user, paging and where IDs come from", () => {
     const description = outingToolDefinitions.find((t) => t.name === "search_outings")?.description ?? "";
 
     for (const phrase of [
@@ -738,10 +868,25 @@ describe("outingToolDefinitions", () => {
       "search_routes",
       "search_waypoints",
       "get_outing",
+      "period_start / period_end (MM-DD",
+      "every year",
+      "cannot wrap around the new year",
+      "can miss outings on the first or last day of the range",
+      "user_id",
       "Next page: offset=N",
+      "Next page: offset=N (limit at most M)",
       "10,000-result window",
     ]) {
       expect(description).toContain(phrase);
     }
+  });
+
+  // AC5.7: no tool exposes a real user's ID or username as an example.
+  it("gives no real user as an example in the search_outings definition", () => {
+    const definition = outingToolDefinitions.find((t) => t.name === "search_outings");
+    const text = JSON.stringify({ d: definition?.description, s: definition?.inputSchema.shape });
+
+    expect(text).not.toContain("430052");
+    expect(text).not.toContain("o.laurendeau");
   });
 });
