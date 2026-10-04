@@ -41,6 +41,7 @@ Next page: offset=<N>
 
 - The first line gives how many books Camptocamp found, how many are shown and from which offset. The `Filters:` line repeats the query, in quotes, then `book type <book_type>` and `activity <activity>` only when they are given.
 - Each result is one line: the book ID in brackets, its title in the language picked by `lang`, then the author, the book types and the activities. A part is left out when Camptocamp has no value for it. Titles and authors are printed as Camptocamp stores them, spaces included; book types and activities are codes, copied verbatim.
+- A book Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`, or by `- (not shown: Camptocamp sent an item in an unexpected format)` when its ID is unreadable. See [Missing data](../using-with-llms.md#missing-data).
 - The editor, publication date, ISBN, pages and the routes the book covers are only in [`get_book`](get_book.md).
 - The last line is `Next page: offset=N` when more results follow, `Next page: offset=N (limit at most M)` near the end of the 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` See [Paging](../using-with-llms.md#paging).
 - When nothing matches, the whole output is one line: `No books found matching query "<query>".`, with the other filters before the period when they are given.

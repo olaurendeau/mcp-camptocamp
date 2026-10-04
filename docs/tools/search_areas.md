@@ -39,6 +39,7 @@ Next page: offset=<N>
 
 - The first line gives how many areas Camptocamp found, how many are shown and from which offset. The `Filters:` line repeats the query, in quotes, and `area type <area_type>` only when `area_type` is given.
 - Each result is one line: the area ID in brackets, its title in the language picked by `lang` (or the first available in the fallback order), and its type code, `range`, `admin_limits` or `country`, copied verbatim.
+- An area Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`, or by `- (not shown: Camptocamp sent an item in an unexpected format)` when its ID is unreadable. See [Missing data](../using-with-llms.md#missing-data).
 - The last line is `Next page: offset=N` when more results follow, `Next page: offset=N (limit at most M)` near the end of the 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` See [Paging](../using-with-llms.md#paging).
 - When nothing matches, the whole output is one line: `No areas found matching query "<query>".`, followed by `, area type <area_type>` before the period when it is given.
 
@@ -72,7 +73,7 @@ The Swiss canton (`admin_limits`) and the two ranges named after it come back to
   - [280059] Province de Savone (admin_limits)
   ```
 
-  The German name finds the same canton: `search_areas {query: "wallis", lang: "de", limit: 3}` returned `[14384] Wallis (admin_limits)` first on 2026-10-05, with the titles in German.
+  The German name finds the same canton: `search_areas {query: "wallis", lang: "de", limit: 3}` returned `[14384] Wallis (admin_limits)` first, with the titles in German, captured from v1.3.0 on 2026-10-05.
 
 - **Towns are not areas.** Search for the range or the département instead. `search_areas {query: "chamonix", limit: 3}`, captured from v1.3.0 on 2026-10-05:
 

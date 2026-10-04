@@ -26,7 +26,7 @@ Read one article from its ID: its text, summary, author, type (`collab` or `pers
 # <title> (ID: <id>)
 **URL**: https://www.camptocamp.org/articles/<id>
 **Language**: <shown> (no <requested> version; available: <languages>)
-**Text in other languages**: <field> (<languages>)
+**Text in other languages**: <field> (<languages>), …
 
 **Type**: <article_type>
 **Author**: <name> (user ID: <user_id>)
@@ -61,8 +61,8 @@ Read one article from its ID: its text, summary, author, type (`collab` or `pers
 ```
 
 - The title is in the language picked by `lang`, or the first available in the fallback order. The `**URL**` line is the article's page on camptocamp.org, to cite as the source.
-- `**Language**` is printed only when the article has no version in the requested language: it says which language is shown and which exist.
-- `**Text in other languages**` is printed only when the shown version has no summary or no description and another language has one. It gives the field name, `summary` or `description`, with those languages: call again with one of them as `lang` to read it. **This line is not in v1.3.0**: it comes with the release after v1.3.0. See [`get_area`](get_area.md#example) for an example.
+- `**Language**` is printed only when the article has no version in the requested language: it says which language is shown and which exist. This line needs v1.3.0 or later. See [Language](../using-with-llms.md#language).
+- `**Text in other languages**` is printed only when the shown version has no summary or no description and another language has one. It names each such section by its API name, `summary` or `description`, without its text, followed by its languages; when both are missing, both are listed, separated by a comma. Call again with one of the listed `lang` values to read it. **This line is not in v1.3.0**: it comes with the release after v1.3.0. See [`get_area`](get_area.md#example) for an example.
 - `**Type**` is `collab` (community-edited reference) or `personal` (one author's view). The person is labelled `**Author**` on a `personal` article and `**Created by**` on a `collab` article, which many users edit after its creator.
 - Each labelled line is left out when Camptocamp has no value for it. Categories, activities and the quality are codes, copied verbatim.
 - `## Summary` and `## Description` are printed only when the text exists, between the markers described in [User-written text](../using-with-llms.md#user-written-text).

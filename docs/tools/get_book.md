@@ -26,7 +26,7 @@ Read one book from its ID: author, editor, publication date, ISBN, pages, langua
 # <title> (ID: <id>)
 **URL**: https://www.camptocamp.org/books/<id>
 **Language**: <shown> (no <requested> version; available: <languages>)
-**Text in other languages**: <field> (<languages>)
+**Text in other languages**: <field> (<languages>), …
 
 **Author**: <author>
 **Editor**: <editor>
@@ -59,8 +59,8 @@ Read one book from its ID: author, editor, publication date, ISBN, pages, langua
 ```
 
 - The title is in the language picked by `lang`, or the first available in the fallback order. The `**URL**` line is the book's page on camptocamp.org, to cite as the source.
-- `**Language**` is printed only when the book has no version in the requested language: it says which language is shown and which exist.
-- `**Text in other languages**` is printed only when the shown version has no summary or no description and another language has one. It gives the field name, `summary` or `description`, with those languages: call again with one of them as `lang` to read it. **This line is not in v1.3.0**: it comes with the release after v1.3.0. See [`get_area`](get_area.md#example) for an example.
+- `**Language**` is printed only when the book has no version in the requested language: it says which language is shown and which exist. This line needs v1.3.0 or later. See [Language](../using-with-llms.md#language).
+- `**Text in other languages**` is printed only when the shown version has no summary or no description and another language has one. It names each such section by its API name, `summary` or `description`, without its text, followed by its languages; when both are missing, both are listed, separated by a comma. Call again with one of the listed `lang` values to read it. **This line is not in v1.3.0**: it comes with the release after v1.3.0. See [`get_area`](get_area.md#example) for an example.
 - Each labelled line is printed as Camptocamp stores it, and left out when Camptocamp has no value for it. `**Languages**` gives the languages the book is written in, not the languages of its Camptocamp page. Book types and activities are codes, copied verbatim.
 - `## Summary` and `## Description` are printed only when the text exists, between the markers described in [User-written text](../using-with-llms.md#user-written-text).
 - The three association lists are printed only when they are not empty, with every item Camptocamp sends and no count. A route line gives the route's ratings, each labelled with its system. A waypoint line gives its type and elevation; a `virtual` waypoint has no elevation. An item Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`.
@@ -99,7 +99,8 @@ The book has no summary, no associated waypoint and no associated article, so th
 
 ## Limits
 
-- **Fields are shown as Camptocamp stores them.** Nothing is checked or normalised: book 14746 has `**ISBN**: 2 911755  57 X`, with its spaces, and no publication date or page count, so `get_book {id: 14746}` prints no `**Publication date**` and no `**Pages**` line. Say "not given on Camptocamp" for a missing field.
+- **Fields are shown as Camptocamp stores them.** Nothing is checked or normalised: book 14746 has `**ISBN**: 2 911755  57 X`, with its spaces.
+- **A missing line means an empty field, not a missing fact.** `get_book {id: 14746}`, captured from v1.3.0 on 2026-10-05, prints no `**Publication date**` and no `**Pages**` line: Camptocamp has no value in those fields. Its description, however, ends with `195 pages`. Read the summary and the description before saying that a value is not given on Camptocamp, and say which part of the page a value comes from.
 - **The association lists are those of Camptocamp.** Its users link books to routes and waypoints by hand, so a route missing from the list may still be in the book.
 - **Long texts are cut at 8,000 characters**, ending with `[truncated, N more characters]`. Read the rest on the page given on the `**URL**` line.
 - **An unknown ID is an error.** `get_book {id: 999999999}`, captured from v1.3.0 on 2026-10-05:
