@@ -118,6 +118,10 @@ describe("tool registration", () => {
     const json = JSON.stringify(tools);
     expect(json).not.toContain("430052");
     expect(json).not.toContain("o.laurendeau");
+    // The accounts of outing 1757161, the S1 (#118) example.
+    expect(json).not.toContain("466185");
+    expect(json).not.toContain("944173");
+    expect(json).not.toContain("MarionO");
   });
 
   it("keeps the input JSON Schema of every tool", async () => {
