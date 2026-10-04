@@ -266,6 +266,43 @@ describe("searchWaypoints", () => {
   });
 });
 
+// AC9.1: the four keyword searches page with `offset`, sent only when given.
+describe("offset on searchWaypoints, searchAreas, searchBooks and searchArticles", () => {
+  const searches: Array<[string, (offset?: number) => Promise<unknown>, string]> = [
+    ["searchWaypoints", (offset) => searchWaypoints({ query: "pourri", limit: 2, offset }), "/waypoints"],
+    ["searchAreas", (offset) => searchAreas({ query: "valais", limit: 2, offset }), "/areas"],
+    ["searchBooks", (offset) => searchBooks({ query: "mont blanc", limit: 2, offset }), "/books"],
+    ["searchArticles", (offset) => searchArticles({ query: "crampons", limit: 2, offset }), "/articles"],
+  ];
+
+  it.each(searches)("%s sends offset", async (_name, call, path) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await call(2);
+
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.pathname).toBe(path);
+    expect(url.searchParams.get("offset")).toBe("2");
+    expect(url.searchParams.get("limit")).toBe("2");
+  });
+
+  it.each(searches)("%s sends no offset when none is given", async (_name, call) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await call();
+
+    expect(new URL(mockFetch.mock.calls[0][0] as string).searchParams.has("offset")).toBe(false);
+  });
+
+  it("searchWaypoints sends offset 0", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchWaypoints({ area_id: 14403, offset: 0 });
+
+    expect(new URL(mockFetch.mock.calls[0][0] as string).searchParams.get("offset")).toBe("0");
+  });
+});
+
 describe("getWaypoint", () => {
   it("fetches waypoint by ID", async () => {
     const mockData = {

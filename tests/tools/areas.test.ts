@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { z } from "zod";
 import {
   handleSearchAreas,
   handleGetArea,
@@ -20,6 +21,11 @@ const mockGetArea = throughSchema(vi.mocked(api.getArea), areaDetailSchema);
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+/** Calls the handler as the MCP server does: with input parsed by the tool schema, defaults applied. */
+function search(input: z.input<typeof searchAreasSchema>): Promise<string> {
+  return handleSearchAreas(searchAreasSchema.parse(input));
+}
 
 // Mirrors GET /areas?q=valais&limit=10&lang=fr (2026-10-03), trimmed to the fields the tool reads.
 const ecrins: AreaSearchResult = {
@@ -52,6 +58,14 @@ const valaisEast: AreaSearchResult = {
     { lang: "it", title: "Alpi Pennine Orientali" },
   ],
   available_langs: ["sl", "de", "en", "fr", "it"],
+};
+
+// From GET /areas?q=valais&limit=2&offset=1&pl=fr (2026-10-04).
+const valaisWest: AreaSearchResult = {
+  document_id: 14437,
+  area_type: "range",
+  locales: [{ lang: "fr", title: "Valais W - Alpes Pennines W" }],
+  available_langs: ["fr", "it", "zh", "sl", "de", "en"],
 };
 
 const malaysia: AreaSearchResult = {
@@ -100,30 +114,58 @@ const hautesAlpesDetail: AreaDetail = {
   geometry: { geom: null, geom_detail: null },
 };
 
+// AC9.1, AC9.4: R6 paging.
+describe("search_areas paging", () => {
+  it("sends the offset, names the filters and points to the next page", async () => {
+    // GET /areas?q=valais&limit=2&offset=1&pl=fr (2026-10-04): 5 areas, the two Valais ranges on this page.
+    mockSearchAreas.mockResolvedValueOnce({ total: 5, documents: [valaisWest, valaisEast] });
+
+    const result = await search({ query: "valais", area_type: "range", offset: 1, limit: 2 });
+
+    expect(mockSearchAreas).toHaveBeenCalledWith({ query: "valais", limit: 2, offset: 1, area_type: "range" });
+    expect(result.split("\n")).toEqual([
+      "Found 5 area(s). Showing 2 from offset 1:",
+      'Filters: query "valais", area type range',
+      "",
+      "- [14437] Valais W - Alpes Pennines W (range)",
+      "- [14436] Valais E - Alpes Pennines E (range)",
+      "",
+      "Next page: offset=3",
+    ]);
+  });
+
+  it("refuses offset + limit above 10,000 without calling the API", async () => {
+    await expect(search({ query: "mont blanc", offset: 9995, limit: 10 })).rejects.toThrow(
+      "offset + limit must not exceed 10000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.",
+    );
+    expect(mockSearchAreas).not.toHaveBeenCalled();
+  });
+});
+
 describe("handleSearchAreas", () => {
-  it("forwards query, limit and area_type to the API", async () => {
+  it("forwards query, limit, offset and area_type to the API", async () => {
     mockSearchAreas.mockResolvedValueOnce({ total: 0, documents: [] });
 
-    await handleSearchAreas({ query: "valais", limit: 20, area_type: "range" });
+    await search({ query: "valais", limit: 20, area_type: "range" });
 
-    expect(mockSearchAreas).toHaveBeenCalledWith({ query: "valais", limit: 20, area_type: "range" });
+    expect(mockSearchAreas).toHaveBeenCalledWith({ query: "valais", limit: 20, offset: 0, area_type: "range" });
   });
 
   it("sends no area type when area_type is absent", async () => {
     mockSearchAreas.mockResolvedValueOnce({ total: 0, documents: [] });
 
-    await handleSearchAreas({ query: "ecrins", limit: 10 });
+    await search({ query: "ecrins", limit: 10 });
 
     expect(mockSearchAreas).toHaveBeenCalledTimes(1);
-    expect(mockSearchAreas.mock.calls[0]).toEqual([{ query: "ecrins", limit: 10 }]);
+    expect(mockSearchAreas.mock.calls[0]).toEqual([{ query: "ecrins", limit: 10, offset: 0 }]);
   });
 
   it("formats the header and one line per area", async () => {
     mockSearchAreas.mockResolvedValueOnce({ total: 5, documents: [ecrins, valaisCanton, malaysia] });
 
-    const result = await handleSearchAreas({ query: "e", limit: 3 });
+    const result = await search({ query: "e", limit: 3 });
 
-    expect(result).toContain("Found 5 area(s). Showing 3:");
+    expect(result).toContain("Found 5 area(s). Showing 3 from offset 0:");
     expect(result).toContain("- [14403] Écrins (range)");
     expect(result.split("\n").filter((l) => l.startsWith("- ["))).toEqual([
       "- [14403] Écrins (range)",
@@ -135,7 +177,7 @@ describe("handleSearchAreas", () => {
   it("prints area_type verbatim and never translates it", async () => {
     mockSearchAreas.mockResolvedValueOnce({ total: 3, documents: [ecrins, valaisCanton, malaysia] });
 
-    const result = await handleSearchAreas({ query: "a", limit: 10 });
+    const result = await search({ query: "a", limit: 10 });
 
     expect(result).toContain("(admin_limits)");
     expect(result).toContain("(country)");
@@ -143,18 +185,18 @@ describe("handleSearchAreas", () => {
     expect(result).not.toContain("département");
   });
 
-  it("returns exactly 'No areas found.' on an empty result", async () => {
+  it("returns exactly 'No areas found matching <filters>.' on an empty result", async () => {
     mockSearchAreas.mockResolvedValueOnce({ total: 0, documents: [] });
 
-    const result = await handleSearchAreas({ query: "chamonix", limit: 10 });
+    const result = await search({ query: "chamonix", limit: 10 });
 
-    expect(result).toBe("No areas found.");
+    expect(result).toBe('No areas found matching query "chamonix".');
   });
 
   it("uses the fr title even when another locale comes first", async () => {
     mockSearchAreas.mockResolvedValueOnce({ total: 1, documents: [valaisEast] });
 
-    const result = await handleSearchAreas({ query: "valais", limit: 10, area_type: "range" });
+    const result = await search({ query: "valais", limit: 10, area_type: "range" });
 
     expect(result).toContain("- [14436] Valais E - Alpes Pennines E (range)");
   });
@@ -168,7 +210,7 @@ describe("handleSearchAreas", () => {
       ],
     });
 
-    const result = await handleSearchAreas({ query: "x", limit: 10 });
+    const result = await search({ query: "x", limit: 10 });
 
     expect(result).toContain("- [280012] Isernia (admin_limits)");
     expect(result).toContain("- [999] Untitled (range)");
@@ -178,7 +220,7 @@ describe("handleSearchAreas", () => {
   it("propagates API errors", async () => {
     mockSearchAreas.mockRejectedValueOnce(new Error("Camptocamp API error: 500 Internal Server Error"));
 
-    await expect(handleSearchAreas({ query: "ecrins", limit: 10 })).rejects.toThrow("Camptocamp API error: 500");
+    await expect(search({ query: "ecrins", limit: 10 })).rejects.toThrow("Camptocamp API error: 500");
   });
 });
 
