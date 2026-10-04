@@ -111,7 +111,7 @@ export async function searchRoutes(options: RouteSearchOptions): Promise<RouteSe
 }
 
 export async function getRoute(id: number): Promise<RouteDetail> {
-  return getJson<RouteDetail>({ path: `/routes/${id}` });
+  return getJson<RouteDetail>({ path: `/routes/${id}`, document: { type: "route", id } });
 }
 
 export async function searchWaypoints(options: WaypointSearchOptions): Promise<WaypointSearchResponse> {
@@ -119,7 +119,7 @@ export async function searchWaypoints(options: WaypointSearchOptions): Promise<W
 }
 
 export async function getWaypoint(id: number): Promise<WaypointDetail> {
-  return getJson<WaypointDetail>({ path: `/waypoints/${id}` });
+  return getJson<WaypointDetail>({ path: `/waypoints/${id}`, document: { type: "waypoint", id } });
 }
 
 export interface OutingSearchResult {
@@ -191,7 +191,7 @@ export async function searchUserOutings(options: UserOutingSearchOptions): Promi
 }
 
 export async function getOuting(id: number): Promise<OutingDetail> {
-  return getJson<OutingDetail>({ path: `/outings/${id}` });
+  return getJson<OutingDetail>({ path: `/outings/${id}`, document: { type: "outing", id } });
 }
 
 export type AreaType = "range" | "admin_limits" | "country";
@@ -231,7 +231,7 @@ export async function searchAreas(options: AreaSearchOptions): Promise<AreaSearc
 }
 
 export async function getArea(id: number): Promise<AreaDetail> {
-  return getJson<AreaDetail>({ path: `/areas/${id}` });
+  return getJson<AreaDetail>({ path: `/areas/${id}`, document: { type: "area", id } });
 }
 
 // The API treats `date=X,` as the single day X, so open-ended ranges use these bounds.
@@ -350,7 +350,7 @@ export async function searchBooks(options: BookSearchOptions): Promise<BookSearc
 }
 
 export async function getBook(id: number): Promise<BookDetail> {
-  return getJson<BookDetail>({ path: `/books/${id}` });
+  return getJson<BookDetail>({ path: `/books/${id}`, document: { type: "book", id } });
 }
 
 export interface ArticleSearchResult {
@@ -403,5 +403,5 @@ export async function searchArticles(options: ArticleSearchOptions): Promise<Art
 }
 
 export async function getArticle(id: number): Promise<ArticleDetail> {
-  return getJson<ArticleDetail>({ path: `/articles/${id}` });
+  return getJson<ArticleDetail>({ path: `/articles/${id}`, document: { type: "article", id } });
 }
