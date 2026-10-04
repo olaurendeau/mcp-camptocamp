@@ -1,6 +1,6 @@
 # ChatGPT desktop app and Codex
 
-The ChatGPT desktop app, Codex CLI and the Codex IDE extension can all start this server on your machine. OpenAI's docs say they "support MCP servers and share MCP configuration for the same Codex host": add the server once, in any of them, and the other two use it too.
+The ChatGPT desktop app, Codex CLI and the Codex IDE extension can all start this server on your machine. OpenAI's docs say they "support MCP servers and share MCP configuration for the same Codex host": once you add the server in one of them, the others that use the same Codex host see it too.
 
 ChatGPT on the web cannot use this server: see [ChatGPT on the web](#chatgpt-on-the-web).
 
@@ -21,7 +21,7 @@ ChatGPT on the web cannot use this server: see [ChatGPT on the web](#chatgpt-on-
 
 ## Add the server
 
-Pick one of the four ways below. They all end up as the same entry: a `[mcp_servers.camptocamp]` table in `~/.codex/config.toml`. To change the startup timeout or the approval mode, edit that file: see [In config.toml](#in-configtoml).
+Pick one of the four ways below. On the same Codex host, they all end up as the same entry: a `[mcp_servers.camptocamp]` table in that host's `config.toml`, by default `~/.codex/config.toml`. To change the startup timeout or the approval mode, edit that file: see [In config.toml](#in-configtoml).
 
 ### In the ChatGPT desktop app
 
@@ -93,9 +93,11 @@ OpenAI's docs don't say whether an open app or Codex session reloads the file wh
 
 > Supported values are auto, prompt, writes, and approve. The writes mode prompts for tools that aren't marked read-only.
 
-The 13 tools of this server are read-only: each one declares the MCP annotation `readOnlyHint: true`. With `default_tools_approval_mode = "writes"`, Codex therefore runs them without prompting, in the ChatGPT desktop app, Codex CLI and the IDE extension alike. If a later release added a tool that is not marked read-only, Codex would still prompt for that one.
+The 13 tools of this server are read-only: each one declares the MCP annotation `readOnlyHint: true`.
 
-The Codex docs say "marked read-only" without naming the annotation. OpenAI's [ChatGPT developer mode docs](https://developers.openai.com/api/docs/guides/developer-mode) name it: "We respect the `readOnlyHint` tool annotation … Tools without this hint are treated as write actions."
+The Codex docs say "marked read-only" without naming the annotation. The OpenAI quote that names it comes from the docs of a different client, [ChatGPT developer mode](https://developers.openai.com/api/docs/guides/developer-mode) on the web: "We respect the `readOnlyHint` tool annotation … Tools without this hint are treated as write actions."
+
+So, assuming Codex reads "marked read-only" the same way, the tools should run without prompts with `default_tools_approval_mode = "writes"`, in the ChatGPT desktop app, Codex CLI and the IDE extension alike. A tool that is not marked read-only would still prompt.
 
 The docs do not describe what `auto`, `prompt` and `approve` do, so this page does not recommend them.
 
@@ -126,7 +128,7 @@ If `camptocamp` is missing or marked as failed, run the [smoke test](../getting-
 ## Troubleshooting
 
 - **The server times out on its first start.** Pre-warm it, or raise `startup_timeout_sec`: see [The server times out on its first start](../troubleshooting.md#the-server-times-out-on-its-first-start).
-- **The tools are missing at the start of a session, then appear.** When it builds the first list of tools, Codex waits for optional MCP servers for `mcp_optional_startup_grace_ms`, a top-level setting of `config.toml` that defaults to 1000 milliseconds. The docs say: "Set it to 0 to wait for each server's `startup_timeout_sec` instead."
+- **How long Codex waits while it builds the initial tool catalog.** The docs say the top-level `config.toml` setting `mcp_optional_startup_grace_ms` "controls how long Codex waits for optional MCP servers when building the initial tool catalog. It defaults to 1000 milliseconds. Set it to 0 to wait for each server's `startup_timeout_sec` instead."
 - **A project's `.codex/config.toml` is ignored.** Codex reads it in trusted projects only. Add the server to `~/.codex/config.toml` instead, or trust the project.
 - **The Docker variant stops right after it starts.** `-i` is missing from `args`: see [Docker: the server stops right after it starts](../troubleshooting.md#docker-the-server-stops-right-after-it-starts).
 
