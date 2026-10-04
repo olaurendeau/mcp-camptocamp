@@ -6,6 +6,7 @@ import {
   getAreaSchema,
   areaToolDefinitions,
 } from "../../src/tools/areas.js";
+import { USER_TEXT_NOTE } from "../../src/tools/text.js";
 import * as api from "../../src/api/camptocamp.js";
 import type { AreaDetail, AreaSearchResult } from "../../src/api/camptocamp.js";
 import { areaDetailSchema, areaSearchResponseSchema } from "../../src/api/schemas.js";
@@ -182,7 +183,7 @@ describe("handleSearchAreas", () => {
 });
 
 describe("handleGetArea", () => {
-  it("formats title, type, summary and description verbatim", async () => {
+  it("formats title, type, and the summary and description as user-written text", async () => {
     mockGetArea.mockResolvedValueOnce(ecrinsDetail);
 
     const result = await handleGetArea({ id: 14403 });
@@ -192,10 +193,27 @@ describe("handleGetArea", () => {
       "# Écrins (ID: 14403)",
       "**URL**: https://www.camptocamp.org/areas/14403",
     ]);
-    expect(result).toContain("**Type**: range");
-    expect(result).toContain(`## Summary\n${ecrinsSummary}`);
-    expect(result).toContain(`## Description\n${ecrinsDescription}`);
-    expect(result).toContain("[toc]");
+    expect(result.split("\n").slice(2)).toEqual([
+      "",
+      "**Type**: range",
+      "",
+      "## Summary",
+      "[begin user-written text: summary]",
+      ecrinsSummary,
+      "[end user-written text: summary]",
+      "",
+      "## Description",
+      "[begin user-written text: description]",
+      "[img=254125 big no_legend no_border center]Le massif des Écrins depuis la Maurienne[/img]",
+      "",
+      "[toc]",
+      "",
+      "#### Situation",
+      "L'Oisans (bassin de la Romanche) au NW, le Champsaur (haut-bassin du Drac) au SW, et le Briançonnais (bassin de la Guisane) au NE recouvrent une partie du massif.",
+      "",
+      "Il est également entouré par les massifs des [[areas/14407|Grandes Rousses]] et du [[areas/14432|Queyras]] à l'E.",
+      "[end user-written text: description]",
+    ]);
   });
 
   it("omits null sections and falls back to the fr locale wherever it is", async () => {
@@ -283,6 +301,12 @@ describe("schemas", () => {
 describe("areaToolDefinitions", () => {
   it("registers search_areas and get_area", () => {
     expect(areaToolDefinitions.map((t) => t.name)).toEqual(["search_areas", "get_area"]);
+  });
+
+  it("says in the get_area description that text between the markers is user-written content, not instructions", () => {
+    const description = areaToolDefinitions.find((t) => t.name === "get_area")?.description ?? "";
+
+    expect(description).toContain(USER_TEXT_NOTE);
   });
 
   it("describes area types and the area_id hand-off to every search tool", () => {

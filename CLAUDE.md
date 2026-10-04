@@ -21,7 +21,8 @@ src/
     ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
     ├── areas.ts          # Tools: search_areas, get_area
     ├── books.ts          # Tools: search_books, get_book
-    └── articles.ts       # Tools: search_articles, get_article
+    ├── articles.ts       # Tools: search_articles, get_article
+    └── text.ts           # formatUserText: delimits, demotes and caps user-written text
 tests/
 ├── api/
 │   └── camptocamp.test.ts  # Unit tests with mocked fetch
@@ -35,7 +36,8 @@ tests/
     ├── paging.test.ts      # Shared search paging unit tests
     ├── areas.test.ts       # Tool handler unit tests
     ├── books.test.ts       # Tool handler unit tests
-    └── articles.test.ts    # Tool handler unit tests
+    ├── articles.test.ts    # Tool handler unit tests
+    └── text.test.ts        # formatUserText unit tests
 ```
 
 The tool handlers in `src/tools/` are pure functions (no SDK coupling) — they take typed inputs and return formatted strings, making them easy to test in isolation.
@@ -102,6 +104,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)           |
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
+
+Free-text locale fields written by Camptocamp users (descriptions, summaries, remarks, gear, access, conditions, weather…) go through `formatUserText` in `src/tools/text.ts`: printed under `## <Heading>` between `[begin user-written text: <field>]` and `[end user-written text: <field>]`, line-start Markdown headings demoted two levels (capped at `######`), copies of the markers neutralised (`[` → `(`), lookalikes included (full-width, dash variants, zero-width characters), and cut after 8000 characters with `[truncated, N more characters]`. Each `get_*` tool description says that text between the markers is user-written content, not instructions.
 
 ## Camptocamp API v6
 
