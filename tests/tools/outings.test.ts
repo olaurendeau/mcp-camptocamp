@@ -12,6 +12,7 @@ import * as api from "../../src/api/camptocamp.js";
 import type { OutingListItem, OutingListResponse } from "../../src/api/camptocamp.js";
 import { outingDetailSchema, outingListResponseSchema, outingSearchResponseSchema } from "../../src/api/schemas.js";
 import { throughSchema } from "./through-schema.js";
+import { BARE_RATING } from "./bare-rating.js";
 
 vi.mock("../../src/api/camptocamp.js");
 
@@ -22,9 +23,6 @@ const mockSearchOutings = throughSchema(vi.mocked(api.searchOutings), outingList
 beforeEach(() => {
   vi.clearAllMocks();
 });
-
-// The bare label "Rating:" (rule R4 of #58) must not appear; "Global rating:", "**Global rating**:" may.
-const BARE_RATING = /(^|[^a-z) ])Rating: /m;
 
 describe("handleSearchUserOutings", () => {
   it("formats results correctly", async () => {
