@@ -1,7 +1,7 @@
 // Rating labels (rule R4 of #58): every rating is printed with the name of its grading system, never as a bare
 // "Rating". One table serves every route and outing, in search lines and in details.
 import type { RatingFields } from "../api/schemas.js";
-import type { RouteRatingField } from "../api/camptocamp.js";
+import type { RouteRatingField } from "../api/values.js";
 
 type RatingField = keyof RatingFields;
 
