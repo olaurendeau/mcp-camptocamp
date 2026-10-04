@@ -5,7 +5,8 @@
 # - version bump (npm version)       → developer only, with --no-git-tag-version
 # - version tags (git tag/push vX.Y) → coordinator only, one named tag at a time
 # - bulk tag push (--tags/--follow-tags/--mirror/glob), moving or deleting a version tag → nobody
-# - tags and releases through the REST API (…/git/refs, …/releases) → nobody
+# - tag creation through the REST API (POST …/git/refs) → coordinator only
+# - moving or deleting a tag, or writing a release, through the REST API → nobody
 # - manual publication               → nobody (publish.yml publishes from the tag)
 # The human decides when to release and which version; agents only carry it out.
 # A guardrail for agents, not a security boundary: the human and obfuscated commands bypass it.
@@ -163,8 +164,14 @@ while IFS= read -r seg; do
   fi
 
   # The tag may sit in a quoted field or a JSON heredoc (--input -), so look for it in the raw command.
+  # Creating it (POST …/git/refs) is a tag push; writing to an existing one (…/git/refs/tags/…) moves or deletes it.
   if has "$seg" "$api_refs" && api_writes "$seg" && grep -q 'refs/tags' <<<"$raw"; then
-    deny "No agent creates, moves or deletes a tag through the API (…/git/refs): a v* tag triggers publish.yml. The coordinator tags with git tag and pushes one named tag (git push origin vX.Y.Z)."
+    if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$seg" 'git/refs/tags/'; then
+      deny "No agent moves or deletes a tag through the API (PATCH/DELETE …/git/refs/tags/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
+    fi
+    if [ "$agent" != "coordinator" ]; then
+      deny "Only the coordinator creates version tags (POST …/git/refs or git push origin vX.Y.Z), on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
+    fi
   fi
 
   if has "$seg" "$bump"; then

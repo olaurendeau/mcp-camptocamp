@@ -277,13 +277,28 @@ check allow pr-reviewer "sed -n '/gh pr merge/p' CONTRIBUTING.md"
 check allow pr-reviewer "awk -F: '/git tag v1.1.0/ {print \$1}' notes.txt"
 check deny  developer   "awk '{print}' notes.txt && gh pr merge 7"
 
-# Tags and releases through the REST API: nobody (they trigger publish.yml like a pushed tag)
+# Tags through the REST API: creating one (POST …/git/refs) is the coordinator's, like git push origin vX.Y.Z
+TAG_API_CREATE=(
+  'gh api repos/{owner}/{repo}/git/refs -f ref=refs/tags/v1.0.5 -f sha=abc'
+  'gh api -X POST repos/o/r/git/refs -f ref=refs/tags/v1.0.5 -f sha=abc'
+  "$(lines 'gh api repos/o/r/git/refs --input - <<EOF' '{"ref":"refs/tags/v1.0.5","sha":"abc"}' 'EOF')"
+  "curl -H \"Authorization: token \$T\" https://api.github.com/repos/o/r/git/refs -d '{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}'"
+)
+for cmd in "${TAG_API_CREATE[@]}"; do
+  check allow coordinator "$cmd"
+  for role in developer pr-reviewer ""; do
+    check deny "$role" "$cmd"
+  done
+done
+
+# Moving or deleting a tag through the REST API, and writing releases: nobody (they trigger publish.yml)
 for role in coordinator developer pr-reviewer ""; do
-  check deny  "$role" 'gh api repos/{owner}/{repo}/git/refs -f ref=refs/tags/v1.0.5 -f sha=abc'
   check deny  "$role" 'gh api -X PATCH repos/o/r/git/refs/tags/v1.0.4 -f sha=abc -F force=true'
+  check deny  "$role" 'gh api --method PATCH repos/o/r/git/refs/tags/v1.0.4 --input body.json'
+  check deny  "$role" "curl --request PATCH https://api.github.com/repos/o/r/git/refs/tags/v1.0.4 -d '{\"sha\":\"abc\",\"force\":true}'"
   check deny  "$role" 'gh api --method DELETE repos/o/r/git/refs/tags/v1.0.4'
-  check deny  "$role" "$(lines 'gh api repos/o/r/git/refs --input - <<EOF' '{"ref":"refs/tags/v1.0.5","sha":"abc"}' 'EOF')"
-  check deny  "$role" "curl -H \"Authorization: token \$T\" https://api.github.com/repos/o/r/git/refs -d '{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}'"
+  check deny  "$role" 'gh api -X DELETE "repos/o/r/git/refs/tags/v1.0.4"'
+  check deny  "$role" 'curl -X DELETE https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
   check deny  "$role" 'gh api repos/{owner}/{repo}/releases -f tag_name=v1.0.5'
   check deny  "$role" 'gh api -X PATCH repos/o/r/releases/123 -f draft=false'
   check deny  "$role" 'gh api -X DELETE repos/o/r/releases/123'
