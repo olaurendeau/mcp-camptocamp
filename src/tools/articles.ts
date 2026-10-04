@@ -121,7 +121,7 @@ export const articleToolDefinitions = [
     name: "get_article",
     title: "Get article details",
     description:
-      "Get a Camptocamp.org article by ID: text (Camptocamp markup kept), summary, author, type (collab/personal), categories, activities, quality, and the IDs of associated routes, waypoints, articles, outings and books, which can be followed with get_route, get_waypoint, get_article, get_outing and get_book. The Language line gives the language of the returned text (fr when available, otherwise another locale). The second line is the document's camptocamp.org URL, to cite as the source. " +
+      "Get a Camptocamp.org article by ID: text, summary, author, type (collab/personal), categories, activities, quality, and the IDs of associated routes, waypoints, articles, outings and books, which can be followed with get_route, get_waypoint, get_article, get_outing and get_book. The Language line gives the language of the returned text (fr when available, otherwise another locale). The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,
     inputSchema: getArticleSchema,
     handler: handleGetArticle,
