@@ -156,6 +156,72 @@ check allow developer   "git commit -m\"docs: note that npm publish is human-onl
 check allow pr-reviewer "git show \"abc:CONTRIBUTING.md\" | grep -n -E '^\\| (\`gh pr merge\`|release)'"
 check deny  developer   "$(lines 'gh pr \' '  merge 7 --squash')"
 
+# Global options before the subcommand: git -C/-c/--git-dir, npm --prefix, make -C
+for role in developer pr-reviewer ""; do
+  check deny "$role" 'git -C /repo tag v1.1.0'
+  check deny "$role" 'git -C /repo push origin v1.1.0'
+  check deny "$role" 'git -c user.name=x push origin refs/tags/v1.1.0'
+  check deny "$role" 'git --git-dir=/repo/.git push origin v1.1.0'
+  check deny "$role" 'git -C "/my repo" --no-pager push origin v1.1.0'
+  check deny "$role" 'cd /repo && git -C "$WT" tag -a v1.1.0 -m release'
+done
+check allow coordinator 'git -C /repo tag v1.1.0'
+check allow coordinator 'git -C /repo push origin v1.1.0'
+check allow coordinator 'git -C "/my repo" tag -a v1.1.0 -m release'
+for role in coordinator developer pr-reviewer ""; do
+  check deny "$role" 'git -C /repo push --tags'
+  check deny "$role" 'git -C /repo push origin --follow-tags'
+  check deny "$role" 'git -C /repo tag -f v1.0.4'
+  check deny "$role" 'git -C /repo push origin :v1.0.4'
+  check deny "$role" 'git -c core.x=y push --force origin v1.0.4'
+  check deny "$role" 'npm --prefix . publish'
+  check deny "$role" 'pnpm --filter "my pkg" publish'
+  check deny "$role" 'make -C . publish'
+  check deny "$role" 'make build publish'
+done
+check allow developer   'git -C /repo push -u origin feat/new-tool'
+check allow developer   'git -C /repo tag --list'
+check allow developer   'git -C /repo log v1.0.4'
+check allow developer   'git -C /repo push --force-with-lease origin feat/new-tool'
+check allow developer   'npm --prefix . version 1.1.0 --no-git-tag-version'
+check allow developer   'npm -w pkg version 1.1.0 --no-git-tag-version'
+check deny  developer   'npm --prefix . version patch'
+check deny  developer   'npm --prefix "/my dir" version 1.1.0'
+check deny  developer   'pnpm -C . version 1.1.0'
+check deny  developer   'yarn --cwd . version'
+for role in coordinator pr-reviewer ""; do
+  check deny "$role" 'npm --prefix . version 1.1.0 --no-git-tag-version'
+  check deny "$role" 'npm -w pkg version patch'
+done
+check allow developer   'npm --prefix . view @olaurendeau/mcp-camptocamp version'
+check allow developer   'npm --prefix . run test'
+check allow developer   'make -C . publish-prep'
+check allow developer   'make -C . check'
+
+# Refspecs: + forces the update, --mirror and globs push every tag, push.followTags is --follow-tags
+for role in coordinator developer pr-reviewer ""; do
+  check deny "$role" 'git push origin +v1.1.0'
+  check deny "$role" "git push origin '+v1.1.0'"
+  check deny "$role" "git push origin +'v1.1.0'"
+  check deny "$role" 'git push origin +refs/tags/v1.0.4'
+  check deny "$role" 'git push origin +HEAD:refs/tags/v1.0.4'
+  check deny "$role" 'git -C /repo push origin +v1.0.4'
+  check deny "$role" 'git push --mirror origin'
+  check deny "$role" 'git -C /repo push --mirror'
+  check deny "$role" "git push origin 'refs/tags/*'"
+  check deny "$role" 'git push origin refs/tags/*:refs/tags/*'
+  check deny "$role" 'git -c push.followTags=true push origin feat/new-tool'
+  check deny "$role" 'git config push.followtags true'
+done
+check allow developer   'git push origin +feat/new-tool'
+check allow coordinator 'git push origin HEAD:refs/heads/feat/x'
+
+# Listing tags with options before -l is not creating one
+check allow developer   'git tag -n -l v1*'
+check allow developer   "git tag --sort=-v:refname -l 'v*'"
+check allow pr-reviewer 'git -C /repo tag -n5 --list'
+check deny  developer   'git tag -a -l v1.1.0'
+
 # Exemptions apply to their own command only, not to the whole command line
 check allow coordinator "git tag -l 'v*' --sort=-v:refname | head -1"
 check deny  coordinator "git tag -l 'v*' --sort=-v:refname | head -1 && npm version patch && git push --follow-tags"
