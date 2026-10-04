@@ -74,8 +74,40 @@ jobs:
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
+      # The MCP registry checks the npm package at the exact version and answers
+      # 400 "version '<v>' was not found" until npm serves it, which can lag the publish
+      - name: Wait for the npm version to be visible
+        run: |
+          URL="https://registry.npmjs.org/@olaurendeau/mcp-camptocamp/$VERSION"
+          for attempt in $(seq 1 30); do
+            if curl -fs -o /dev/null -H "Cache-Control: no-cache" "$URL"; then
+              echo "npm serves @olaurendeau/mcp-camptocamp@$VERSION"
+              exit 0
+            fi
+            echo "Attempt $attempt/30: @olaurendeau/mcp-camptocamp@$VERSION not on npm yet, retrying in 10s"
+            sleep 10
+          done
+          echo "::error::@olaurendeau/mcp-camptocamp@$VERSION still not served by $URL after 5 minutes; rerun the failed job once it is"
+          exit 1
+
       - name: Authenticate to MCP Registry
         run: ./mcp-publisher login github-oidc
 
+      # Retry only the "version not found" race (another npm edge may still lag); fail fast otherwise
       - name: Publish to MCP Registry
-        run: ./mcp-publisher publish
+        run: |
+          set -o pipefail
+          LOG="$RUNNER_TEMP/mcp-publisher.log"
+          for attempt in 1 2 3 4; do
+            if ./mcp-publisher publish 2>&1 | tee "$LOG"; then
+              exit 0
+            fi
+            if ! grep -q "not found" "$LOG" || [ "$attempt" -eq 4 ]; then
+              echo "::error::MCP Registry publish failed (attempt $attempt/4)"
+              exit 1
+            fi
+            DELAY=$((15 * 2 ** (attempt - 1)))
+            echo "Attempt $attempt/4: npm version not yet visible to the MCP Registry, retrying in ${DELAY}s"
+            sleep "$DELAY"
+            ./mcp-publisher login github-oidc
+          done
