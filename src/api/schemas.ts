@@ -20,7 +20,7 @@ export const titledAssociationSchema = z.object({
 });
 export type TitledAssociation = z.infer<typeof titledAssociationSchema>;
 
-// Route locales also carry the summit name, shown as "prefix : title" in association lines.
+// Route locales also carry the summit name, shown as "prefix : title" wherever a route is named.
 const routeLocaleSchema = localeSchema.extend({ title_prefix: z.string().nullish() });
 
 export const routeAssociationSchema = z.object({
@@ -67,7 +67,7 @@ export const routeSearchResponseSchema = searchResponseSchema(routeSearchResultS
 export const routeDetailSchema = z.object({
   document_id: z.number(),
   locales: z.array(
-    localeSchema.extend({
+    routeLocaleSchema.extend({
       description: z.string().nullish(),
       remarks: z.string().nullish(),
       gear: z.string().nullish(),
@@ -163,7 +163,7 @@ export const outingDetailSchema = z.object({
   condition_rating: z.string().nullish(),
   participant_count: z.number().nullish(),
   author: authorSchema.nullish(),
-  associations: z.object({ routes: z.array(titledAssociationSchema).nullish() }).nullish(),
+  associations: z.object({ routes: z.array(routeAssociationSchema).nullish() }).nullish(),
 });
 
 // Items of GET /outings?sort=-date_end… (search_outings); only range areas are listed, by area_type.

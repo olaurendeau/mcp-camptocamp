@@ -41,7 +41,7 @@ describe("response schemas", () => {
   it("accept the API's null fields and drop the untyped ones", () => {
     expect(routeDetailSchema.parse(route53914)).toEqual({
       document_id: 53914,
-      locales: [{ lang: "fr", title: "Martine is on the rock" }],
+      locales: [{ lang: "fr", title: "Martine is on the rock", title_prefix: "Aiguille Dibona" }],
       activities: ["rock_climbing"],
       elevation_max: 3131,
       height_diff_down: null,
