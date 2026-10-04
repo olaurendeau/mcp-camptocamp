@@ -105,7 +105,13 @@ describe("formatSearchPage", () => {
     expect(result.split("\n").at(-1)).toBe("Next page: offset=9990");
   });
 
-  it("points past the 10,000-result window instead of giving an offset that would be refused", () => {
+  it("caps the next page limit when a full page would pass the 10,000-result window", () => {
+    const result = formatSearchPage({ kind: "outing", total: 346652, offset: 9985, limit: 10, lines: lines(10) });
+
+    expect(result.split("\n").at(-1)).toBe("Next page: offset=9995 (limit at most 5)");
+  });
+
+  it("points past the 10,000-result window once the next offset reaches it", () => {
     const result = formatSearchPage({ kind: "outing", total: 346652, offset: 9990, limit: 10, lines: lines(10) });
 
     expect(result.split("\n").at(-1)).toBe(WINDOW_SENTENCE);

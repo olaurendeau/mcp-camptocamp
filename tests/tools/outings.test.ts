@@ -476,7 +476,15 @@ describe("handleSearchOutings", () => {
       expect(result.split("\n").at(-1)).toBe("Next page: offset=9990");
     });
 
-    it("points past the 10,000-result window instead of an offset that would be refused", async () => {
+    it("caps the next page limit near the end of the 10,000-result window", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse(page(10, 1), 346652));
+
+      const result = await search({ offset: 9985 });
+
+      expect(result.split("\n").at(-1)).toBe("Next page: offset=9995 (limit at most 5)");
+    });
+
+    it("points past the 10,000-result window once the next offset reaches it", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse(page(10, 1), 346652));
 
       const result = await search({ offset: 9990 });

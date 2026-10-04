@@ -91,7 +91,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
 | `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                               |
 | `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes with summit names)     |
-| `search_outings`      | Search outings by keyword, area, activity, dates, route or waypoint, newest first; `offset` pages    |
+| `search_outings`      | Search outings by keyword, area, activity, dates, route, waypoint; newest first, paged with `offset` |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`              |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                   |
 | `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable           |

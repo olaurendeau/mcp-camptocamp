@@ -27,6 +27,15 @@ export interface SearchPage {
   order?: string;
 }
 
+/** Footer pointing to the next page, with a smaller limit when a full page would pass the window. */
+function formatNextPage(next: number, limit: number): string {
+  if (next >= MAX_RESULT_WINDOW) {
+    return "More results exist beyond Camptocamp's 10,000-result window; narrow the filters.";
+  }
+  const room = MAX_RESULT_WINDOW - next;
+  return room < limit ? `Next page: offset=${next} (limit at most ${room})` : `Next page: offset=${next}`;
+}
+
 /** R6: shared header, filters and next-page footer of every search tool. */
 export function formatSearchPage({
   kind,
@@ -51,12 +60,7 @@ export function formatSearchPage({
   output.push("", ...lines);
   const next = offset + lines.length;
   if (next < total) {
-    output.push(
-      "",
-      next + limit <= MAX_RESULT_WINDOW
-        ? `Next page: offset=${next}`
-        : "More results exist beyond Camptocamp's 10,000-result window; narrow the filters.",
-    );
+    output.push("", formatNextPage(next, limit));
   }
   return output.join("\n");
 }
