@@ -11,9 +11,13 @@ The server runs on your machine and talks to its client over stdio. A client tha
 
 ## Clients
 
+- [Claude Desktop](clients/claude-desktop.md): the `claude_desktop_config.json` entry, checking the connectors, and tool approval.
+- [Claude Code](clients/claude-code.md): the `claude mcp add` command, scopes, the allow rule that stops permission prompts, and Claude Code's limits.
 - [ChatGPT desktop app and Codex](clients/chatgpt-desktop-and-codex.md): the ChatGPT desktop app, Codex CLI and the Codex IDE extension, which share one configuration on the same Codex host. ChatGPT on the web cannot use this server.
+- [Mistral Vibe Code](clients/mistral-vibe-code.md): the Vibe Code CLI and its VS Code extension, with the `config.toml` entry and per-tool permissions.
+- [Gemini CLI and Gemini Code Assist](clients/gemini-cli.md): `settings.json`, folder trust, and a policy rule that allows the read-only tools.
 
-Until your client has its own page here, use the [Claude Code command](getting-started.md#claude-code) or the [configuration for other MCP clients](getting-started.md#other-mcp-clients).
+For a client without its own page here, use the [configuration for other MCP clients](getting-started.md#other-mcp-clients).
 
 ## Guides
 
