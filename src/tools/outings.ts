@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { documentId } from "./inputs.js";
+import { documentId, searchQuery } from "./inputs.js";
 import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
 import type {
   OutingSearchResponse,
@@ -49,7 +49,7 @@ const isoDate = z
 const MAX_RESULT_WINDOW = 10000;
 
 export const searchOutingsSchema = z.object({
-  query: z.string().optional().describe("Keyword matched against outing titles (e.g. 'cosmiques')"),
+  query: searchQuery("Keyword matched against outing titles (e.g. 'cosmiques')", { allowBlank: true }).optional(),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14409 for Vanoise)").optional(),
   activity: z
     .enum(OUTING_ACTIVITIES, {

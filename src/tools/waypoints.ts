@@ -1,11 +1,13 @@
 import { z } from "zod";
-import { documentId } from "./inputs.js";
+import { documentId, searchQuery } from "./inputs.js";
 import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointSearchResponse, WaypointDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, formatHeader, formatAreasSection } from "./format.js";
 
 export const searchWaypointsSchema = z.object({
-  query: z.string().optional().describe("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')"),
+  query: searchQuery("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')", {
+    allowBlank: true,
+  }).optional(),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)").optional(),
 });
