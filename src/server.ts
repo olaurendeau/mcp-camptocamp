@@ -12,7 +12,7 @@ export interface ToolDefinition {
   name: string;
   title: string;
   description: string;
-  inputSchema: z.AnyZodObject;
+  inputSchema: z.ZodObject<z.ZodRawShape>;
   // `never` accepts every handler whatever its input type; the SDK validates input against inputSchema first
   handler: (input: never) => Promise<string>;
 }

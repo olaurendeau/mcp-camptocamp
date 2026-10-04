@@ -538,7 +538,7 @@ describe("type filters on searchWaypoints and searchBooks", () => {
   });
 
   it("sends neither wtyp, btyp nor act when not given", async () => {
-    mockFetch.mockImplementation(async () => makeResponse({ documents: [], total: 0 }));
+    mockFetch.mockImplementation(() => Promise.resolve(makeResponse({ documents: [], total: 0 })));
 
     await searchWaypoints({ query: "pourri" });
     await searchBooks({ query: "vanoise" });
@@ -899,9 +899,9 @@ describe("getOuting", () => {
     const result = outingDetailSchema.parse(await getOuting(1880674));
 
     const route = wellFormed(result.associations?.routes)[0];
-    expect(route?.document_id).toBe(54085);
-    expect(route?.locales[0].title_prefix).toBe("Mont Pourri");
-    expect(route?.locales[1].title_prefix).toBe("Mont Pourri");
+    expect(route.document_id).toBe(54085);
+    expect(route.locales[0].title_prefix).toBe("Mont Pourri");
+    expect(route.locales[1].title_prefix).toBe("Mont Pourri");
   });
 
   it("keeps the outing's and its associated route's ratings through the response schema", async () => {

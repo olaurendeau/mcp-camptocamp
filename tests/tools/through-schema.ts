@@ -7,6 +7,7 @@ const isThenable = (value: unknown): value is PromiseLike<unknown> =>
   typeof (value as PromiseLike<unknown> | undefined)?.then === "function";
 
 /** True only when A and B are the same type: mutual assignability would let optional fields differ. */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- G only probes how A and B relate
 type Equals<A, B> = (<G>() => G extends A ? 1 : 2) extends <G>() => G extends B ? 1 : 2 ? true : false;
 
 /** The schema whose output is exactly what the mocked function resolves to: any other schema does not compile. */
@@ -62,7 +63,7 @@ export function throughSchema<T extends ApiFunction, S extends z.ZodTypeAny>(
   const setImplementation = mocked.mockImplementation.bind(mocked);
   const reset = mocked.mockReset.bind(mocked);
   const parse = async function (this: unknown, ...args: Parameters<T>) {
-    return (schema as S).parse(await fixture.apply(this, args));
+    return (schema as S).parse(await fixture.apply(this, args)) as unknown;
   } as unknown as Parameters<typeof setImplementation>[0];
 
   const toMocked = (result: unknown) => (result === fixture ? mocked : result);

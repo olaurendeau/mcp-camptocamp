@@ -69,7 +69,7 @@ function demoteHeadings(text: string): string {
     const underline = SETEXT_UNDERLINE.exec(line);
     const title = result.at(-1);
     if (underline && title !== undefined && !NOT_A_SETEXT_TITLE.test(title)) {
-      const hashes = underline[1].startsWith("=") ? "###" : "####";
+      const hashes = underline[0].includes("=") ? "###" : "####";
       result[result.length - 1] = `${hashes} ${title.replace(/^ {0,3}/, "")}`;
     } else {
       result.push(line);
