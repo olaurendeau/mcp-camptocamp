@@ -19,11 +19,22 @@ import {
   formatLanguageLine,
 } from "./format.js";
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
-import { formatUserText, USER_TEXT_NOTE } from "./text.js";
+import { formatUserTexts, USER_TEXT_NOTE, type TextSection } from "./text.js";
 import { ACTIVITIES, ROUTE_CONFIGURATIONS, ROUTE_TYPES, enumValue } from "./enums.js";
 import type { Lang } from "./enums.js";
 import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
 import { describeRange, heightDiffUp, rangeFilter, ratingBound, ratingFilter, ratingScales } from "./filters.js";
+
+// The free-text sections get_route prints, in print order.
+const ROUTE_TEXT = [
+  ["summary", "Summary"],
+  ["description", "Description"],
+  ["slope", "Slope"],
+  ["remarks", "Remarks"],
+  ["gear", "Gear"],
+  ["route_history", "Route history"],
+  ["external_resources", "External resources"],
+] as const satisfies readonly TextSection<string>[];
 
 const RATING_SYSTEM_NAMES = Object.keys(ROUTE_RATING_SYSTEMS) as [RouteRatingField, ...RouteRatingField[]];
 
@@ -203,13 +214,7 @@ function formatRouteDetail(route: RouteDetail, lang?: Lang): string {
 
   lines.push(...formatAreasSection(route.areas, lang));
 
-  lines.push(...formatUserText("summary", "Summary", locale?.summary));
-  lines.push(...formatUserText("description", "Description", locale?.description));
-  lines.push(...formatUserText("slope", "Slope", locale?.slope));
-  lines.push(...formatUserText("remarks", "Remarks", locale?.remarks));
-  lines.push(...formatUserText("gear", "Gear", locale?.gear));
-  lines.push(...formatUserText("route_history", "Route history", locale?.route_history));
-  lines.push(...formatUserText("external_resources", "External resources", locale?.external_resources));
+  lines.push(...formatUserTexts(locale, ROUTE_TEXT));
 
   lines.push(...formatRouteAssociations(route, lang));
 

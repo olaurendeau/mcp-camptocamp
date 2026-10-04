@@ -15,7 +15,7 @@ import {
   formatListItems,
   formatLanguageLine,
 } from "./format.js";
-import { formatUserText, USER_TEXT_NOTE } from "./text.js";
+import { formatUserTexts, SUMMARY_AND_DESCRIPTION, USER_TEXT_NOTE } from "./text.js";
 import { ACTIVITIES, BOOK_TYPES, enumValue } from "./enums.js";
 import type { Lang } from "./enums.js";
 
@@ -65,8 +65,7 @@ function formatBookDetail(book: BookDetail, lang?: Lang): string {
     lines.push("", ...labelled);
   }
 
-  lines.push(...formatUserText("summary", "Summary", locale?.summary));
-  lines.push(...formatUserText("description", "Description", locale?.description));
+  lines.push(...formatUserTexts(locale, SUMMARY_AND_DESCRIPTION));
 
   const routes = book.associations?.routes;
   if (routes && routes.length > 0) {

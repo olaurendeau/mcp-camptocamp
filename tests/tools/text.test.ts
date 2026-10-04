@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { formatUserText, USER_TEXT_NOTE } from "../../src/tools/text.js";
+import {
+  formatUserText,
+  formatUserTexts,
+  hasUserText,
+  SUMMARY_AND_DESCRIPTION,
+  USER_TEXT_NOTE,
+} from "../../src/tools/text.js";
 import { describeGrowth, measureGrowth, MAX_GROWTH_RATIO } from "./growth.js";
 
 function format(value: string): string[] {
@@ -288,6 +294,55 @@ describe("formatUserText", () => {
 
     // "#### A\n" is 7 characters once demoted, so 8003 in all.
     expect(lines[4]).toBe("[truncated, 3 more characters]");
+  });
+});
+
+describe("hasUserText", () => {
+  it.each([
+    ["null", null],
+    ["undefined", undefined],
+    ["empty", ""],
+    ["blank", " \n"],
+  ])("is false when the field is %s", (_label, value) => {
+    expect(hasUserText(value)).toBe(false);
+  });
+
+  it("is true when the field has text", () => {
+    expect(hasUserText("x")).toBe(true);
+  });
+});
+
+describe("formatUserTexts", () => {
+  const sections = [
+    ["summary", "Summary"],
+    ["description", "Description"],
+    ["gear", "Gear"],
+  ] as const;
+
+  it("prints each section in section order, like the concatenated formatUserText calls", () => {
+    // Keys deliberately in another order than the sections: the section list decides the print order.
+    const locale = { gear: "Piolet", description: "## Approche\nPar le glacier", summary: "Course classique" };
+    expect(formatUserTexts(locale, sections)).toEqual([
+      ...formatUserText("summary", "Summary", locale.summary),
+      ...formatUserText("description", "Description", locale.description),
+      ...formatUserText("gear", "Gear", locale.gear),
+    ]);
+  });
+
+  it("skips missing, null and blank fields", () => {
+    const locale = { summary: null, description: " \n", gear: "Piolet" };
+    expect(formatUserTexts(locale, sections)).toEqual(formatUserText("gear", "Gear", "Piolet"));
+  });
+
+  it("prints nothing when there is no locale", () => {
+    expect(formatUserTexts(undefined, sections)).toEqual([]);
+  });
+
+  it("shares the summary and description sections of areas, books and articles", () => {
+    expect(SUMMARY_AND_DESCRIPTION).toEqual([
+      ["summary", "Summary"],
+      ["description", "Description"],
+    ]);
   });
 });
 
