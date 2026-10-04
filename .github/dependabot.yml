@@ -33,6 +33,9 @@ updates:
     ignore:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # zod 4 is postponed (human decision, see #190): the migration is planned there, not as a routine bump.
+      - dependency-name: zod
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
