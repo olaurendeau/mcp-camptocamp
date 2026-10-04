@@ -398,6 +398,90 @@ describe("handleGetRoute areas", () => {
   });
 });
 
+// Real GET /routes/53914 (Martine is on the rock, Aiguille Dibona), trimmed texts: the live API sends
+// null for unset values. Untyped fields (version, quality, route_types, maps…) omitted.
+const route53914: api.RouteDetail = {
+  document_id: 53914,
+  locales: [
+    {
+      lang: "fr",
+      title: "Martine is on the rock",
+      description: "## Approche\nDu refuge, contourner la base de l'aiguille pour accéder au versant E.",
+      remarks: "* Face E, donc agréable le matin.",
+      gear: "- Corde 1×50 m\n- 15 dégaines",
+      route_history: "- Ouverture : 1987-1988 - Denis Bancillon, Eric Allène.",
+    },
+  ],
+  activities: ["rock_climbing"],
+  elevation_min: 2719,
+  elevation_max: 3131,
+  height_diff_up: 412,
+  height_diff_down: null,
+  durations: ["1", "2"],
+  global_rating: "TD",
+  engagement_rating: "I",
+  risk_rating: null,
+  equipment_rating: "P1+",
+  exposition_rock_rating: null,
+  rock_free_rating: "6b+",
+  rock_required_rating: "6a",
+  aid_rating: null,
+  main_waypoint_id: 39006,
+  geometry: { geom_detail: null },
+  areas: [
+    { document_id: 14274, locales: [{ lang: "fr", title: "France" }], area_type: "country", available_langs: null },
+    {
+      document_id: 14328,
+      locales: [
+        { lang: "zh", title: "伊泽尔省" },
+        { lang: "fr", title: "Isère" },
+      ],
+      area_type: "admin_limits",
+      available_langs: null,
+    },
+    { document_id: 14403, locales: [{ lang: "fr", title: "Écrins" }], area_type: "range", available_langs: null },
+  ],
+};
+
+describe("handleGetRoute with the API's null fields", () => {
+  it("formats route 53914 with height_diff_down, risk_rating, exposition_rock_rating and aid_rating null", async () => {
+    mockGetRoute.mockResolvedValueOnce(route53914);
+
+    const result = await handleGetRoute({ id: 53914 });
+
+    expect(result).toBe(
+      [
+        "# Martine is on the rock (ID: 53914)",
+        "",
+        "**Activities**: rock_climbing",
+        "**Global rating**: TD",
+        "**Rock free rating**: 6b+",
+        "**Engagement**: I",
+        "**Equipment**: P1+",
+        "**Max elevation**: 3131m",
+        "**Min elevation**: 2719m",
+        "**Elevation gain**: 412m",
+        "",
+        "## Areas",
+        "- [14274] France (country)",
+        "- [14328] Isère (admin_limits)",
+        "- [14403] Écrins (range)",
+        "",
+        "## Description",
+        "## Approche",
+        "Du refuge, contourner la base de l'aiguille pour accéder au versant E.",
+        "",
+        "## Remarks",
+        "* Face E, donc agréable le matin.",
+        "",
+        "## Gear",
+        "- Corde 1×50 m",
+        "- 15 dégaines",
+      ].join("\n"),
+    );
+  });
+});
+
 describe("get_route tool definition", () => {
   it("tells the LLM about the areas section and area_id reuse", () => {
     const tool = routeToolDefinitions.find((t) => t.name === "get_route");
