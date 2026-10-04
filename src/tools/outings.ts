@@ -3,7 +3,8 @@ import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searc
 import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
 import { ACTIVITIES, enumValue } from "./enums.js";
 import type { Lang } from "./enums.js";
-import { CONDITION_RATINGS, OUTING_RATING_FIELDS, getOuting, searchOutings } from "../api/camptocamp.js";
+import { getOuting, searchOutings } from "../api/camptocamp.js";
+import { CONDITION_RATINGS, OUTING_RATING_FIELDS } from "../api/values.js";
 import type { OutingDetail, OutingListResponse, OutingSearchParams } from "../api/camptocamp.js";
 import {
   pickLocale,
