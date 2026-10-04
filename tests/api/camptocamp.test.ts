@@ -646,7 +646,8 @@ describe("getWaypoint", () => {
 
   it("keeps all_routes, books and recent_outings through the response schema", async () => {
     // Trimmed from the live GET /waypoints/37355?lang=fr response (2026-10-04): one item per list, without
-    // geometry, areas and texts; the other associations as the API sends them, with images and articles emptied.
+    // geometry, areas and texts; the other associations as the API sends them (no routes key), with
+    // waypoint_children, images and articles emptied.
     const mockData = {
       document_id: 37355,
       locales: [{ lang: "fr", title: "Mont Blanc" }],
@@ -655,7 +656,6 @@ describe("getWaypoint", () => {
       associations: {
         waypoints: [],
         waypoint_children: [],
-        routes: [],
         articles: [],
         images: [],
         xreports: [],
