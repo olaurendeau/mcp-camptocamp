@@ -12,9 +12,9 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | `get_route`           | Détail par ID (sommet : titre, textes, cotations, D+, orientations, durée, zones, topos, points, sorties) |
 | `search_waypoints`    | Points de passage par nom et/ou zone `area_id`, filtrables par type (sommet, refuge, bivouac…) ; paginée  |
 | `get_waypoint`        | Détail d'un point par ID (altitude, GPS, zones, infos refuge, accès, itinéraires, topos, sorties)         |
-| `search_user_outings` | Alias de `search_outings` par `user_id` : sorties d'un utilisateur, cotations nommées ; paginée           |
-| `get_outing`          | Détail d'une sortie par ID (cotations, conditions, météo, participants, itinéraires et leurs cotations)   |
-| `search_outings`      | Sorties récentes : mot-clé, zone, activité, dates, période annuelle, itinéraire, point, auteur ; paginée  |
+| `search_user_outings` | Alias de `search_outings` par `user_id` : sorties où figure l'utilisateur, pas que les siennes ; paginée  |
+| `get_outing`          | Détail d'une sortie par ID (cotations, conditions, météo, participants et leurs comptes, itinéraires)     |
+| `search_outings`      | Sorties récentes : mot-clé, zone, activité, dates, période, itinéraire, point, participant ; paginée      |
 | `search_areas`        | Recherche des zones (massif, département/canton, pays) par nom ; ID réutilisable en `area_id` ; paginée   |
 | `get_area`            | Détail d'une zone par ID (type, résumé, description)                                                      |
 | `search_books`        | Livres par titre uniquement (auteur/ISBN peu fiables), filtrables par type et activité ; paginée          |

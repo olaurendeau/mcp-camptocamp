@@ -47,7 +47,6 @@ describe("handleGetOuting", () => {
       global_rating: "D",
       engagement_rating: "IV",
       participant_count: 2,
-      author: { name: "o.laurendeau", user_id: 430052 },
       associations: {
         routes: [{ document_id: 100, locales: [{ lang: "fr", title: "Traversée des Drus" }] }],
       },
@@ -59,7 +58,6 @@ describe("handleGetOuting", () => {
       "# Traversée des Drus (ID: 42)",
       "**URL**: https://www.camptocamp.org/outings/42",
     ]);
-    expect(result).toContain("**Author**: o.laurendeau (user ID: 430052)");
     expect(result).toContain("**Date**: 2026-07-06\n");
     expect(result).toContain("**Participants**: 2");
     expect(result).toContain("**Global rating**: D");
@@ -239,6 +237,132 @@ describe("handleGetOuting", () => {
       "- [1678194] Tour du Mont Pourri en 5 jours",
     ]);
     expect(result).not.toMatch(BARE_RATING);
+  });
+
+  // S1 (#118): the detail has no `author` key; associations.users are the accounts linked to the outing,
+  // and the first one is not its author (1757161 was written by emag, the second).
+  describe("Camptocamp accounts linked to the outing", () => {
+    // Trimmed from the live GET /outings/1757161 response (2026-10-04): texts, geometry and untyped fields left
+    // out, the users kept as sent (locales without title, extra keys), the route association reduced to its locale.
+    const outing1757161 = {
+      document_id: 1757161,
+      version: 3,
+      locales: [
+        {
+          lang: "fr",
+          version: 3,
+          title: "Rosablanche : Depuis Fionnay",
+          description: "Une bien jolie sortie pour commencer notre semaine de ski en Suisse!",
+          participants: null,
+        },
+      ],
+      activities: ["snow_ice_mixed"],
+      date_start: "2025-03-31",
+      date_end: "2025-03-31",
+      elevation_max: 3336,
+      height_diff_up: 1846,
+      global_rating: "PD",
+      condition_rating: "good",
+      participant_count: 3,
+      associations: {
+        users: [
+          {
+            document_id: 466185,
+            version: 2,
+            locales: [{ version: 1, lang: "fr" }],
+            activities: null,
+            categories: ["amateur"],
+            available_langs: ["fr"],
+            areas: [],
+            protected: false,
+            type: "u",
+            name: "MarionO",
+            forum_username: "MarionO",
+          },
+          {
+            document_id: 944173,
+            version: 1,
+            locales: [{ version: 1, lang: "en" }],
+            activities: null,
+            categories: ["amateur"],
+            available_langs: ["en"],
+            areas: [],
+            protected: false,
+            type: "u",
+            name: "emag",
+            forum_username: "emag",
+          },
+        ],
+        routes: [
+          {
+            document_id: 45186,
+            locales: [{ lang: "fr", title: "Depuis Fionnay", title_prefix: "Rosablanche" }],
+          },
+        ],
+        articles: [],
+        images: [],
+        xreports: [],
+      },
+      protected: false,
+      type: "o",
+    };
+
+    it("lists them in API order right after the participant count, and calls nobody the author (AC1.1, AC1.2)", async () => {
+      mockGetOuting.mockResolvedValueOnce(outing1757161);
+
+      const result = await handleGetOuting({ id: 1757161 });
+
+      const lines = result.split("\n");
+      const participants = lines.indexOf("**Participants**: 3");
+      expect(participants).toBeGreaterThan(0);
+      expect(lines[participants + 1]).toBe(
+        "**Participants with a Camptocamp account**: MarionO (user ID: 466185), emag (user ID: 944173)",
+      );
+      expect(result).not.toContain("**Author**");
+      expect(result).not.toMatch(/author/i);
+    });
+
+    it.each([
+      ["missing", undefined],
+      ["empty", []],
+    ])("leaves the line out when the users are %s (AC1.3)", async (_case, users) => {
+      mockGetOuting.mockResolvedValueOnce({ ...outing1757161, associations: { ...outing1757161.associations, users } });
+
+      const result = await handleGetOuting({ id: 1757161 });
+
+      expect(result).toContain("**Participants**: 3");
+      expect(result).not.toContain("Camptocamp account");
+      expect(result).not.toMatch(/author/i);
+    });
+
+    it("keeps the participant count and the participants free text alongside them (AC1.4)", async () => {
+      mockGetOuting.mockResolvedValueOnce({
+        ...outing1757161,
+        locales: [{ ...outing1757161.locales[0], participants: "Marion, Mario et moi" }],
+      });
+
+      const result = await handleGetOuting({ id: 1757161 });
+
+      const lines = result.split("\n");
+      expect(lines).toContain("**Participants**: 3");
+      const section = lines.indexOf("## Participants");
+      expect(lines.slice(section, section + 4)).toEqual([
+        "## Participants",
+        "[begin user-written text: participants]",
+        "Marion, Mario et moi",
+        "[end user-written text: participants]",
+      ]);
+    });
+
+    it("says in the get_outing description where the author is and what the listed accounts are (AC1.5)", () => {
+      const description = outingToolDefinitions.find((t) => t.name === "get_outing")?.description ?? "";
+
+      expect(description).toContain("The outing detail does not carry its author");
+      expect(description).toContain("search_outings result lines end with 'Author: <name>'");
+      expect(description).toContain(
+        "'Participants with a Camptocamp account' lists the Camptocamp accounts linked to the outing",
+      );
+    });
   });
 
   it("propagates API errors", async () => {
@@ -634,6 +758,42 @@ describe("handleSearchOutings", () => {
 
       expect(await search({ user_id: 430052 })).toBe("No outings found matching user 430052.");
     });
+
+    // S1 (#118): `u=` matches outings the user is listed on, so the list shows outings written by someone else.
+    it("lists an outing the user is listed on but did not write, with its real author (AC1.6)", async () => {
+      // Trimmed from the live GET /outings?u=466185&date=2025-03-31,2025-03-31 response (2026-10-04).
+      mockSearchOutings.mockResolvedValueOnce(
+        listResponse([
+          {
+            document_id: 1757161,
+            locales: [{ lang: "fr", title: "Rosablanche : Depuis Fionnay" }],
+            activities: ["snow_ice_mixed"],
+            date_start: "2025-03-31",
+            date_end: "2025-03-31",
+            condition_rating: "good",
+            elevation_max: 3336,
+            height_diff_up: 1846,
+            global_rating: "PD",
+            areas: [
+              { document_id: 14067, area_type: "country", locales: [{ lang: "fr", title: "Suisse" }] },
+              { document_id: 14384, area_type: "admin_limits", locales: [{ lang: "fr", title: "Valais" }] },
+              {
+                document_id: 14437,
+                area_type: "range",
+                locales: [{ lang: "fr", title: "Valais W - Alpes Pennines W" }],
+              },
+            ],
+            author: { name: "emag", user_id: 944173 },
+          },
+        ]),
+      );
+
+      const result = await search({ user_id: 466185, limit: 50 });
+
+      expect(mockSearchOutings).toHaveBeenCalledWith({ user_id: 466185, limit: 50, offset: 0 });
+      const line = result.split("\n").find((l) => l.startsWith("- [1757161] "));
+      expect(line).toMatch(/ \| Author: emag$/);
+    });
   });
 
   // R6 / AC9.4: the output tells how to fetch the next page, within Camptocamp's 10,000-result window.
@@ -1014,6 +1174,21 @@ describe("outingToolDefinitions", () => {
       expect(text).not.toContain("o.laurendeau");
     },
   );
+
+  // AC1.6: `u=` matches every outing the user is listed on, not only those they wrote.
+  it("describes user_id as the user's listed outings, not only those they wrote, in both tools", () => {
+    const listed = "outings this user is listed on as a participant, not only those they wrote";
+    const userOutings = outingToolDefinitions.find((t) => t.name === "search_user_outings")?.description ?? "";
+
+    expect(userOutings).toContain(listed);
+    expect(searchOutingsSchema.shape.user_id.description).toContain(listed);
+    expect(searchUserOutingsSchema.shape.user_id.description).toContain(listed);
+    expect(searchOutingsSchema.shape.user_id.description).not.toMatch(/author/i);
+    for (const definition of outingToolDefinitions) {
+      expect(definition.description).not.toContain("published by");
+      expect(definition.description).not.toContain("the author's Camptocamp user ID");
+    }
+  });
 
   it("describes search_user_outings as an alias of search_outings with offset paging", () => {
     const description = outingToolDefinitions.find((t) => t.name === "search_user_outings")?.description ?? "";
