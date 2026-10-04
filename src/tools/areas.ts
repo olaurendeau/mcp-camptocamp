@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { documentId } from "./inputs.js";
+import { documentId, searchQuery } from "./inputs.js";
 import { searchAreas, getArea } from "../api/camptocamp.js";
 import type { AreaSearchResponse, AreaDetail } from "../api/camptocamp.js";
 import { pickLocale, formatHeader, formatAreaLine } from "./format.js";
 
 export const searchAreasSchema = z.object({
-  query: z.string().describe("Area name in any language (e.g. 'Écrins', 'Valais', 'Wallis')"),
+  query: searchQuery("Area name in any language (e.g. 'Écrins', 'Valais', 'Wallis')", { allowBlank: false }),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   area_type: z
     .enum(["range", "admin_limits", "country"])

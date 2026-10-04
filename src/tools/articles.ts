@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { documentId } from "./inputs.js";
+import { documentId, searchQuery } from "./inputs.js";
 import { searchArticles, getArticle } from "../api/camptocamp.js";
 import type { ArticleSearchResponse, ArticleDetail } from "../api/camptocamp.js";
 import {
@@ -13,7 +13,7 @@ import {
 } from "./format.js";
 
 export const searchArticlesSchema = z.object({
-  query: z.string().describe("Search query (e.g. 'crampons', 'avalanche', 'rappel')"),
+  query: searchQuery("Search query (e.g. 'crampons', 'avalanche', 'rappel')", { allowBlank: false }),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
 });
 

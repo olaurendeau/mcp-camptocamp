@@ -229,6 +229,16 @@ describe("book tool definitions", () => {
     expect(searchBooksSchema.safeParse({ limit: 10 }).success).toBe(false);
   });
 
+  it("rejects a blank query", () => {
+    for (const query of ["", "   "]) {
+      const parsed = searchBooksSchema.safeParse({ query });
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues).toEqual([
+        expect.objectContaining({ path: ["query"], message: "must not be blank" }),
+      ]);
+    }
+  });
+
   it("accepts only a positive integer id", () => {
     expect(getBookSchema.parse({ id: 373877 })).toEqual({ id: 373877 });
     for (const id of [0, -1, 1.5]) expect(getBookSchema.safeParse({ id }).success).toBe(false);
