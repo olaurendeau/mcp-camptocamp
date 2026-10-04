@@ -46,7 +46,7 @@ describe("handleSearchRoutes", () => {
     const result = await handleSearchRoutes({ query: "Barre des Écrins", limit: 10 });
 
     expect(result).toContain("Found 2 route(s)");
-    expect(result).toContain("[57842] Voie Gamma");
+    expect(result).toContain("[57842] Barre des Écrins : Voie Gamma");
     expect(result).toContain("4102m");
     expect(result).toContain("Rating: ED");
     expect(result).toContain("[53914] Arête des Cosmiques");
@@ -237,7 +237,7 @@ describe("handleSearchRoutes with area_id", () => {
     const result = await handleSearchRoutes({ query: "couloir", limit: 10, area_id: 14403 });
 
     expect(result.split("\n")[0]).toBe("Found 294 route(s) in area 14403. Showing 10:");
-    expect(result).toContain("[54275] Couloir NE");
+    expect(result).toContain("[54275] Pic de Neige Cordier : Couloir NE");
     expect(result).not.toContain("undefined");
   });
 
@@ -483,6 +483,81 @@ describe("handleGetRoute with the API's null fields", () => {
         "- 15 dégaines",
       ].join("\n"),
     );
+  });
+});
+
+describe("summit names", () => {
+  it("prints the summit name before the route title in search_routes", async () => {
+    // Trimmed from the live GET /routes?q=voie normale&limit=10&pl=fr response (2026-10-04): the first
+    // document only, reduced to the typed fields (summary, geometry, areas and untyped ratings left out).
+    mockSearchRoutes.mockResolvedValueOnce({
+      total: 1213,
+      documents: [
+        {
+          document_id: 430919,
+          locales: [{ lang: "fr", title: "Voie normale", title_prefix: "Castell Vidre" }],
+          activities: ["rock_climbing"],
+          elevation_max: 1629,
+          height_diff_difficulties: 80,
+          global_rating: "AD+",
+          rock_free_rating: "5b",
+        },
+      ],
+    });
+
+    const result = await handleSearchRoutes({ query: "voie normale", limit: 10 });
+
+    const line = result.split("\n").find((l) => l.startsWith("- [430919]"));
+    expect(line?.startsWith("- [430919] Castell Vidre : Voie normale (rock_climbing)")).toBe(true);
+  });
+
+  it("prints the route title alone when the summit name is blank", async () => {
+    // Route 1678194 as found by the live GET /routes?q=tour du mont pourri&pl=fr (2026-10-04), its
+    // title_prefix "" there replaced by "   " to check that a blank summit name is trimmed away too.
+    mockSearchRoutes.mockResolvedValueOnce({
+      total: 1,
+      documents: [
+        {
+          document_id: 1678194,
+          locales: [{ lang: "fr", title: "Tour du Mont Pourri en 5 jours", title_prefix: "   " }],
+          activities: ["hiking"],
+          elevation_max: 2690,
+        },
+      ],
+    });
+
+    const result = await handleSearchRoutes({ query: "tour du mont pourri", limit: 50 });
+
+    expect(result.split("\n")[2]).toBe("- [1678194] Tour du Mont Pourri en 5 jours (hiking) | Max elevation: 2690m");
+    expect(result).not.toContain("] : ");
+    expect(result).not.toContain("]  : ");
+  });
+
+  it("prints the summit name in the get_route heading", async () => {
+    // Trimmed from the live GET /routes/54085 response (2026-10-04): the fr locale only, its texts cut,
+    // and the untyped fields (ratings, orientations, maps, areas, geometry) left out.
+    mockGetRoute.mockResolvedValueOnce({
+      document_id: 54085,
+      locales: [
+        {
+          lang: "fr",
+          title: "Versant W par le Glacier du Geay",
+          title_prefix: "Mont Pourri",
+          description: "Le Mont Pourri est le second sommet de la Vanoise.",
+        },
+      ],
+      activities: ["skitouring"],
+      elevation_min: 2370,
+      elevation_max: 3779,
+      height_diff_up: 1425,
+      height_diff_down: null,
+      durations: ["1"],
+      main_waypoint_id: 37916,
+    });
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(result.split("\n")[0]).toBe("# Mont Pourri : Versant W par le Glacier du Geay (ID: 54085)");
   });
 });
 

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { documentId, searchQuery } from "./inputs.js";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteSearchResponse, RouteDetail } from "../api/camptocamp.js";
-import { pickLocale, pickTitle, formatHeader, formatAreasSection } from "./format.js";
+import { pickLocale, formatHeader, formatRouteName, formatAreasSection } from "./format.js";
 
 export const searchRoutesSchema = z.object({
   query: searchQuery("Search query for routes (e.g. 'Mont Blanc voie normale')", { allowBlank: true }).optional(),
@@ -26,12 +26,12 @@ function formatRouteSearchResult(response: RouteSearchResponse, areaId?: number)
   const lines: string[] = [`Found ${response.total} route(s)${scope}. Showing ${response.documents.length}:\n`];
 
   for (const route of response.documents) {
-    const title = pickTitle(route.locales);
+    const name = formatRouteName(pickLocale(route.locales));
     const activities = route.activities.join(", ");
     const elevation = route.elevation_max ? ` | Max elevation: ${route.elevation_max}m` : "";
     const rating = route.global_rating ? ` | Rating: ${route.global_rating}` : "";
 
-    lines.push(`- [${route.document_id}] ${title} (${activities})${elevation}${rating}`);
+    lines.push(`- [${route.document_id}] ${name} (${activities})${elevation}${rating}`);
   }
 
   return lines.join("\n");
@@ -41,7 +41,7 @@ function formatRouteDetail(route: RouteDetail): string {
   const locale = pickLocale(route.locales);
   const lines: string[] = [];
 
-  lines.push(...formatHeader(pickTitle(route.locales), route.document_id, "routes"));
+  lines.push(...formatHeader(formatRouteName(locale), route.document_id, "routes"));
   lines.push(`\n**Activities**: ${route.activities.join(", ")}`);
 
   if (route.global_rating) lines.push(`**Global rating**: ${route.global_rating}`);
@@ -91,7 +91,7 @@ export const routeToolDefinitions = [
     name: "search_routes",
     title: "Search routes",
     description:
-      "Search for mountain routes on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching routes with basic info (ID, title, activities, elevation, rating).",
+      "Search for mountain routes on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching routes with basic info (ID, name as '<summit> : <route title>', activities, elevation, rating).",
     inputSchema: searchRoutesSchema,
     handler: handleSearchRoutes,
   },
@@ -99,7 +99,7 @@ export const routeToolDefinitions = [
     name: "get_route",
     title: "Get route details",
     description:
-      "Get full details of a specific route from Camptocamp.org by its ID, including description, ratings, elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source.",
+      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, ratings, elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source.",
     inputSchema: getRouteSchema,
     handler: handleGetRoute,
   },

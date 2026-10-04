@@ -81,21 +81,21 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 ## MCP Tools
 
-| Tool                  | Description                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Search routes by keyword and/or `area_id`; returns ID, title, activities, elevation, rating       |
-| `get_route`           | Get full route detail by ID (description, ratings, elevation data, gear, areas)                   |
-| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                               |
-| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                         |
-| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                            |
-| `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes)                    |
-| `search_outings`      | Search outings by keyword, area, activity, date range, route or waypoint, most recent first       |
-| `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`           |
-| `get_area`            | Get area detail by ID (type, summary, description)                                                |
-| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable        |
-| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles) |
-| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type       |
-| `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)        |
+| Tool                  | Description                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------- |
+| `search_routes`       | Search routes by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, rating |
+| `get_route`           | Get full route detail by ID (summit : title, description, ratings, elevation data, gear, areas)      |
+| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
+| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
+| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                               |
+| `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes with summit names)     |
+| `search_outings`      | Search outings by keyword, area, activity, date range, route or waypoint, most recent first          |
+| `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`              |
+| `get_area`            | Get area detail by ID (type, summary, description)                                                   |
+| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable           |
+| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)    |
+| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type          |
+| `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)           |
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 
