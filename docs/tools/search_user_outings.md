@@ -24,6 +24,57 @@ List the outings (trip reports) a Camptocamp user is listed on as a participant,
 
 <!-- generated:inputs end -->
 
+## Output format
+
+Exactly that of [`search_outings`](search_outings.md#output-format), with `user <user_id>` as the only filter:
+
+```text
+Found <total> outing(s), most recent first. Showing <n> from offset <offset>:
+Filters: user <user_id>
+
+- [<id>] <title> (<activities>) | <date> | Conditions: <condition> | Max elevation: <metres>m | Elevation gain: <metres>m | <rating system>: <grade> | … | Areas: <range> [<area id>], … | Author: <name>
+
+Next page: offset=<N>
+```
+
+- Each result line gives the outing's ID, title, activities, date (`<start> → <end>` over several days), the conditions, max elevation, elevation gain and ratings its author reported, the mountain ranges, and the author. A part is left out when the author gave no value.
+- `Author:` is the user who wrote the report, who can be someone other than `user_id`.
+- The footer is `Next page: offset=N` when more outings follow, with the same variants near the 10,000-result window as `search_outings`. See [Paging](../using-with-llms.md#paging).
+- With no outing, the output is the single line `No outings found matching user <user_id>.`
+
+## Example
+
+The outings of LaurentB2, user ID 211581, one of the two skiers of the [June example](../using-with-llms.md#3-one-report-get_outing).
+
+`search_user_outings {user_id: 211581, limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+```text
+Found 749 outing(s), most recent first. Showing 3 from offset 0:
+Filters: user 211581
+
+- [1946459] Pointe de Leschaux : en boucle par le Col de Leschaux (hiking) | 2026-08-30 | Conditions: excellent | Max elevation: 2653m | Elevation gain: 1230m | Hiking rating: T3 | Areas: Vanoise [14409] | Author: Loïc Perrin
+- [1946315] Aiguille de Mey : Tour alpin de l'aiguille de Mey (hiking) | 2026-08-29 | Conditions: average | Max elevation: 2806m | Elevation gain: 1700m | Hiking rating: T4 | Areas: Vanoise [14409] | Author: Loïc Perrin
+- [1944041] Via Alpina - J16 : Chemnitzer Hütte >> Pfundres (hiking) | 2026-08-23 | Conditions: good | Max elevation: 2723m | Elevation gain: 560m | Hiking rating: T2 | Areas: Alpes de Zillertal [14457] | Author: Loïc Perrin
+
+Next page: offset=3
+```
+
+All three outings were written by Loïc Perrin and list LaurentB2 as a participant, so they appear in LaurentB2's list.
+
+## Limits
+
+- **Participants, not only authors.** The list holds every outing the user is listed on, including those other users wrote. To keep only the outings a user wrote, check the `Author:` part of each line.
+- **No search by name.** No tool finds a Camptocamp user from a name. The user ID is the number in the user's camptocamp.org profile URL, or comes from the `**Participants with a Camptocamp account**` line of [`get_outing`](get_outing.md).
+- **No other filter.** For a user's outings in an area, an activity, a rating range, conditions, dates, a period, a route or a waypoint, call `search_outings {user_id}` with those filters.
+- **An unknown user ID returns no results, not an error.** `search_user_outings {user_id: 999999999, limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  No outings found matching user 999999999.
+  ```
+
+- **Paging stops at 10,000 results.** A call where `offset + limit` exceeds 10,000 is refused before any request.
+- **Outings are past reports, not a forecast**, each with its own date.
+
 ## Related tools
 
 - [`search_outings`](search_outings.md): filter a user's outings by area, activity, rating, conditions, dates or route with `search_outings {user_id}`.

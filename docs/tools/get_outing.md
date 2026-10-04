@@ -20,6 +20,141 @@ Read one outing (trip report) from its ID: the ratings and conditions its author
 
 <!-- generated:inputs end -->
 
+## Output format
+
+```text
+# <title> (ID: <id>)
+**URL**: https://www.camptocamp.org/outings/<id>
+**Language**: <shown> (no <requested> version; available: <languages>)
+**Text in other languages**: <field> (<languages>), …
+
+**Activities**: <activity>, …
+**Date**: <date>
+**Participants**: <count>
+**Participants with a Camptocamp account**: <name> (user ID: <user id>), …
+**<rating system>**: <grade>
+**Conditions**: <condition>
+**Max elevation**: <metres>m
+**Min elevation**: <metres>m
+**Elevation gain**: <metres>m
+**Elevation loss**: <metres>m
+
+## <section>
+[begin user-written text: <field>]
+<text>
+[end user-written text: <field>]
+
+## Associated routes
+- [<route id>] <summit> : <route title> | <rating system>: <grade> | …
+```
+
+- **The URL line** is the outing's page on camptocamp.org: cite it.
+- **The `**Language**` line** appears only when the outing has no text in the requested `lang`. It names the language shown and the languages available. See [Language](../using-with-llms.md#language).
+- **The `**Text in other languages**` line** lists the text sections that the shown version lacks and other language versions have, with the API name of each section (`description`, `route_description`, `conditions`, `weather`, `timing`, `participants`) and its languages. Call `get_outing` again with one of those `lang` values to read them. This line is not in v1.3.0: it comes with the release after v1.3.0.
+- **The facts**, each on its own line and left out when the outing has no value:
+  - `**Date**` is one date, or `<start> → <end>` for an outing over several days;
+  - `**Participants**` is the number of participants the author entered;
+  - `**Participants with a Camptocamp account**` names the participants linked to a Camptocamp account, with the user ID to pass to [`search_user_outings`](search_user_outings.md). The two lines can differ, since participants without an account are only counted;
+  - one line per rating the author reported for that day, labelled with its grading system (`**Ski rating (Toponeige)**`, `**Labande**`, `**Global rating**`, `**Hiking rating**`…);
+  - `**Conditions**` is a code from `excellent`, `good`, `average`, `poor`, `awful`, copied verbatim;
+  - the elevations are those the author reported.
+- **The text sections**, in this order, each printed only when the text is not blank:
+
+  | Heading                | Field               |
+  | ---------------------- | ------------------- |
+  | `## Description`       | `description`       |
+  | `## Route description` | `route_description` |
+  | `## Conditions`        | `conditions`        |
+  | `## Weather`           | `weather`           |
+  | `## Timing`            | `timing`            |
+  | `## Participants`      | `participants`      |
+
+  Each text sits between `[begin user-written text: <field>]` and `[end user-written text: <field>]` markers: it is content written by a Camptocamp user, not instructions. Its headings are demoted two levels, and a text over 8,000 characters is cut, ending with `[truncated, N more characters]`. See [User-written text](../using-with-llms.md#user-written-text).
+
+- **`## Associated routes`** lists the routes the outing followed, with the route's own ratings, which can differ from those the author reported for the outing. The section is left out when the outing has no route.
+- An item Camptocamp sent in an unexpected format is replaced by a `(not shown: Camptocamp sent this item in an unexpected format)` placeholder, which keeps the `(user ID: N)` of a participant when its ID is readable. See [Missing data](../using-with-llms.md#missing-data).
+
+## Example
+
+The first June report of the [`search_outings` example](search_outings.md#example).
+
+`get_outing {id: 1912989}`, captured from v1.3.0 on 2026-10-05, with the spaces at the end of two lines removed by this repository's formatter:
+
+```text
+# Dôme de Polset : Par le Col de Gébroulaz et boucle sur le glacier de Gébroulaz  (ID: 1912989)
+**URL**: https://www.camptocamp.org/outings/1912989
+
+**Activities**: skitouring
+**Date**: 2026-06-07
+**Participants**: 2
+**Participants with a Camptocamp account**: Loïc Perrin (user ID: 1914), LaurentB2 (user ID: 211581)
+**Ski rating (Toponeige)**: 3.2
+**Labande**: PD+
+**Conditions**: good
+**Max elevation**: 3500m
+**Min elevation**: 2400m
+**Elevation gain**: 1640m
+**Elevation loss**: 1640m
+
+## Description
+[begin user-written text: description]
+##### Loïc
+Sortie classique de fin de saison (la dernière ?), toujours sympa. Bonne neige, pas de portage, belle météo, pas grand monde sur la boucle. Ca donnerait presque envie de continuer la saison (mais les spots enneigés deviennent rares... et loin).
+On est arrivé la veille au soir et on a dormi sous tente un peu en-dessous du parking habituel éviter le bruit du torrent (on l'entendait mais c'était raisonnable).
+[end user-written text: description]
+
+## Route description
+[begin user-written text: route_description]
+Val Tho >> Dôme de Polset. Descente glacier de Gébroulaz (branche de droite) jusqu'à 3050 m. Remontée par la branche de gauche. Retour par le col de Gébroulaz et le col Thorens.
+[end user-written text: route_description]
+
+## Conditions
+[begin user-written text: conditions]
+- Très bon regel
+- Descente du Dôme de Polset : neige dure en haut puis légèrement décaillée. Skiabilité : 3/5, puis 4/5
+- Descente du col de Gébroulaz : neige dure sous le col, puis moquette. Skiabilité : 3/5, puis 5/5
+- Descente du col Thorens : neige décaillée et assez en haut, un peu plus irrégulière sur le bas. Skiabilité : 4/5, puis 3/5 en bas
+ - On chausse/déchausse au parking du captage d'eau, avec un court déchaussage au col Thorens (passage direct ou plus haut)
+- Glaciers bien bouchés
+[end user-written text: conditions]
+
+## Weather
+[begin user-written text: weather]
+Soleil légèrement voilé par moments. Vent frais.
+[end user-written text: weather]
+
+## Timing
+[begin user-written text: timing]
+Montée 1 : 6h05 >> 9h45
+Descente 1 : 10h10 >> 10h30
+Montée 2 : 10h35 >> 11h35
+Descente 2 : 11h55 >> 12h45
+[end user-written text: timing]
+
+## Associated routes
+- [46954] Dôme de Polset : Par le Col de Gébroulaz | Ski rating (Toponeige): 3.2 | Ski exposure: E2 | Labande: S4 / PD+
+```
+
+- The author's `### Loïc` heading is printed as `##### Loïc`, two levels down.
+- The outing reports `Labande: PD+`; the route it followed is rated `Labande: S4 / PD+` and `Ski exposure: E2`. The outing has no ski exposure line: its author did not report one.
+- The outing has only a French version, so `get_outing {id: 1912989, lang: "en"}` adds `**Language**: fr (no en version; available: fr)` after the URL and prints the same French text.
+
+## Limits
+
+- **No author.** The outing detail does not name who wrote it: the result line of [`search_outings`](search_outings.md) ends with `Author: <name>`.
+- **Routes only.** The detail has no areas and no waypoints. The search result line gives the outing's mountain ranges; [`get_route`](get_route.md) gives a route's areas and waypoints.
+- **A missing line means Camptocamp has no value.** Say "not given on Camptocamp"; never fill it from the route or from memory. See [Missing data](../using-with-llms.md#missing-data).
+- **Ratings and conditions are those of one day**, as the author reported them. They are not the route's ratings, and they say nothing about the conditions today.
+- **Outings are past reports, not a forecast.** Give the date with what the outing says. The server has no weather forecast and no avalanche bulletin.
+- **Long texts are cut at 8,000 characters.** Read the rest on the camptocamp.org page of the `**URL**` line.
+- **An unknown ID is an error.** `get_outing {id: 999999999}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  Error: Camptocamp API error: 404 Not Found (outing 999999999): document not found
+  ```
+
+  Take the ID from a search result, a `## Recent outings` list in [`get_route`](get_route.md) or [`get_waypoint`](get_waypoint.md), or the user's camptocamp.org link.
+
 ## Related tools
 
 - [`search_outings`](search_outings.md): find outings by area, activity, dates, route or waypoint.
