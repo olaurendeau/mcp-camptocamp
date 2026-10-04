@@ -90,10 +90,18 @@ export function formatAssociatedRouteLine(route: RouteAssociation): string {
   return [name, ...formatRatingParts(route)].join(" | ");
 }
 
-// "- [id] <title> (<type>) | <elevation>m", ending "| main waypoint" for a route's main_waypoint_id.
+// A virtual waypoint groups documents (waypoint 1947492 "Ouvertures 2013" groups the routes first climbed
+// in 2013) and has no real location: the API still sends a placeholder elevation (0) and position (43.0, 8.0),
+// which Camptocamp's own map hides (decision D5 on #153).
+export function isVirtualWaypoint(waypoint: Pick<WaypointAssociation, "waypoint_type">): boolean {
+  return waypoint.waypoint_type === "virtual";
+}
+
+// "- [id] <title> (<type>) | <elevation>m", ending "| main waypoint" for a route's main_waypoint_id. A
+// virtual waypoint has no elevation part.
 export function formatWaypointLine(waypoint: WaypointAssociation, options: { main?: boolean } = {}): string {
   const parts = [`- [${waypoint.document_id}] ${pickTitle(waypoint.locales)} (${waypoint.waypoint_type})`];
-  if (isPresent(waypoint.elevation)) parts.push(`${waypoint.elevation}m`);
+  if (isPresent(waypoint.elevation) && !isVirtualWaypoint(waypoint)) parts.push(`${waypoint.elevation}m`);
   if (options.main) parts.push("main waypoint");
   return parts.join(" | ");
 }

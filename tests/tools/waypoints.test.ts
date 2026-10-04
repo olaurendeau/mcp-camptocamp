@@ -608,6 +608,90 @@ describe("zero elevation", () => {
   });
 });
 
+describe("virtual waypoints", () => {
+  // Trimmed from the live GET /waypoints/1947492?lang=fr response (2026-10-04): a virtual waypoint grouping
+  // the routes first climbed in 2013, with the placeholder elevation 0 and geometry (43.0, 8.0); the 222
+  // routes, 1253 recent outings, 1 article and images removed.
+  const ouvertures2013 = {
+    document_id: 1947492,
+    locales: [
+      {
+        lang: "en",
+        title: "First Ascents in 2013",
+        summary: null,
+        description:
+          "### [Search - Filters](https://www.camptocamp.org/routes?w=1947492) # (zoom out the map on this link for a visual)",
+      },
+      {
+        lang: "fr",
+        title: "Ouvertures 2013",
+        summary: "### [- Recherche - Filtres -](https://www.camptocamp.org/routes?w=1947492)",
+        description: null,
+      },
+    ],
+    quality: "medium",
+    waypoint_type: "virtual",
+    elevation: 0,
+    geometry: { geom: '{"type": "Point", "coordinates": [890555.926346, 5311971.846945]}' },
+    areas: [],
+    associations: { books: [] },
+  };
+
+  const VIRTUAL_SENTENCE =
+    "Virtual waypoints (waypoint_type virtual) are groupings with no real location, so no elevation or coordinates are shown for them.";
+
+  it("prints the type of get_waypoint 1947492 but no Elevation or Coordinates line", async () => {
+    mockGetWaypoint.mockResolvedValueOnce(ouvertures2013);
+
+    const result = await handleGetWaypoint({ id: 1947492 });
+
+    expect(result.split("\n").slice(0, 4)).toEqual([
+      "# Ouvertures 2013 (ID: 1947492)",
+      "**URL**: https://www.camptocamp.org/waypoints/1947492",
+      "",
+      "**Type**: virtual",
+    ]);
+    expect(result).not.toContain("**Elevation**");
+    expect(result).not.toContain("**Coordinates**");
+  });
+
+  it("prints no elevation in get_waypoint, even a non-zero one", async () => {
+    // Derived: the placeholder elevation set to 7999.
+    mockGetWaypoint.mockResolvedValueOnce({ ...ouvertures2013, elevation: 7999 });
+
+    const result = await handleGetWaypoint({ id: 1947492 });
+
+    expect(result).not.toContain("7999");
+    expect(result).not.toContain("**Elevation**");
+  });
+
+  it("prints no elevation in search_waypoints, even a non-zero one", async () => {
+    // Derived: the search result shape of 1947492, with the placeholder elevation set to 7999.
+    const { document_id, waypoint_type } = ouvertures2013;
+    const locales = ouvertures2013.locales.map(({ lang, title }) => ({ lang, title }));
+    mockSearchWaypoints.mockResolvedValueOnce({
+      total: 1,
+      documents: [{ document_id, locales, waypoint_type, elevation: 7999 }],
+    });
+
+    const result = await search({ query: "Ouvertures 2013", limit: 10 });
+
+    expect(result.split("\n").slice(3)).toEqual(["- [1947492] Ouvertures 2013 (virtual)"]);
+  });
+
+  it.each(["search_waypoints", "get_waypoint"])("says in the %s description why no position is shown", (name) => {
+    const tool = waypointToolDefinitions.find((t) => t.name === name);
+
+    expect(tool?.description).toContain(VIRTUAL_SENTENCE);
+  });
+
+  it("gives the get_waypoint note right after the GPS coordinates", () => {
+    const tool = waypointToolDefinitions.find((t) => t.name === "get_waypoint");
+
+    expect(tool?.description).toContain(`altitude and GPS coordinates. ${VIRTUAL_SENTENCE}`);
+  });
+});
+
 describe("get_waypoint hut details", () => {
   // Trimmed from the live GET /waypoints/104151?lang=fr response (2026-10-04): geometry, areas, associations,
   // the description and the access dropped.
