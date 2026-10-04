@@ -561,6 +561,7 @@ describe("handleGetArticle", () => {
     expect(result).toBe(
       [
         "# Les crampons (ID: 226838)",
+        "**URL**: https://www.camptocamp.org/articles/226838",
         "",
         "**Language**: fr",
         "**Type**: collab",
@@ -611,6 +612,7 @@ describe("handleGetArticle", () => {
     expect(result).toBe(
       [
         "# Valanghe in video (ID: 110093)",
+        "**URL**: https://www.camptocamp.org/articles/110093",
         "",
         "**Language**: it",
         "**Type**: collab",
@@ -662,7 +664,7 @@ describe("handleGetArticle", () => {
     }
   });
 
-  it("keeps only the heading when locales are empty and every displayed field is null", async () => {
+  it("keeps only the heading and URL when locales are empty and every displayed field is null", async () => {
     // Derived from the 193302 fixture: `locales` emptied; article_type, categories, quality and author set to
     // null (activities is already null live); `associations` removed.
     mockGetArticle.mockResolvedValueOnce({
@@ -675,7 +677,9 @@ describe("handleGetArticle", () => {
       associations: undefined,
     });
 
-    expect(await handleGetArticle({ id: 193302 })).toBe("# Untitled (ID: 193302)");
+    expect(await handleGetArticle({ id: 193302 })).toBe(
+      "# Untitled (ID: 193302)\n**URL**: https://www.camptocamp.org/articles/193302",
+    );
   });
 
   it("prints a summary verbatim and a 22,463-character description whole", async () => {
@@ -796,6 +800,7 @@ describe("handleGetArticle", () => {
     expect(result).toBe(
       [
         "# Descendre en rappel (source Petzl) (ID: 716039)",
+        "**URL**: https://www.camptocamp.org/articles/716039",
         "",
         "**Language**: fr",
         "**Type**: personal",

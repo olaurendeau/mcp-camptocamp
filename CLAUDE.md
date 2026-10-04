@@ -99,6 +99,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type          |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)           |
 
+Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
+
 ## Camptocamp API v6
 
 Base URL: `https://api.camptocamp.org`

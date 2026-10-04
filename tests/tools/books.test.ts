@@ -664,6 +664,7 @@ describe("handleGetBook", () => {
     expect(result).toContain(
       [
         "# Mont Blanc Classique & Plaisir (ID: 373877)",
+        "**URL**: https://www.camptocamp.org/books/373877",
         "",
         "**Author**: Marco Romelli",
         "**Editor**: Ideamontagna",
@@ -717,6 +718,7 @@ describe("handleGetBook", () => {
     expect(result).toBe(
       [
         "# Hugo et le Mont Blanc (ID: 14746)",
+        "**URL**: https://www.camptocamp.org/books/14746",
         "",
         "**Author**: Colette Cosnier",
         "**Editor**: Editions Guérin",
@@ -732,7 +734,7 @@ describe("handleGetBook", () => {
     expectNoPlaceholder(result);
   });
 
-  it("keeps only the heading when every displayed field is null", async () => {
+  it("keeps only the heading and URL when every displayed field is null", async () => {
     // Derived from the 14746 fixture: the fr locale keeps only lang and title, with summary and description
     // set to null (version and topic_id dropped); author, editor, url, isbn, book_types and langs set to
     // null (nb_pages, publication_date and activities are already null live); `associations` set to
@@ -751,7 +753,7 @@ describe("handleGetBook", () => {
 
     const result = await handleGetBook({ id: 14746 });
 
-    expect(result).toBe("# Hugo et le Mont Blanc (ID: 14746)");
+    expect(result).toBe("# Hugo et le Mont Blanc (ID: 14746)\n**URL**: https://www.camptocamp.org/books/14746");
   });
 
   it("leaves out Summary and Description when they are empty strings", async () => {

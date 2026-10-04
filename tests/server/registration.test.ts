@@ -157,6 +157,7 @@ describe("tool calls", () => {
         type: "text",
         text: [
           "# Arête des Cosmiques (ID: 53914)",
+          "**URL**: https://www.camptocamp.org/routes/53914",
           "\n**Activities**: mountain_climbing",
           "**Global rating**: AD",
           "**Max elevation**: 3842m",

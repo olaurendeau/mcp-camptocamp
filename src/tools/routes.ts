@@ -41,7 +41,7 @@ function formatRouteDetail(route: RouteDetail): string {
   const locale = pickLocale(route.locales);
   const lines: string[] = [];
 
-  lines.push(formatHeader(formatRouteName(locale), route.document_id));
+  lines.push(...formatHeader(formatRouteName(locale), route.document_id, "routes"));
   lines.push(`\n**Activities**: ${route.activities.join(", ")}`);
 
   if (route.global_rating) lines.push(`**Global rating**: ${route.global_rating}`);
@@ -99,7 +99,7 @@ export const routeToolDefinitions = [
     name: "get_route",
     title: "Get route details",
     description:
-      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, ratings, elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings.",
+      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, ratings, elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source.",
     inputSchema: getRouteSchema,
     handler: handleGetRoute,
   },
