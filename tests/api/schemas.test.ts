@@ -43,13 +43,14 @@ describe("response schemas", () => {
   it("accept the API's null fields and drop the untyped ones", () => {
     expect(routeDetailSchema.parse(route53914)).toEqual({
       document_id: 53914,
-      locales: [{ lang: "fr", title: "Martine is on the rock", title_prefix: "Aiguille Dibona" }],
+      locales: [{ lang: "fr", title: "Martine is on the rock", summary: null, title_prefix: "Aiguille Dibona" }],
       activities: ["rock_climbing"],
       elevation_max: 3131,
       height_diff_down: null,
       risk_rating: null,
       exposition_rock_rating: null,
       aid_rating: null,
+      route_types: ["loop_hut"],
       geometry: { geom_detail: null },
       areas: [
         { document_id: 14403, locales: [{ lang: "fr", title: "Écrins" }], area_type: "range", available_langs: null },

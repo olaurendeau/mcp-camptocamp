@@ -194,6 +194,27 @@ function formatRouteAssociations(route: RouteDetail): string[] {
   return lines;
 }
 
+// The practical facts of a route (#58, S7), each line left out when absent (R1: 0 and false are printed).
+// Values are printed verbatim (R2): enum codes untranslated, lists comma-separated.
+function formatRouteFacts(route: RouteDetail): string[] {
+  const lines: string[] = [];
+  const list = (label: string, values: string[] | null | undefined): void => {
+    if (isPresent(values)) lines.push(`**${label}**: ${values.join(", ")}`);
+  };
+
+  if (isPresent(route.height_diff_difficulties)) {
+    lines.push(`**Difficulties height difference**: ${route.height_diff_difficulties}m`);
+  }
+  if (isPresent(route.height_diff_access)) lines.push(`**Access height difference**: ${route.height_diff_access}m`);
+  list("Orientations", route.orientations);
+  list("Duration (days)", route.durations);
+  list("Route types", route.route_types);
+  list("Configuration", route.configuration);
+  if (isPresent(route.glacier_gear)) lines.push(`**Glacier gear**: ${route.glacier_gear}`);
+  if (isPresent(route.lift_access)) lines.push(`**Lift access**: ${route.lift_access ? "yes" : "no"}`);
+  return lines;
+}
+
 function formatRouteDetail(route: RouteDetail): string {
   const locale = pickLocale(route.locales);
   const lines: string[] = [];
@@ -207,12 +228,17 @@ function formatRouteDetail(route: RouteDetail): string {
   if (isPresent(route.elevation_min)) lines.push(`**Min elevation**: ${route.elevation_min}m`);
   if (isPresent(route.height_diff_up)) lines.push(`**Elevation gain**: ${route.height_diff_up}m`);
   if (isPresent(route.height_diff_down)) lines.push(`**Elevation loss**: ${route.height_diff_down}m`);
+  lines.push(...formatRouteFacts(route));
 
   lines.push(...formatAreasSection(route.areas));
 
+  lines.push(...formatUserText("summary", "Summary", locale?.summary));
   lines.push(...formatUserText("description", "Description", locale?.description));
+  lines.push(...formatUserText("slope", "Slope", locale?.slope));
   lines.push(...formatUserText("remarks", "Remarks", locale?.remarks));
   lines.push(...formatUserText("gear", "Gear", locale?.gear));
+  lines.push(...formatUserText("route_history", "Route history", locale?.route_history));
+  lines.push(...formatUserText("external_resources", "External resources", locale?.external_resources));
 
   lines.push(...formatRouteAssociations(route));
 
@@ -251,7 +277,7 @@ export const routeToolDefinitions = [
     name: "get_route",
     title: "Get route details",
     description:
-      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, every rating labelled by its grading system (Toponeige ski rating, Labande, global rating, rock, ice, hiking…), elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. It also lists, with their IDs, the guidebooks and other books that cover it, its waypoints (the main one marked), sibling routes, related articles, and its most recent outings ('Recent outings (<shown> of <total>)'; list them all with search_outings with route_id). The second line is the document's camptocamp.org URL, to cite as the source. " +
+      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including every rating labelled by its grading system (Toponeige ski rating, Labande, global rating, rock, ice, hiking…), elevation data, practical facts printed as Camptocamp's codes (orientations, duration in days, route types, configuration, glacier gear, difficulties and access height differences, lift access yes/no), its summary, description, slope, remarks, gear, route history and external resources, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. It also lists, with their IDs, the guidebooks and other books that cover it, its waypoints (the main one marked), sibling routes, related articles, and its most recent outings ('Recent outings (<shown> of <total>)'; list them all with search_outings with route_id). The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,
     inputSchema: getRouteSchema,
     handler: handleGetRoute,

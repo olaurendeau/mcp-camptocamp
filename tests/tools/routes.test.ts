@@ -420,8 +420,8 @@ describe("handleGetRoute areas", () => {
   });
 });
 
-// Real GET /routes/53914 (Martine is on the rock, Aiguille Dibona), trimmed texts: the live API sends
-// null for unset values. Untyped fields (version, quality, route_types, maps…) omitted.
+// Real GET /routes/53914 (Martine is on the rock, Aiguille Dibona), texts trimmed to their first lines: the live
+// API sends null for unset values, and lift_access false. Untyped fields (version, quality, maps…) omitted.
 const route53914: api.RouteDetail = {
   document_id: 53914,
   locales: [
@@ -439,7 +439,14 @@ const route53914: api.RouteDetail = {
   elevation_max: 3131,
   height_diff_up: 412,
   height_diff_down: null,
+  height_diff_difficulties: 330,
+  height_diff_access: 80,
+  orientations: ["E"],
   durations: ["1", "2"],
+  route_types: ["loop_hut"],
+  configuration: ["face"],
+  glacier_gear: "crampons_spring",
+  lift_access: false,
   global_rating: "TD",
   engagement_rating: "I",
   risk_rating: null,
@@ -466,7 +473,7 @@ const route53914: api.RouteDetail = {
 };
 
 describe("handleGetRoute with the API's null fields", () => {
-  it("formats route 53914 with height_diff_down, risk_rating, exposition_rock_rating and aid_rating null, and its description, remarks and gear as user-written text", async () => {
+  it("formats route 53914 with height_diff_down, risk_rating, exposition_rock_rating and aid_rating null, its practical facts, and its description, remarks, gear and route history as user-written text", async () => {
     mockGetRoute.mockResolvedValueOnce(route53914);
 
     const result = await handleGetRoute({ id: 53914 });
@@ -485,6 +492,14 @@ describe("handleGetRoute with the API's null fields", () => {
         "**Max elevation**: 3131m",
         "**Min elevation**: 2719m",
         "**Elevation gain**: 412m",
+        "**Difficulties height difference**: 330m",
+        "**Access height difference**: 80m",
+        "**Orientations**: E",
+        "**Duration (days)**: 1, 2",
+        "**Route types**: loop_hut",
+        "**Configuration**: face",
+        "**Glacier gear**: crampons_spring",
+        "**Lift access**: no",
         "",
         "## Areas",
         "- [14274] France (country)",
@@ -507,6 +522,11 @@ describe("handleGetRoute with the API's null fields", () => {
         "- Corde 1×50 m",
         "- 15 dégaines",
         "[end user-written text: gear]",
+        "",
+        "## Route history",
+        "[begin user-written text: route_history]",
+        "- Ouverture : 1987-1988 - Denis Bancillon, Eric Allène.",
+        "[end user-written text: route_history]",
       ].join("\n"),
     );
   });
@@ -1460,5 +1480,242 @@ describe("get_route associations", () => {
 
     expect(result).not.toContain("## ");
     expect(result).not.toContain("main waypoint");
+  });
+});
+
+// Trimmed from the live GET /routes/54085 response (2026-10-04): the scalar fields as sent (calculated_duration,
+// public_transportation_rating, route_length and available_langs left out), the fr locale with its description and
+// remarks cut to their first line and one of its two external resources, its two areas; no associations.
+const route54085Facts = {
+  document_id: 54085,
+  version: 6,
+  locales: [
+    {
+      version: 29,
+      lang: "fr",
+      title: "Versant W par le Glacier du Geay",
+      title_prefix: "Mont Pourri",
+      summary:
+        "Le Mont Pourri est le second sommet de la Vanoise et comporte un système glaciaire important. C'est une " +
+        "montagne cristalline (micaschiste grenu) massive offrant de nombreuses voies. La voie du glacier du Geay est " +
+        "la plus classique. À faire plutôt en début de saison, le glacier étant souvent très crevassé.",
+      description: "## Approche",
+      slope: "40°",
+      remarks: "- Orientation générale W puis NW.",
+      gear: null,
+      route_history:
+        "- Premier parcours de la partie du [[routes/54080/fr|Col des Roches]] au sommet : 4 octobre 1860 - Michel " +
+        "Croz. \n- Premier parcours intégral (à la descente) : 8 août 1878 - Christian Almer père et fils, William " +
+        "Auguste Coolidge.",
+      external_resources:
+        "- *Mont Pourri*, [*La Montagne*, 1933, n<sup>o</sup>253, p.356](https://gallica.bnf.fr/ark:/12148/" +
+        "bpt6k9764822r/f446.image) : note sur des ascensions printanières en 1933.",
+      topic_id: null,
+    },
+  ],
+  quality: "medium",
+  main_waypoint_id: 37916,
+  activities: ["skitouring"],
+  elevation_min: 2370,
+  elevation_max: 3779,
+  height_diff_up: 1425,
+  height_diff_down: null,
+  durations: ["1"],
+  height_diff_access: null,
+  height_diff_difficulties: 900,
+  route_types: ["return_same_way"],
+  orientations: ["NW"],
+  glacier_gear: "glacier_safety_gear",
+  configuration: ["glacier"],
+  lift_access: true,
+  ski_rating: "4.1",
+  ski_exposition: "E2",
+  labande_ski_rating: "S4",
+  labande_global_rating: "AD",
+  areas: [
+    { document_id: 14274, locales: [{ lang: "fr", title: "France" }], area_type: "country" },
+    { document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: "range" },
+  ],
+  protected: false,
+  type: "r",
+};
+
+describe("get_route practical facts", () => {
+  it("prints the facts of route 54085 verbatim after its elevations, then every free-text field delimited, in order", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085Facts);
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(result).toBe(
+      [
+        "# Mont Pourri : Versant W par le Glacier du Geay (ID: 54085)",
+        "**URL**: https://www.camptocamp.org/routes/54085",
+        "",
+        "**Activities**: skitouring",
+        "**Ski rating (Toponeige)**: 4.1",
+        "**Ski exposure**: E2",
+        "**Labande**: S4 / AD",
+        "**Max elevation**: 3779m",
+        "**Min elevation**: 2370m",
+        "**Elevation gain**: 1425m",
+        "**Difficulties height difference**: 900m",
+        "**Orientations**: NW",
+        "**Duration (days)**: 1",
+        "**Route types**: return_same_way",
+        "**Configuration**: glacier",
+        "**Glacier gear**: glacier_safety_gear",
+        "**Lift access**: yes",
+        "",
+        "## Areas",
+        "- [14274] France (country)",
+        "- [14409] Vanoise (range)",
+        "",
+        "## Summary",
+        "[begin user-written text: summary]",
+        route54085Facts.locales[0].summary,
+        "[end user-written text: summary]",
+        "",
+        "## Description",
+        "[begin user-written text: description]",
+        "#### Approche",
+        "[end user-written text: description]",
+        "",
+        "## Slope",
+        "[begin user-written text: slope]",
+        "40°",
+        "[end user-written text: slope]",
+        "",
+        "## Remarks",
+        "[begin user-written text: remarks]",
+        "- Orientation générale W puis NW.",
+        "[end user-written text: remarks]",
+        "",
+        "## Route history",
+        "[begin user-written text: route_history]",
+        "- Premier parcours de la partie du Col des Roches (routes/54080) au sommet : 4 octobre 1860 - Michel Croz. ",
+        "- Premier parcours intégral (à la descente) : 8 août 1878 - Christian Almer père et fils, William Auguste " +
+          "Coolidge.",
+        "[end user-written text: route_history]",
+        "",
+        "## External resources",
+        "[begin user-written text: external_resources]",
+        "- *Mont Pourri*, [*La Montagne*, 1933, n<sup>o</sup>253, p.356](https://gallica.bnf.fr/ark:/12148/" +
+          "bpt6k9764822r/f446.image) : note sur des ascensions printanières en 1933.",
+        "[end user-written text: external_resources]",
+      ].join("\n"),
+    );
+  });
+
+  it("prints the access height difference, and lift_access false as no", async () => {
+    mockGetRoute.mockResolvedValueOnce({ ...route54085Facts, height_diff_access: 300, lift_access: false });
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(result).toContain(
+      "**Difficulties height difference**: 900m\n**Access height difference**: 300m\n**Orientations**: NW\n",
+    );
+    expect(result).toContain("**Glacier gear**: glacier_safety_gear\n**Lift access**: no\n");
+  });
+
+  it('prints glacier_gear "no" verbatim, as a value and not as a missing field', async () => {
+    mockGetRoute.mockResolvedValueOnce({ ...route54085Facts, glacier_gear: "no" });
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(result).toContain("**Configuration**: glacier\n**Glacier gear**: no\n**Lift access**: yes\n");
+  });
+
+  it("prints 0 height differences, and lists comma-separated and verbatim", async () => {
+    mockGetRoute.mockResolvedValueOnce({
+      ...route54085Facts,
+      height_diff_difficulties: 0,
+      height_diff_access: 0,
+      orientations: ["N", "NE", "E"],
+      durations: ["1", "2"],
+      route_types: ["loop", "traverse"],
+      configuration: ["edge", "face"],
+      glacier_gear: "crampons_req",
+    });
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(result).toContain(
+      [
+        "**Difficulties height difference**: 0m",
+        "**Access height difference**: 0m",
+        "**Orientations**: N, NE, E",
+        "**Duration (days)**: 1, 2",
+        "**Route types**: loop, traverse",
+        "**Configuration**: edge, face",
+        "**Glacier gear**: crampons_req",
+      ].join("\n"),
+    );
+  });
+
+  it.each([
+    ["null", null],
+    ["missing", undefined],
+  ])("prints no fact line and no new text section when the fields are %s", async (_label, value) => {
+    mockGetRoute.mockResolvedValueOnce({
+      document_id: 54085,
+      locales: [
+        {
+          lang: "fr",
+          title: "Versant W par le Glacier du Geay",
+          summary: value,
+          slope: value,
+          route_history: value,
+          external_resources: value,
+        },
+      ],
+      activities: ["skitouring"],
+      height_diff_difficulties: value,
+      height_diff_access: value,
+      orientations: value,
+      durations: value,
+      route_types: value,
+      configuration: value,
+      glacier_gear: value,
+      lift_access: value,
+    });
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(result).toBe(
+      [
+        "# Versant W par le Glacier du Geay (ID: 54085)",
+        "**URL**: https://www.camptocamp.org/routes/54085",
+        "",
+        "**Activities**: skitouring",
+      ].join("\n"),
+    );
+  });
+
+  it("prints no fact line for empty lists", async () => {
+    mockGetRoute.mockResolvedValueOnce({
+      ...route54085Facts,
+      orientations: [],
+      durations: [],
+      route_types: [],
+      configuration: [],
+    });
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    for (const label of ["Orientations", "Duration (days)", "Route types", "Configuration"]) {
+      expect(result).not.toContain(`**${label}**`);
+    }
+  });
+
+  it("tells the LLM about the practical facts and the new text sections", () => {
+    const tool = routeToolDefinitions.find((t) => t.name === "get_route");
+
+    expect(tool?.description).toContain(
+      "orientations, duration in days, route types, configuration, glacier gear, difficulties and access height " +
+        "differences, lift access",
+    );
+    expect(tool?.description).toContain(
+      "its summary, description, slope, remarks, gear, route history and external resources",
+    );
   });
 });

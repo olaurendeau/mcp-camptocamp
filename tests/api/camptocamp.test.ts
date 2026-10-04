@@ -350,6 +350,83 @@ describe("getRoute", () => {
     });
   });
 
+  it("keeps the route's practical facts and free-text fields through the response schema", async () => {
+    // Trimmed from the live GET /routes/54085 response (2026-10-04): the practical facts as sent, height_diff_access
+    // null, the untyped calculated_duration and route_length; the fr locale with its texts cut to their first words.
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        document_id: 54085,
+        locales: [
+          {
+            version: 29,
+            lang: "fr",
+            title: "Versant W par le Glacier du Geay",
+            summary: "Le Mont Pourri est le second sommet de la Vanoise",
+            slope: "40°",
+            route_history: "- Premier parcours de la partie du [[routes/54080/fr|Col des Roches]] au sommet",
+            external_resources: "- *Mont Pourri or Mont Thuriaz* par W. A. B. Coolidge",
+            title_prefix: "Mont Pourri",
+            topic_id: null,
+          },
+        ],
+        activities: ["skitouring"],
+        route_length: null,
+        durations: ["1"],
+        calculated_duration: 0.2375,
+        height_diff_access: null,
+        height_diff_difficulties: 900,
+        route_types: ["return_same_way"],
+        orientations: ["NW"],
+        glacier_gear: "glacier_safety_gear",
+        configuration: ["glacier"],
+        lift_access: true,
+      }),
+    );
+
+    const result = await getRoute(54085);
+
+    expect(result).toEqual({
+      document_id: 54085,
+      locales: [
+        {
+          lang: "fr",
+          title: "Versant W par le Glacier du Geay",
+          summary: "Le Mont Pourri est le second sommet de la Vanoise",
+          slope: "40°",
+          route_history: "- Premier parcours de la partie du [[routes/54080/fr|Col des Roches]] au sommet",
+          external_resources: "- *Mont Pourri or Mont Thuriaz* par W. A. B. Coolidge",
+          title_prefix: "Mont Pourri",
+        },
+      ],
+      activities: ["skitouring"],
+      durations: ["1"],
+      height_diff_access: null,
+      height_diff_difficulties: 900,
+      route_types: ["return_same_way"],
+      orientations: ["NW"],
+      glacier_gear: "glacier_safety_gear",
+      configuration: ["glacier"],
+      lift_access: true,
+    });
+  });
+
+  it("keeps lift_access false through the response schema", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        document_id: 54085,
+        locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay" }],
+        activities: ["skitouring"],
+        height_diff_access: 300,
+        lift_access: false,
+      }),
+    );
+
+    const result = await getRoute(54085);
+
+    expect(result.lift_access).toBe(false);
+    expect(result.height_diff_access).toBe(300);
+  });
+
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 404));
 

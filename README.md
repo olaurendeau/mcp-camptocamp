@@ -9,7 +9,7 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | Outil                 | Description                                                                                               |
 | --------------------- | --------------------------------------------------------------------------------------------------------- |
 | `search_routes`       | Recherche d'itinéraires (mot-clé, zone, point, activité, cotation, D+, type, configuration) ; paginée     |
-| `get_route`           | Détail d'un itinéraire par ID (sommet : titre, texte, cotations, dénivelé, zones, topos, points, sorties) |
+| `get_route`           | Détail par ID (sommet : titre, textes, cotations, D+, orientations, durée, zones, topos, points, sorties) |
 | `search_waypoints`    | Points de passage par nom et/ou zone `area_id`, filtrables par type (sommet, refuge, bivouac…) ; paginée  |
 | `get_waypoint`        | Détail d'un point par ID (altitude, GPS, zones, infos refuge, accès, itinéraires, topos, sorties)         |
 | `search_user_outings` | Alias de `search_outings` par `user_id` : sorties d'un utilisateur, cotations nommées ; paginée           |
@@ -23,6 +23,8 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | `get_article`         | Détail d'un article par ID (texte, auteur, type, itinéraires, points, sorties, livres liés)               |
 
 Chaque outil `get_*` commence par le titre et l'ID du document, suivis de son lien camptocamp.org (`**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>`) à citer comme source.
+
+`get_route` donne aussi les infos pratiques de l'itinéraire, recopiées telles que Camptocamp les envoie (codes non traduits) : `**Difficulties height difference**` et `**Access height difference**` (en mètres), `**Orientations**`, `**Duration (days)**`, `**Route types**` (`return_same_way`, `loop`…), `**Configuration**` (`glacier`, `edge`…), `**Glacier gear**` (`glacier_safety_gear`…) et `**Lift access**` (`yes`/`no`). Ses textes libres sont imprimés dans cet ordre : `Summary`, `Description`, `Slope` (pente, par exemple `40°`), `Remarks`, `Gear`, `Route history`, `External resources`.
 
 `get_route` liste aussi, avec leurs ID, les livres (topos, magazines…) qui couvrent l'itinéraire, ses points de passage (le principal marqué `main waypoint`), les itinéraires voisins, les articles liés et ses sorties récentes (`## Recent outings (10 of 64)`, suivi de `More: search_outings with route_id=<id>` pour les voir toutes). Une liste vide n'imprime pas de section.
 

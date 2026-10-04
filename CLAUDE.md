@@ -120,7 +120,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | Tool                  | Description                                                                                                      |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`              |
-| `get_route`           | Route detail by ID (summit : title, text, ratings, elevation, areas, books, waypoints, outings…)                 |
+| `get_route`           | Route by ID (summit : title, texts, ratings, elevation, orientations, durations, areas, books, outings…)         |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`, by `waypoint_type`; paged with `offset`     |
 | `get_waypoint`        | Waypoint by ID (altitude, GPS, areas, hut details, access period, routes, books, recent outings)                 |
 | `search_user_outings` | Alias of `search_outings` by `user_id`: a user's outings, newest first, labelled ratings, paged                  |
@@ -136,6 +136,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 `search_routes` needs at least one filter (D5 on #58); any one is enough. Rating bounds are checked against the scale of `rating_system` (`ROUTE_RATING_SYSTEMS` in `src/tools/ratings.ts`) and list values against `src/tools/enums.ts` before any request, since Camptocamp silently ignores an unknown value (R7). The same goes for `waypoint_type` on `search_waypoints` (`WAYPOINT_TYPES`, 26 values; not a filter on its own, so a query or `area_id` is still required) and `book_type` / `activity` on `search_books` (`BOOK_TYPES`, 9 values; `ACTIVITIES`).
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
+
+`get_route` prints, after the elevations, the route's practical facts verbatim (R2 on #58: enum codes never translated; `formatRouteFacts` in `src/tools/routes.ts`): `**Difficulties height difference**`, `**Access height difference**` (m), `**Orientations**`, `**Duration (days)**`, `**Route types**`, `**Configuration**`, `**Glacier gear**`, `**Lift access**` (`yes` / `no`), each left out when absent (0 and `false` printed). Its free-text fields follow the areas, in this order: `summary`, `description`, `slope`, `remarks`, `gear`, `route_history`, `external_resources`.
 
 `get_route` ends with the route's associations, each section left out when its list is empty: `## Associated waypoints` (`| main waypoint` on `main_waypoint_id`), `## Associated routes`, `## Associated books` (`formatBookLine`, shared with `search_books`), `## Associated articles`, then `## Recent outings (<shown> of <total>)` in `search_outings` line format (`formatRecentOutings`), ending `More: search_outings with route_id=<id>` when more exist.
 
@@ -155,6 +157,7 @@ Locale: searches send `pl=fr`, which returns one locale per document, French whe
   - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.
   - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
 - `GET /routes/{id}`
+  - Practical facts read: `height_diff_difficulties`, `height_diff_access`, `orientations`, `durations`, `route_types`, `configuration`, `glacier_gear`, `lift_access`; locale texts: `summary`, `description`, `slope`, `remarks`, `gear`, `route_history`, `external_resources`.
   - `associations`: `waypoints` (the one matching `main_waypoint_id` is marked), `routes`, `books`, `articles`, and `recent_outings {documents, total}` (the latest 10, shaped like `/outings` list items); `images` and `xreports` are not read.
 - `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}][&wtyp={waypoint_type}][&offset={n}]` (at least one of `q` and `a`)
 - `GET /waypoints/{id}`
