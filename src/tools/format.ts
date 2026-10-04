@@ -11,10 +11,17 @@ interface TitledDocument {
   locales: Locale[];
 }
 
-// `lang=fr` does not filter locales nor put `fr` first (book 373877 returns it, fr, en; article 716039
-// lists en before fr), and some documents have no `fr` at all, so look it up and fall back to the first.
+// The API's own fallback order for `pl=fr` (route 675555 has [it, en] and a `pl=fr` search returns en).
+const LANG_ORDER = ["fr", "en", "it", "de", "es", "ca", "eu", "sl", "zh"];
+
+// Detail endpoints return every locale in no useful order (book 373877: it, fr, en; article 716039:
+// en before fr), so pick the one a `pl=fr` search would return: fr, then LANG_ORDER, then the first.
 export function pickLocale<T extends { lang: string }>(locales: T[]): T | undefined {
-  return locales.find((l) => l.lang === "fr") ?? locales[0];
+  for (const lang of LANG_ORDER) {
+    const locale = locales.find((l) => l.lang === lang);
+    if (locale) return locale;
+  }
+  return locales[0];
 }
 
 export function pickTitle(locales: Locale[]): string {
@@ -33,9 +40,9 @@ export function formatRouteLine(route: {
   document_id: number;
   locales: Array<Locale & { title_prefix?: string | null }>;
 }): string {
-  const locale = pickLocale(route.locales);
-  const title = locale?.title ?? "Untitled";
-  const name = locale?.title_prefix ? `${locale.title_prefix} : ${title}` : title;
+  const title = pickTitle(route.locales);
+  const prefix = pickLocale(route.locales)?.title_prefix;
+  const name = prefix ? `${prefix} : ${title}` : title;
   return `- [${route.document_id}] ${name}`;
 }
 

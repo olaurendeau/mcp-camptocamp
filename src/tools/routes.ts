@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { documentId } from "./inputs.js";
+import { documentId, searchQuery } from "./inputs.js";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteSearchResponse, RouteDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, formatHeader, formatAreasSection } from "./format.js";
 
 export const searchRoutesSchema = z.object({
-  query: z.string().optional().describe("Search query for routes (e.g. 'Mont Blanc voie normale')"),
+  query: searchQuery("Search query for routes (e.g. 'Mont Blanc voie normale')", { allowBlank: true }).optional(),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)").optional(),
 });
@@ -41,7 +41,7 @@ function formatRouteDetail(route: RouteDetail): string {
   const locale = pickLocale(route.locales);
   const lines: string[] = [];
 
-  lines.push(formatHeader(locale?.title ?? "Untitled", route.document_id));
+  lines.push(formatHeader(pickTitle(route.locales), route.document_id));
   lines.push(`\n**Activities**: ${route.activities.join(", ")}`);
 
   if (route.global_rating) lines.push(`**Global rating**: ${route.global_rating}`);

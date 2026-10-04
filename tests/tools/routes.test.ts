@@ -132,6 +132,45 @@ describe("handleGetRoute", () => {
 
     await expect(handleGetRoute({ id: 999 })).rejects.toThrow("Camptocamp API error: 404");
   });
+
+  it("shows the en locale of a route with [it, en] locales, as search_routes does with pl=fr", async () => {
+    // Trimmed from the live GET /routes/675555 response (2026-10-04): texts cut to their first line,
+    // null fields, title_prefix, summary, maps, areas and geometry left out.
+    mockGetRoute.mockResolvedValueOnce({
+      document_id: 675555,
+      locales: [
+        {
+          lang: "it",
+          title: "Via Ferrata Gamma 2",
+          description: "## Attacco\r\nDai **Piani d'Erna 1330m**, prendere il sentiero numero 1.",
+          remarks: "E' considerata una delle ferrate più impegnative delle alpi.",
+        },
+        {
+          lang: "en",
+          title: "Via ferrata Gamma 2 - al Dente del Resegone",
+          description: "Good things about this route ...",
+          remarks: '- Could be preceded by climbing the interesting "via ferrata Gamma 1".',
+          gear: "- via ferrata kit (see under Remarks for special concerns or modifications).",
+        },
+      ],
+      activities: ["via_ferrata"],
+      elevation_min: 1240,
+      elevation_max: 1809,
+      height_diff_up: 569,
+      height_diff_down: 85,
+      engagement_rating: "III",
+      equipment_rating: "P1",
+      durations: ["1"],
+      main_waypoint_id: 40045,
+    });
+
+    const result = await handleGetRoute({ id: 675555 });
+
+    expect(result.split("\n")[0]).toBe("# Via ferrata Gamma 2 - al Dente del Resegone (ID: 675555)");
+    expect(result).toContain("## Description\nGood things about this route ...");
+    expect(result).toContain("## Gear\n- via ferrata kit");
+    expect(result).not.toContain("Piani d'Erna");
+  });
 });
 
 describe("handleSearchRoutes with area_id", () => {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { documentId } from "./inputs.js";
+import { documentId, searchQuery } from "./inputs.js";
 import { searchBooks, getBook } from "../api/camptocamp.js";
 import type { BookSearchResponse, BookDetail } from "../api/camptocamp.js";
 import {
@@ -13,7 +13,7 @@ import {
 } from "./format.js";
 
 export const searchBooksSchema = z.object({
-  query: z.string().describe("Search query matched against book titles (e.g. 'Vallot', 'Mont Blanc')"),
+  query: searchQuery("Search query matched against book titles (e.g. 'Vallot', 'Mont Blanc')", { allowBlank: false }),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
 });
 
@@ -47,7 +47,7 @@ function formatBookSearchResult(response: BookSearchResponse): string {
 
 function formatBookDetail(book: BookDetail): string {
   const locale = pickLocale(book.locales);
-  const lines: string[] = [formatHeader(locale?.title ?? "Untitled", book.document_id)];
+  const lines: string[] = [formatHeader(pickTitle(book.locales), book.document_id)];
 
   const fields: Array<[string, string | number | null | undefined]> = [
     ["Author", book.author],
