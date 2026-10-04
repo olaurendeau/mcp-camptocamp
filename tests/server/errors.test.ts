@@ -40,7 +40,6 @@ describe("upstream HTTP errors", () => {
 
     const text = await callForText(client, name, { id: 999999999 });
 
-    expect(text).toMatch(/^Error: Camptocamp API error: 404/);
     expect(text).toBe(`Error: Camptocamp API error: 404 Not Found (${type} 999999999): document not found`);
   });
 

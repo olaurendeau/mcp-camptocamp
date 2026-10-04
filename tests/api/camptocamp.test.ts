@@ -399,11 +399,18 @@ describe("getArea", () => {
   });
 
   it("throws on a 404 response", async () => {
+    // Status and body of the live GET /areas/999999999 response; every missing ID answers the same.
     mockFetch.mockResolvedValueOnce(
-      makeResponse({ status: "error", errors: [{ name: "Not Found" }] }, 404, "Not Found"),
+      makeResponse(
+        { status: "error", errors: [{ location: "body", name: "Not Found", description: "document not found" }] },
+        404,
+        "Not Found",
+      ),
     );
 
-    await expect(getArea(999999999)).rejects.toThrow("Camptocamp API error: 404");
+    await expect(getArea(999999999)).rejects.toThrow(
+      new Error("Camptocamp API error: 404 Not Found (area 999999999): document not found"),
+    );
   });
 });
 
