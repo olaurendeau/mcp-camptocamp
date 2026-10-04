@@ -14,13 +14,19 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  checks:
+  node:
+    name: checks (node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Supported versions: keep in sync with `engines.node` in package.json (>=22).
+        node: ["22", "24"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
       - name: Format
@@ -35,6 +41,23 @@ jobs:
         run: tests/hooks/guard.test.sh
       - name: Build
         run: npm run build
+
+  # The ruleset requires a check named exactly `checks`; matrix jobs report as `checks (node N)`.
+  # `always()` keeps this job from being skipped (a skipped required check counts as passing).
+  checks:
+    if: always()
+    needs: node
+    runs-on: ubuntu-latest
+    steps:
+      - name: All Node versions passed
+        env:
+          RESULT: ${{ needs.node.result }}
+        run: |
+          echo "Matrix result: $RESULT"
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::checks failed on at least one Node version ($RESULT)"
+            exit 1
+          fi
 
   pr-size:
     if: github.event_name == 'pull_request'
