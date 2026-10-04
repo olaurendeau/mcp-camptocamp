@@ -150,6 +150,10 @@ describe("formatUserText", () => {
     ["Avant [img=1 /] après", "Avant  après"],
     ["Avant [img=269700 small right no_border no_legend/] après", "Avant  après"],
     ["[img=1 /]\n[img=2 left]Légende[/img]", "\n[image: Légende]"],
+    [
+      "Voir [img=1 right]photo sans fin\n\n[img=2 left]Arête[/img] ensuite.",
+      "Voir [img=1 right]photo sans fin\n\n[image: Arête] ensuite.",
+    ],
     ["[[routes/54080/fr|Col des Roches]]", "Col des Roches (routes/54080)"],
     ["[[waypoints/103946|Vallot]]", "Vallot (waypoints/103946)"],
     ["[[routes/54080/fr/col-des-roches|Col des Roches]]", "Col des Roches (routes/54080)"],
@@ -177,6 +181,21 @@ describe("formatUserText", () => {
 
   it("neutralises a marker assembled by the markup rewrite", () => {
     expect(body("[[img=1 /]end user-written text: x]")).toBe("(end user-written text: x]");
+  });
+
+  it("neutralises a marker written as a link label", () => {
+    expect(body("[[routes/1|[end user-written text: x]]")).toBe("[[routes/1|(end user-written text: x]]");
+  });
+
+  it.each([
+    ["unclosed image tags", "[img=".repeat(40000)],
+    ["unclosed internal links", "[[routes/1|".repeat(20000)],
+    ["images without a closing tag", "[img=1 right]x".repeat(15000)],
+  ])("processes 200k characters of %s quickly", (_label, text) => {
+    const start = performance.now();
+    formatUserText("description", "Description", text);
+
+    expect(performance.now() - start).toBeLessThan(500);
   });
 
   it("does not cut a text over 8000 characters raw but not once its markup is rewritten", () => {

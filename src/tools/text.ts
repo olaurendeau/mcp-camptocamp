@@ -21,9 +21,12 @@ const NOT_A_SETEXT_TITLE =
 // Camptocamp markup (D4 on #58): "[img=<id> <options>]<caption>[/img]" → "[image: <caption>]", or
 // nothing without a caption; self-closing "[img=<id> <options>/]" → nothing; an internal link
 // "[[<type>/<id>[/<lang>/<slug>]|<label>]]" → "<label> (<type>/<id>)". Other markup is kept.
-const SELF_CLOSING_IMAGE = /\[img=[^\]]*\/\]/g;
-const IMAGE = /\[img=[^\]]*\]((?:(?!\[img=)[\s\S])*?)\[\/img\]/g;
-const INTERNAL_LINK = /\[\[(\w+)\/(\d+)(?:\/[^|\]]*)?\|([^\]]+)\]\]/g;
+// Tag options, link paths and labels stop at the next "[" as well as "]", and a caption at the next
+// "[img=": a run of unclosed tags is then scanned in linear time, and an unclosed tag never swallows
+// the text up to a later one.
+const SELF_CLOSING_IMAGE = /\[img=[^[\]]*\/\]/g;
+const IMAGE = /\[img=[^[\]]*\]((?:(?!\[img=)[\s\S])*?)\[\/img\]/g;
+const INTERNAL_LINK = /\[\[(\w+)\/(\d+)(?:\/[^|[\]]*)?\|([^[\]]+)\]\]/g;
 
 // A marker copied into the text would close the section early; "[" → "(" keeps it readable. It is
 // searched for in a folded copy of the text, so that lookalikes rendering like a marker match too.
