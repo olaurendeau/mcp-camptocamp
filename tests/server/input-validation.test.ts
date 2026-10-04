@@ -77,3 +77,91 @@ describe("integer ID inputs", () => {
     });
   });
 });
+
+const MAX_QUERY_LENGTH = 200;
+
+type Client = Awaited<ReturnType<typeof connect>>;
+
+/** Text of a tool result, which the server always returns as one text block. */
+function resultText(result: Awaited<ReturnType<Client["callTool"]>>): string {
+  const content = result.content as Array<{ type: string; text: string }>;
+  return content[0].text;
+}
+
+// Every search tool with a free-text `query`.
+const QUERY_TOOLS = [
+  "search_routes",
+  "search_waypoints",
+  "search_outings",
+  "search_areas",
+  "search_books",
+  "search_articles",
+];
+
+describe("search query inputs", () => {
+  it.each(QUERY_TOOLS)("%s accepts a 200-character query", async (tool) => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const result = await client.callTool({ name: tool, arguments: { query: "a".repeat(MAX_QUERY_LENGTH) } });
+
+    expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each(QUERY_TOOLS)("%s rejects a 201-character query without calling Camptocamp", async (tool) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: tool, arguments: { query: "a".repeat(MAX_QUERY_LENGTH + 1) } });
+
+    expect(result.isError).toBe(true);
+    const text = resultText(result);
+    expect(text).toContain(`Invalid arguments for tool ${tool}`);
+    expect(text).toContain('"query"');
+    expect(text).toContain(`"maximum": ${String(MAX_QUERY_LENGTH)}`);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // D3: a blank query would list the whole collection, never a useful answer.
+  describe.each(["search_areas", "search_books", "search_articles"])("%s", (tool) => {
+    it.each(["", "   "])("rejects the blank query %j without calling Camptocamp", async (query) => {
+      const fetchMock = stubFetch();
+      const client = await connect();
+
+      const result = await client.callTool({ name: tool, arguments: { query } });
+
+      expect(result.isError).toBe(true);
+      const text = resultText(result);
+      expect(text).toContain(`Invalid arguments for tool ${tool}`);
+      expect(text).toContain('"query"');
+      expect(text).toContain("must not be blank");
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  // Where query is optional, a blank query still counts as missing.
+  it.each(["search_routes", "search_waypoints"])("%s treats a blank query as missing", async (tool) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: tool, arguments: { query: "   " } });
+
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe(
+      `Error: ${tool} needs a query, an area_id, or both. Use search_areas to find an area_id.`,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("search_outings treats a blank query as missing and searches without q", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_outings", arguments: { query: "   " } });
+
+    expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.has("q")).toBe(false);
+  });
+});

@@ -120,6 +120,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       },
       "query": {
         "description": "Area name in any language (e.g. 'Écrins', 'Valais', 'Wallis')",
+        "maxLength": 200,
         "type": "string",
       },
     },
@@ -141,6 +142,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       },
       "query": {
         "description": "Search query (e.g. 'crampons', 'avalanche', 'rappel')",
+        "maxLength": 200,
         "type": "string",
       },
     },
@@ -162,6 +164,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       },
       "query": {
         "description": "Search query matched against book titles (e.g. 'Vallot', 'Mont Blanc')",
+        "maxLength": 200,
         "type": "string",
       },
     },
@@ -221,6 +224,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       },
       "query": {
         "description": "Keyword matched against outing titles (e.g. 'cosmiques')",
+        "maxLength": 200,
         "type": "string",
       },
       "route_id": {
@@ -257,6 +261,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       },
       "query": {
         "description": "Search query for routes (e.g. 'Mont Blanc voie normale')",
+        "maxLength": 200,
         "type": "string",
       },
     },
@@ -304,6 +309,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       },
       "query": {
         "description": "Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')",
+        "maxLength": 200,
         "type": "string",
       },
     },
