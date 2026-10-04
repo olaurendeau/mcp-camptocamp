@@ -1488,6 +1488,23 @@ describe("outingToolDefinitions", () => {
     }
   });
 
+  // #211: what the tool description keeps on its own, without the input-field descriptions.
+  it("keeps the filter logic, ordering, unknown IDs and the tools to call in the search_outings description", () => {
+    const description = outingToolDefinitions.find((t) => t.name === "search_outings")?.description ?? "";
+
+    for (const phrase of [
+      "All filters are optional and combine with AND",
+      "most recent first",
+      "An unknown area/route/waypoint/user ID yields no results, not an error",
+      "Call get_outing with an ID",
+      "area_id (from search_areas)",
+      "route_id (from search_routes)",
+      "waypoint_id (from search_waypoints)",
+    ]) {
+      expect(description).toContain(phrase);
+    }
+  });
+
   // #211: the date and period details moved to the fields they are about.
   it("gives the date overlap and the period limits on their input fields", () => {
     const { date_from, date_to, period_start, period_end } = searchOutingsSchema.shape;
