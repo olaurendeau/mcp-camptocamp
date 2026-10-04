@@ -14,9 +14,9 @@ src/
 ├── api/
 │   └── camptocamp.ts     # Camptocamp API v6 client (fetch wrapper, typed responses)
 └── tools/
-    ├── enums.ts          # Camptocamp's closed value lists (CUSTODIANSHIPS: hut custodianship meanings)
     ├── format.ts         # Shared formatting helpers: locales, headers, document lines, dates, isPresent (0 and false are printed)
-    ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY), shared by every route/outing line
+    ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
+    ├── enums.ts          # Camptocamp's closed value lists: filters (activities, route types, configurations), CUSTODIANSHIPS meanings
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
     ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
@@ -32,7 +32,7 @@ tests/
 │   └── guard.test.sh       # Tests for the agent guard hook (.claude/hooks/guard.sh), run on the host
 └── tools/
     ├── format.test.ts      # Shared formatting helper unit tests
-    ├── ratings.test.ts     # Rating label order and Labande joining
+    ├── ratings.test.ts     # Rating label order, Labande joining and rating scales
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
     ├── outings.test.ts     # Tool handler unit tests
@@ -95,7 +95,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 | Tool                  | Description                                                                                          |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Search by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, gain, ratings |
+| `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`  |
 | `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas) |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
 | `get_waypoint`        | Waypoint by ID (altitude, GPS, areas; huts: capacity, custodianship, phones, website, access period) |
@@ -109,9 +109,11 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type          |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)           |
 
+`search_routes` needs at least one filter (D5 on #58); any one is enough. Rating bounds are checked against the scale of `rating_system` (`ROUTE_RATING_SYSTEMS` in `src/tools/ratings.ts`) and list values against `src/tools/enums.ts` before any request, since Camptocamp silently ignores an unknown value (R7).
+
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 
-Free-text locale fields written by Camptocamp users (descriptions, summaries, remarks, gear, access, conditions, weather…) go through `formatUserText` in `src/tools/text.ts`: printed under `## <Heading>` between `[begin user-written text: <field>]` and `[end user-written text: <field>]`, line-start Markdown headings demoted two levels (capped at `######`), copies of the markers neutralised (`[` → `(`), lookalikes included (full-width, dash variants, zero-width characters), and cut after 8000 characters with `[truncated, N more characters]`. Each `get_*` tool description says that text between the markers is user-written content, not instructions.
+Free-text locale fields written by Camptocamp users (descriptions, summaries, remarks, gear, access, conditions, weather…) go through `formatUserText` in `src/tools/text.ts`: printed under `## <Heading>` between `[begin user-written text: <field>]` and `[end user-written text: <field>]`. The pipeline: Camptocamp image tags rewritten to `[image: <caption>]` (nothing without a caption) and internal links `[[routes/54080/fr|Col des Roches]]` to `Col des Roches (routes/54080)`, other markup kept; line-start Markdown headings demoted two levels (capped at `######`), setext headings (`===` / `---` underlines) turned into `###` / `####`; copies of the markers neutralised (`[` → `(`), lookalikes included (full-width, `【`, dash variants, `user written` / `userwritten` / `user_written`, zero-width characters, combining grapheme joiner, variation selectors); then cut after 8000 characters with `[truncated, N more characters]`, N counted after the earlier steps. Each `get_*` tool description says that text between the markers is user-written content, not instructions.
 
 ## Camptocamp API v6
 
