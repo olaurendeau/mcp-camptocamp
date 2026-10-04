@@ -101,8 +101,9 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 Base URL: `https://api.camptocamp.org`
 
-- `GET /routes?q={query}&limit=10&lang=fr`
-- `GET /routes?a={area_id}&limit=10&lang=fr` (combinable with `q`)
+- `GET /routes?limit=10&pl=fr[&q={query}][&a={area_id}][&w={waypoint_id}][&act={activity}][&{rating param}={min},{max}][&hdif={min},{max}][&rtyp={types}][&conf={configurations}][&offset={n}]`
+  - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.
+  - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
 - `GET /routes/{id}?lang=fr`
 - `GET /waypoints?q={query}&limit=10&lang=fr`
 - `GET /waypoints?a={area_id}&limit=10&lang=fr` (combinable with `q`)
