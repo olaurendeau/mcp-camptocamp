@@ -130,12 +130,28 @@ describe("searches (AC8.2, AC8.3)", () => {
     for (const outing of result.documents) expect(outing.author).toEqual(AUTHOR);
   });
 
-  // `u=`, behind search_outings {user_id} and its search_user_outings alias.
-  it("outings of user 430052, each by that user, fewer than all outings", async () => {
+  // `u=`, behind search_outings {user_id} and its search_user_outings alias. It matches the outings the user
+  // is listed on (associations.users), not only those they wrote: the author may be someone else.
+  it("outings of user 430052, each with an author, fewer than all outings", async () => {
     const result = await searchOutings({ user_id: 430052 });
 
     expectNarrows(result, await allOutings());
-    for (const outing of result.documents) expect(outing.author).toEqual({ ...AUTHOR, user_id: 430052 });
+    for (const outing of result.documents) expect(outing.author).toEqual(AUTHOR);
+  });
+
+  it("outings of user 466185 on 2025-03-31 include 1757161, written by user 944173", async () => {
+    const result = await searchOutings({ user_id: 466185, date_from: "2025-03-31", date_to: "2025-03-31" });
+    const outing = result.documents.find((document) => document.document_id === 1757161);
+
+    expect(outing, "outing 1757161 is no longer found by u=466185").toBeDefined();
+    expect(outing?.author).toEqual({ ...AUTHOR, user_id: 944173 });
+  });
+
+  // get_outing prints associations.users; a renamed key would silently drop its line.
+  it("outing 1757161 lists its linked users 466185 and 944173", async () => {
+    const outing = await getOuting(1757161);
+
+    expect(outing.associations?.users?.map((user) => user.document_id)).toEqual([466185, 944173]);
   });
 
   // `period=2020-06-01,2020-06-30`: the same days in every year.

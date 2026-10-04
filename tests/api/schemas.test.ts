@@ -77,9 +77,36 @@ describe("response schemas", () => {
 
     for (const malformed of [{ name: "o.laurendeau" }, { user_id: 430052 }, { ...author, user_id: "430052" }, "x"]) {
       expect(outingListItemSchema.parse({ ...item, author: malformed })).toEqual({ ...item, author: null });
-      expect(outingDetailSchema.parse({ ...item, author: malformed }).author).toBeNull();
       expect(articleDetailSchema.parse({ document_id: 2, locales: [], author: malformed }).author).toBeNull();
     }
+  });
+
+  // S1 (#118): /outings/{id} has no author; its users are kept as {document_id, name}, their locales have no title.
+  it("keep an outing's linked users as document_id and name, and drop any author key", () => {
+    const outing = { document_id: 1757161, locales: [], activities: ["snow_ice_mixed"] };
+    const user = { version: 2, locales: [{ version: 1, lang: "fr" }], type: "u", forum_username: "MarionO" };
+    const parsed = outingDetailSchema.parse({
+      ...outing,
+      author: { name: "emag", user_id: 944173 },
+      associations: {
+        users: [
+          { ...user, document_id: 466185, name: "MarionO" },
+          { ...user, document_id: 944173, name: "emag" },
+        ],
+      },
+    });
+
+    expect(parsed).toEqual({
+      ...outing,
+      associations: {
+        users: [
+          { document_id: 466185, name: "MarionO" },
+          { document_id: 944173, name: "emag" },
+        ],
+      },
+    });
+    expect(outingDetailSchema.parse({ ...outing, associations: { users: null } }).associations?.users).toBeNull();
+    expect(outingDetailSchema.parse({ ...outing, associations: {} }).associations?.users).toBeUndefined();
   });
 
   it("reject a response missing a field the formatters dereference", () => {

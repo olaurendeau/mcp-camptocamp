@@ -123,9 +123,9 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_route`           | Route by ID (summit : title, texts, ratings, elevation, orientations, durations, areas, books, outings…)         |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`, by `waypoint_type`; paged with `offset`     |
 | `get_waypoint`        | Waypoint by ID (altitude, GPS, areas, hut details, access period, routes, books, recent outings)                 |
-| `search_user_outings` | Alias of `search_outings` by `user_id`: a user's outings, newest first, labelled ratings, paged                  |
-| `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings)             |
-| `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged             |
+| `search_user_outings` | Alias of `search_outings` by `user_id`: outings the user is listed on, written or not; newest first, paged       |
+| `get_outing`          | Outing by ID (ratings, conditions, weather, participants, linked accounts, routes; no author: see search lines)  |
+| `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, listed user; newest first, paged      |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                               |
 | `search_books`        | Search books by title only (author/ISBN unreliable), by `book_type` and `activity`; paged with `offset`          |
@@ -165,8 +165,9 @@ Locale: searches send `pl=fr`, which returns one locale per document, French whe
 - `GET /waypoints/{id}`
   - `associations`: `all_routes {documents, total}` (shaped like `/routes` search results; there is no `routes` key, hut 104151), `books`, and `recent_outings {documents, total}`; `waypoints`, `waypoint_children`, `articles`, `images` and `xreports` are not read.
 - `GET /outings/{id}`
+  - No `author` key (only list items carry one). `associations.users` (`document_id`, `name`; locales without title) are the accounts linked to the outing, printed in API order as `**Participants with a Camptocamp account**`; the first is not necessarily the author (outing 1757161).
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]`
-  - `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).
+  - `u` matches the outings the user is listed on (`associations.users`), not only those they wrote. `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
 - `GET /areas?q={query}&limit=10&pl=fr[&atyp={type}][&offset={n}]`
 - `GET /areas/{id}`
