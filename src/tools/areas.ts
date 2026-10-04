@@ -67,7 +67,7 @@ export const areaToolDefinitions = [
     name: "get_area",
     title: "Get area details",
     description:
-      "Get a Camptocamp.org area by ID: title, type, summary and description (Camptocamp markup included). No geometry, no route count; use search_routes / search_waypoints with area_id for those. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      "Get a Camptocamp.org area by ID: title, type, summary and description. No geometry, no route count; use search_routes / search_waypoints with area_id for those. The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,
     inputSchema: getAreaSchema,
     handler: handleGetArea,
