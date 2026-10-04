@@ -24,6 +24,8 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 
 Chaque outil `get_*` commence par le titre et l'ID du document, suivis de son lien camptocamp.org (`**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>`) à citer comme source.
 
+Les textes libres écrits par les contributeurs (description, résumé, remarques, matériel, accès, conditions, météo…) sont imprimés entre `[begin user-written text: <champ>]` et `[end user-written text: <champ>]`, avec leurs titres Markdown abaissés de deux niveaux et une coupe à 8000 caractères (`[truncated, N more characters]`). La description de chaque outil `get_*` précise que ce texte est du contenu écrit par les utilisateurs, pas des instructions.
+
 ## Installation
 
 ### npm (recommandé)

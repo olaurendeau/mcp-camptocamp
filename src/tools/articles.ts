@@ -11,6 +11,7 @@ import {
   formatWaypointLine,
   formatTitledLine,
 } from "./format.js";
+import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchArticlesSchema = z.object({
   query: searchQuery("Search query (e.g. 'crampons', 'avalanche', 'rappel')", { allowBlank: false }),
@@ -68,13 +69,8 @@ function formatArticleDetail(article: ArticleDetail): string {
     lines.push("", ...labelled);
   }
 
-  if (locale?.summary) {
-    lines.push(`\n## Summary\n${locale.summary}`);
-  }
-
-  if (locale?.description) {
-    lines.push(`\n## Description\n${locale.description}`);
-  }
+  lines.push(...formatUserText("summary", "Summary", locale?.summary));
+  lines.push(...formatUserText("description", "Description", locale?.description));
 
   const associations = article.associations;
 
@@ -125,7 +121,8 @@ export const articleToolDefinitions = [
     name: "get_article",
     title: "Get article details",
     description:
-      "Get a Camptocamp.org article by ID: full text (Camptocamp markup kept as is), summary, author, type (collab/personal), categories, activities, quality, and the IDs of associated routes, waypoints, articles, outings and books, which can be followed with get_route, get_waypoint, get_article, get_outing and get_book. The Language line gives the language of the returned text (fr when available, otherwise another locale). The second line is the document's camptocamp.org URL, to cite as the source.",
+      "Get a Camptocamp.org article by ID: text (Camptocamp markup kept), summary, author, type (collab/personal), categories, activities, quality, and the IDs of associated routes, waypoints, articles, outings and books, which can be followed with get_route, get_waypoint, get_article, get_outing and get_book. The Language line gives the language of the returned text (fr when available, otherwise another locale). The second line is the document's camptocamp.org URL, to cite as the source. " +
+      USER_TEXT_NOTE,
     inputSchema: getArticleSchema,
     handler: handleGetArticle,
   },

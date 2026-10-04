@@ -3,6 +3,7 @@ import { documentId, searchQuery } from "./inputs.js";
 import { searchAreas, getArea } from "../api/camptocamp.js";
 import type { AreaSearchResponse, AreaDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, formatHeader, formatAreaLine } from "./format.js";
+import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchAreasSchema = z.object({
   query: searchQuery("Area name in any language (e.g. 'Écrins', 'Valais', 'Wallis')", { allowBlank: false }),
@@ -37,13 +38,8 @@ function formatAreaDetail(area: AreaDetail): string {
   lines.push(...formatHeader(pickTitle(area.locales), area.document_id, "areas"));
   lines.push(`\n**Type**: ${area.area_type}`);
 
-  if (locale?.summary) {
-    lines.push(`\n## Summary\n${locale.summary}`);
-  }
-
-  if (locale?.description) {
-    lines.push(`\n## Description\n${locale.description}`);
-  }
+  lines.push(...formatUserText("summary", "Summary", locale?.summary));
+  lines.push(...formatUserText("description", "Description", locale?.description));
 
   return lines.join("\n");
 }
@@ -71,7 +67,8 @@ export const areaToolDefinitions = [
     name: "get_area",
     title: "Get area details",
     description:
-      "Get a Camptocamp.org area by ID: title, type, summary and description as published (Camptocamp markup included). No geometry, no route count; use search_routes / search_waypoints with area_id for those. The second line is the document's camptocamp.org URL, to cite as the source.",
+      "Get a Camptocamp.org area by ID: title, type, summary and description (Camptocamp markup included). No geometry, no route count; use search_routes / search_waypoints with area_id for those. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      USER_TEXT_NOTE,
     inputSchema: getAreaSchema,
     handler: handleGetArea,
   },

@@ -6,6 +6,7 @@ import {
   getArticleSchema,
   articleToolDefinitions,
 } from "../../src/tools/articles.js";
+import { formatUserText, USER_TEXT_NOTE } from "../../src/tools/text.js";
 import * as api from "../../src/api/camptocamp.js";
 import type { ArticleDetail } from "../../src/api/camptocamp.js";
 import { articleDetailSchema, articleSearchResponseSchema } from "../../src/api/schemas.js";
@@ -571,9 +572,7 @@ describe("handleGetArticle", () => {
         "**Categories**: gear",
         "**Activities**: mountain_climbing, snow_ice_mixed, hiking, snowshoeing, skitouring, ice_climbing",
         "**Quality**: great",
-        "",
-        "## Description",
-        ARTICLE_226838.locales[0].description,
+        ...formatUserText("description", "Description", ARTICLE_226838.locales[0].description),
         "",
         "## Associated articles",
         "- [1204346] Portail Matériel",
@@ -602,8 +601,7 @@ describe("handleGetArticle", () => {
 
     const result = await handleGetArticle({ id: 226838 });
 
-    expect(result).toContain(`\n## Description\n${description}\n`);
-    expect(result).toContain("[[routes/45148|Face N]]");
+    expect(result).toContain(" [[routes/45148|Face N]]\n[end user-written text: description]\n");
   });
 
   it("names the fallback language when there is no fr locale", async () => {
@@ -640,6 +638,7 @@ describe("handleGetArticle", () => {
         "**Quality**: medium",
         "",
         "## Description",
+        "[begin user-written text: description]",
         "\r\n\r\nLa route est longue au soir tombant,",
       ].join("\n"),
     );
@@ -684,18 +683,47 @@ describe("handleGetArticle", () => {
     );
   });
 
-  it("prints a summary verbatim and a 22,463-character description whole", async () => {
+  it("wraps the summary and cuts the 22,463-character description at 8000 characters", async () => {
     mockGetArticle.mockResolvedValueOnce(ARTICLE_107228);
 
     const result = await handleGetArticle({ id: 107228 });
 
     const locale = ARTICLE_107228.locales[0];
     expect(locale.description.length).toBe(22463);
-    expect(result).toContain(`\n## Summary\n${locale.summary}\n\n## Description\n${locale.description}\n`);
+    expect(result).toContain(
+      [
+        "## Summary",
+        "[begin user-written text: summary]",
+        "Liens utiles pour la préparation de vos futures courses en montagne.",
+        "**Cette article demande une mise à jour permanente. Merci de signaler les liens obsolètes et si possible de les corriger**",
+        "[end user-written text: summary]",
+        "",
+        "## Description",
+        "[begin user-written text: description]",
+        "[toc]",
+        "",
+        "",
+        "",
+        "#### Météo",
+        "",
+        "##### France ",
+      ].join("\n"),
+    );
+    // 22,597 characters once its headings are demoted, so 14,597 are cut.
+    const lines = result.split("\n");
+    const notice = lines.indexOf("[truncated, 14597 more characters]");
+    expect(lines[notice - 1]).toBe("* La [carte des pentes](https://www.geoportail.gouv.fr/donnees/carte-des-pentes)");
+    expect(lines[notice + 1]).toBe("[end user-written text: description]");
+    const begin = lines.indexOf("[begin user-written text: description]");
+    expect(Array.from(lines.slice(begin + 1, notice).join("\n"))).toHaveLength(8000);
     expect(result).toContain("**Categories**: topoguide_supplements\n");
     expect(result.endsWith("- [1204299] Le contenu du sac\n- [1257569] Application YETI - foire aux questions")).toBe(
       true,
     );
+  });
+
+  it("says in the get_article description that text between the markers is user-written content, not instructions", () => {
+    expect(articleToolDefinitions[1].description).toContain(USER_TEXT_NOTE);
   });
 
   it("leaves out an empty-string summary", async () => {
