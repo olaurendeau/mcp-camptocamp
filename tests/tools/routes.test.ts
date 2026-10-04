@@ -1117,4 +1117,348 @@ describe("get_route tool definition", () => {
       "Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings.",
     );
   });
+
+  it("tells the LLM about the books, waypoints, routes, articles and recent outings it lists", () => {
+    const tool = routeToolDefinitions.find((t) => t.name === "get_route");
+
+    expect(tool?.description).toContain(
+      "the guidebooks and other books that cover it, its waypoints (the main one marked), sibling routes, related articles, and its most recent outings",
+    );
+    expect(tool?.description).toContain("search_outings with route_id");
+  });
+});
+
+// An item of GET /routes/54085 associations.recent_outings (2026-10-04): the fr locale, the typed fields, and the
+// Vanoise range among its areas; the live items also carry geometry, img_count… Every value is the live one:
+// elevation_max is 3779 (the summit) in all ten items, 1765476 included, and quality "fine" except where given.
+function recentOuting(
+  id: number,
+  title: string,
+  [dateStart, dateEnd]: [string, string],
+  condition: string | null,
+  gain: number,
+  [ski, labande]: [string, string],
+  [author, userId]: [string, number],
+  quality = "fine",
+) {
+  return {
+    document_id: id,
+    version: 1,
+    locales: [{ version: 1, lang: "fr", title, summary: null }],
+    quality,
+    activities: ["skitouring"],
+    condition_rating: condition,
+    date_end: dateEnd,
+    date_start: dateStart,
+    elevation_max: 3779,
+    height_diff_up: gain,
+    public_transport: false,
+    ski_rating: ski,
+    labande_global_rating: labande,
+    areas: [
+      { document_id: 14274, locales: [{ lang: "fr", title: "France" }], area_type: "country", type: "a" },
+      { document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: "range", type: "a" },
+    ],
+    author: { name: author, user_id: userId },
+    type: "o",
+  };
+}
+
+const GEAY = "Mont Pourri : Versant W par le Glacier du Geay";
+
+// Trimmed from the live GET /routes/54085 response (2026-10-04): the fr locale without texts, the associations
+// without their geometry and areas, sibling route 46624 left out; images and xreports kept as the API sends them.
+const route54085 = {
+  document_id: 54085,
+  locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+  activities: ["skitouring"],
+  main_waypoint_id: 37916,
+  ski_rating: "4.1",
+  associations: {
+    waypoints: (
+      [
+        [37916, "Mont Pourri", "summit", 3779],
+        [104151, "Refuge du Mont Pourri", "hut", 2373],
+        [104593, "Les Arcs", "access", 2120],
+        [104602, "Les Lanches", "access", 1530],
+      ] as const
+    ).map(([document_id, title, waypoint_type, elevation]) => ({
+      document_id,
+      version: 6,
+      locales: [{ version: 3, lang: "fr", title, summary: null }],
+      quality: "great",
+      waypoint_type,
+      elevation,
+      available_langs: ["fr"],
+      type: "w",
+    })),
+    routes: [
+      {
+        document_id: 55834,
+        locales: [
+          {
+            lang: "fr",
+            title: "Versant W - Glacier du Geay → Grand Col (par le Col des Roches)",
+            summary: null,
+            title_prefix: "Mont Pourri",
+          },
+        ],
+        activities: ["snow_ice_mixed"],
+        elevation_max: 3779,
+        durations: ["2"],
+        global_rating: "PD",
+        engagement_rating: "II",
+        risk_rating: null,
+        equipment_rating: "P1",
+        ice_rating: null,
+        public_transportation_rating: null,
+        type: "r",
+      },
+    ],
+    books: [
+      {
+        document_id: 14643,
+        version: 7,
+        locales: [
+          { version: 10, lang: "fr", title: "Le topo de la Vanoise -  Tarentaise - Beaufortain", summary: null },
+        ],
+        quality: "medium",
+        author: "James Merel, Philippe Deslandes",
+        activities: ["mountain_climbing", "snow_ice_mixed", "rock_climbing"],
+        book_types: ["topo"],
+        available_langs: ["fr"],
+        type: "b",
+      },
+      {
+        document_id: 472409,
+        version: 2,
+        locales: [{ version: 1, lang: "fr", title: "Montagnes Magazine #396", summary: null }],
+        quality: "medium",
+        author: null,
+        activities: ["skitouring", "ice_climbing"],
+        book_types: ["magazine"],
+        available_langs: ["fr"],
+        type: "b",
+      },
+    ],
+    articles: [],
+    images: [],
+    xreports: [],
+    recent_outings: {
+      total: 64,
+      documents: [
+        recentOuting(1900552, GEAY, ["2026-04-26", "2026-04-26"], "good", 1425, ["4.1", "AD"], ["krok", 1573563]),
+        recentOuting(
+          1900761,
+          GEAY,
+          ["2026-04-26", "2026-04-26"],
+          "excellent",
+          1425,
+          ["4.1", "AD"],
+          ["Strap98", 1892731],
+        ),
+        recentOuting(
+          1895600,
+          "Mont Pourri : Versant W - Grand Col → Col des Roches → Glacier du Geay",
+          ["2026-04-15", "2026-04-15"],
+          "good",
+          2000,
+          ["3.3", "AD+"],
+          ["lagopède", 455914],
+        ),
+        recentOuting(1880674, GEAY, ["2026-03-07", "2026-03-08"], "good", 1600, ["4.1", "AD"], ["MarionO", 466185]),
+        recentOuting(1871490, GEAY, ["2026-02-07", "2026-02-08"], "good", 1900, ["4.1", "AD"], ["Apoutsiak", 1297]),
+        recentOuting(
+          1765476,
+          "Mont pourri pas le glacier du Geay, face N du mont Turia et retour par le grand col",
+          ["2025-05-01", "2025-05-02"],
+          "good",
+          2200,
+          ["5.1", "TD-"],
+          ["Brossollet", 1363331],
+        ),
+        recentOuting(1758144, GEAY, ["2025-04-10", "2025-04-10"], "good", 1425, ["4.1", "AD"], ["HugoFS", 1547657]),
+        recentOuting(1654405, GEAY, ["2024-06-13", "2024-06-13"], null, 1425, ["4.1", "AD"], ["maxb", 769107], "empty"),
+        recentOuting(1637100, GEAY, ["2024-04-14", "2024-04-14"], "good", 1425, ["4.1", "AD"], ["Tmaitre", 1553329]),
+        recentOuting(
+          1469382,
+          GEAY,
+          ["2022-03-15", "2022-03-16"],
+          null,
+          1425,
+          ["4.1", "AD"],
+          ["Aude.leglise", 1469329],
+          "empty",
+        ),
+      ],
+    },
+  },
+};
+
+// The lines under a heading, up to the next blank line or the end of the output.
+function section(result: string, heading: string): string[] {
+  const lines = result.split("\n");
+  const start = lines.indexOf(heading);
+  if (start === -1) return [];
+  const end = lines.findIndex((line, i) => i > start && line === "");
+  return lines.slice(start + 1, end === -1 ? undefined : end);
+}
+
+describe("get_route associations", () => {
+  it("lists the books of route 54085, title verbatim, without Author when it is null", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085);
+
+    const books = section(await handleGetRoute({ id: 54085 }), "## Associated books");
+
+    expect(books).toEqual([
+      "- [14643] Le topo de la Vanoise -  Tarentaise - Beaufortain | Author: James Merel, Philippe Deslandes | " +
+        "Types: topo | Activities: mountain_climbing, snow_ice_mixed, rock_climbing",
+      "- [472409] Montagnes Magazine #396 | Types: magazine | Activities: skitouring, ice_climbing",
+    ]);
+  });
+
+  it("lists the waypoints of route 54085 and marks only its main waypoint", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085);
+
+    const waypoints = section(await handleGetRoute({ id: 54085 }), "## Associated waypoints");
+
+    expect(waypoints).toEqual([
+      "- [37916] Mont Pourri (summit) | 3779m | main waypoint",
+      "- [104151] Refuge du Mont Pourri (hut) | 2373m",
+      "- [104593] Les Arcs (access) | 2120m",
+      "- [104602] Les Lanches (access) | 1530m",
+    ]);
+  });
+
+  it("lists the sibling routes of route 54085 with their summit name and ratings", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085);
+
+    const routes = section(await handleGetRoute({ id: 54085 }), "## Associated routes");
+
+    expect(routes).toEqual([
+      "- [55834] Mont Pourri : Versant W - Glacier du Geay → Grand Col (par le Col des Roches) | Global rating: PD | " +
+        "Engagement: II | Equipment: P1",
+    ]);
+  });
+
+  it("lists the 10 recent outings of 64 in search_outings format and says where to find more", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085);
+
+    const result = await handleGetRoute({ id: 54085 });
+    const outings = section(result, "## Recent outings (10 of 64)");
+
+    expect(outings).toHaveLength(11);
+    expect(outings[0]).toBe(
+      `- [1900552] ${GEAY} (skitouring) | 2026-04-26 | Conditions: good | Max elevation: 3779m | ` +
+        "Elevation gain: 1425m | Ski rating (Toponeige): 4.1 | Labande: AD | Areas: Vanoise [14409] | Author: krok",
+    );
+    expect(outings[9]).toBe(
+      `- [1469382] ${GEAY} (skitouring) | 2022-03-15 → 2022-03-16 | Max elevation: 3779m | ` +
+        "Elevation gain: 1425m | Ski rating (Toponeige): 4.1 | Labande: AD | Areas: Vanoise [14409] | " +
+        "Author: Aude.leglise",
+    );
+    expect(result.endsWith("\nMore: search_outings with route_id=54085")).toBe(true);
+  });
+
+  it("prints the association sections after the areas, in a fixed order, and no articles section for 54085", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085);
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    const headings = result.split("\n").filter((line) => line.startsWith("## "));
+    expect(headings).toEqual([
+      "## Associated waypoints",
+      "## Associated routes",
+      "## Associated books",
+      "## Recent outings (10 of 64)",
+    ]);
+    expect(result).not.toContain("null");
+    expect(result).not.toContain("undefined");
+  });
+
+  it("lists the articles of route 944120 and leaves out its empty books, routes and recent outings", async () => {
+    // Trimmed from the live GET /routes/944120 response (2026-10-04): a route with articles but no book,
+    // sibling route or outing, and a virtual waypoint at elevation 0.
+    const route944120 = {
+      document_id: 944120,
+      locales: [{ lang: "fr", title: "La dura dura", title_prefix: "Oliana" }],
+      activities: ["rock_climbing"],
+      main_waypoint_id: 189454,
+      associations: {
+        articles: [
+          {
+            document_id: 405598,
+            locales: [
+              { lang: "it", title: "Aperture 2013", summary: null },
+              { lang: "fr", title: "Chroniques - Ouvertures 2013", summary: null },
+            ],
+            categories: ["topoguide_supplements", "tags"],
+            article_type: "collab",
+            type: "c",
+          },
+          {
+            document_id: 947724,
+            locales: [{ lang: "fr", title: "Les voies 9b et au-delà", summary: "Historique des voies de 9b." }],
+            categories: ["topoguide_supplements"],
+            article_type: "collab",
+            type: "c",
+          },
+        ],
+        books: [],
+        routes: [],
+        waypoints: [
+          {
+            document_id: 189454,
+            locales: [{ lang: "fr", title: "Oliana" }],
+            waypoint_type: "climbing_outdoor",
+            elevation: 500,
+          },
+          {
+            document_id: 1947492,
+            locales: [
+              { lang: "en", title: "First Ascents in 2013" },
+              { lang: "fr", title: "Ouvertures 2013" },
+            ],
+            waypoint_type: "virtual",
+            elevation: 0,
+          },
+        ],
+        recent_outings: { documents: [], total: 0 },
+      },
+    };
+    mockGetRoute.mockResolvedValueOnce(route944120);
+
+    const result = await handleGetRoute({ id: 944120 });
+
+    expect(section(result, "## Associated articles")).toEqual([
+      "- [405598] Chroniques - Ouvertures 2013",
+      "- [947724] Les voies 9b et au-delà",
+    ]);
+    expect(section(result, "## Associated waypoints")).toEqual([
+      "- [189454] Oliana (climbing_outdoor) | 500m | main waypoint",
+      "- [1947492] Ouvertures 2013 (virtual) | 0m",
+    ]);
+    expect(result).not.toContain("## Associated books");
+    expect(result).not.toContain("## Associated routes");
+    expect(result).not.toContain("## Recent outings");
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["null lists", { waypoints: null, routes: null, books: null, articles: null, recent_outings: null }],
+  ])("prints no association section when associations are %s", async (_label, associations) => {
+    mockGetRoute.mockResolvedValueOnce({
+      document_id: 99,
+      locales: [{ lang: "fr", title: "Simple route" }],
+      activities: ["hiking"],
+      main_waypoint_id: null,
+      associations,
+    });
+
+    const result = await handleGetRoute({ id: 99 });
+
+    expect(result).not.toContain("## ");
+    expect(result).not.toContain("main waypoint");
+  });
 });

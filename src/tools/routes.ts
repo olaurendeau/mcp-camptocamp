@@ -2,7 +2,19 @@ import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteDetail, RouteRatingField, RouteSearchOptions } from "../api/camptocamp.js";
-import { pickLocale, isPresent, formatHeader, formatRouteName, formatRouteLine, formatAreasSection } from "./format.js";
+import {
+  pickLocale,
+  isPresent,
+  formatHeader,
+  formatRouteName,
+  formatRouteLine,
+  formatAreasSection,
+  formatAssociatedRouteLine,
+  formatWaypointLine,
+  formatBookLine,
+  formatTitledLine,
+  formatRecentOutings,
+} from "./format.js";
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 import { ACTIVITIES, ROUTE_CONFIGURATIONS, ROUTE_TYPES, enumValue } from "./enums.js";
@@ -160,6 +172,28 @@ function describeFilters(options: RouteSearchOptions): string[] {
   return filters;
 }
 
+// The documents linked to a route, so that one get_route call gives the books covering it (#58, S3).
+// An empty or missing list prints no section.
+function formatRouteAssociations(route: RouteDetail): string[] {
+  const associations = route.associations;
+  const lines: string[] = [];
+  const section = (heading: string, items: string[] = []): void => {
+    if (items.length > 0) lines.push(`\n## ${heading}`, ...items);
+  };
+
+  section(
+    "Associated waypoints",
+    associations?.waypoints?.map((waypoint) =>
+      formatWaypointLine(waypoint, { main: waypoint.document_id === route.main_waypoint_id }),
+    ),
+  );
+  section("Associated routes", associations?.routes?.map(formatAssociatedRouteLine));
+  section("Associated books", associations?.books?.map(formatBookLine));
+  section("Associated articles", associations?.articles?.map(formatTitledLine));
+  lines.push(...formatRecentOutings(associations?.recent_outings, `search_outings with route_id=${route.document_id}`));
+  return lines;
+}
+
 function formatRouteDetail(route: RouteDetail): string {
   const locale = pickLocale(route.locales);
   const lines: string[] = [];
@@ -179,6 +213,8 @@ function formatRouteDetail(route: RouteDetail): string {
   lines.push(...formatUserText("description", "Description", locale?.description));
   lines.push(...formatUserText("remarks", "Remarks", locale?.remarks));
   lines.push(...formatUserText("gear", "Gear", locale?.gear));
+
+  lines.push(...formatRouteAssociations(route));
 
   return lines.join("\n");
 }
@@ -215,7 +251,7 @@ export const routeToolDefinitions = [
     name: "get_route",
     title: "Get route details",
     description:
-      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, every rating labelled by its grading system (Toponeige ski rating, Labande, global rating, rock, ice, hiking…), elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, every rating labelled by its grading system (Toponeige ski rating, Labande, global rating, rock, ice, hiking…), elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. It also lists, with their IDs, the guidebooks and other books that cover it, its waypoints (the main one marked), sibling routes, related articles, and its most recent outings ('Recent outings (<shown> of <total>)'; list them all with search_outings with route_id). The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,
     inputSchema: getRouteSchema,
     handler: handleGetRoute,

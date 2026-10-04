@@ -1,13 +1,15 @@
 import { z } from "zod";
-import { documentId, searchQuery } from "./inputs.js";
+import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
 import { searchAreas, getArea } from "../api/camptocamp.js";
-import type { AreaSearchResponse, AreaDetail } from "../api/camptocamp.js";
+import type { AreaDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, formatHeader, formatAreaLine } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchAreasSchema = z.object({
   query: searchQuery("Area name in any language (e.g. 'Écrins', 'Valais', 'Wallis')", { allowBlank: false }),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
+  offset: searchOffset(),
   area_type: z
     .enum(["range", "admin_limits", "country"])
     .optional()
@@ -20,16 +22,6 @@ export const getAreaSchema = z.object({
 
 export type SearchAreasInput = z.infer<typeof searchAreasSchema>;
 export type GetAreaInput = z.infer<typeof getAreaSchema>;
-
-function formatAreaSearchResult(response: AreaSearchResponse): string {
-  if (response.documents.length === 0) {
-    return "No areas found.";
-  }
-
-  const lines: string[] = [`Found ${response.total} area(s). Showing ${response.documents.length}:\n`];
-  lines.push(...response.documents.map(formatAreaLine));
-  return lines.join("\n");
-}
 
 function formatAreaDetail(area: AreaDetail): string {
   const locale = pickLocale(area.locales);
@@ -45,8 +37,20 @@ function formatAreaDetail(area: AreaDetail): string {
 }
 
 export async function handleSearchAreas(input: SearchAreasInput): Promise<string> {
+  const { query, limit, offset, area_type } = input;
+  assertResultWindow(offset, limit);
+
   const response = await searchAreas(input);
-  return formatAreaSearchResult(response);
+  const filters = [`query "${query}"`];
+  if (area_type !== undefined) filters.push(`area type ${area_type}`);
+  return formatSearchPage({
+    kind: "area",
+    total: response.total,
+    offset,
+    limit,
+    lines: response.documents.map((area) => formatAreaLine(area)),
+    filters,
+  });
 }
 
 export async function handleGetArea(input: GetAreaInput): Promise<string> {
@@ -59,7 +63,8 @@ export const areaToolDefinitions = [
     name: "search_areas",
     title: "Search areas",
     description:
-      "Search Camptocamp.org areas by name (titles match in any language, fuzzily — check the returned titles; towns are not areas, search the range or département instead). area_type: range = mountain range/massif; admin_limits = administrative subdivision such as a French département or Swiss canton; country = country. Returns ID, title and type. Pass the returned ID as area_id to search_routes, search_waypoints and search_outings.",
+      "Search Camptocamp.org areas by name (titles match in any language, fuzzily — check the returned titles; towns are not areas, search the range or département instead). area_type: range = mountain range/massif; admin_limits = administrative subdivision such as a French département or Swiss canton; country = country. Returns ID, title and type, after a header giving the total, the offset and the filters. Pass the returned ID as area_id to search_routes, search_waypoints and search_outings. " +
+      PAGING_NOTE,
     inputSchema: searchAreasSchema,
     handler: handleSearchAreas,
   },

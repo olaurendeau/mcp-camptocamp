@@ -3,7 +3,10 @@
 // detail, association) can be passed.
 import type {
   AreaSummary,
+  BookSearchResult,
   Locale,
+  OutingListItem,
+  OutingListResponse,
   RouteAssociation,
   RouteSearchResult,
   TitledAssociation,
@@ -33,9 +36,14 @@ export function joinList(values?: string[] | null): string | undefined {
   return values && values.length > 0 ? values.join(", ") : undefined;
 }
 
+// The type isPresent narrows a present value to. The brand is never set at runtime: it only keeps the
+// false branch from narrowing to null | undefined, since "" and [] are absent too.
+declare const present: unique symbol;
+export type Present<T> = NonNullable<T> & { readonly [present]: true };
+
 // Rule R1 of #58: null, undefined, "" and [] are absent and their line is left out; 0 and false are
 // values and are printed (waypoint 1350803 is at elevation 0).
-export function isPresent<T>(value: T | null | undefined): value is T {
+export function isPresent<T>(value: T): value is Present<T> {
   if (value == null || value === "") return false;
   return !Array.isArray(value) || value.length > 0;
 }
@@ -82,9 +90,58 @@ export function formatAssociatedRouteLine(route: RouteAssociation): string {
   return [name, ...formatRatingParts(route)].join(" | ");
 }
 
-export function formatWaypointLine(waypoint: WaypointAssociation): string {
-  const elevation = isPresent(waypoint.elevation) ? ` | ${waypoint.elevation}m` : "";
-  return `- [${waypoint.document_id}] ${pickTitle(waypoint.locales)} (${waypoint.waypoint_type})${elevation}`;
+// "- [id] <title> (<type>) | <elevation>m", ending "| main waypoint" for a route's main_waypoint_id.
+export function formatWaypointLine(waypoint: WaypointAssociation, options: { main?: boolean } = {}): string {
+  const parts = [`- [${waypoint.document_id}] ${pickTitle(waypoint.locales)} (${waypoint.waypoint_type})`];
+  if (isPresent(waypoint.elevation)) parts.push(`${waypoint.elevation}m`);
+  if (options.main) parts.push("main waypoint");
+  return parts.join(" | ");
+}
+
+// A book in a search result or a route's associations: "- [id] <title> | Author: … | Types: … | Activities: …".
+// The title is printed verbatim: book 14643 has a double space in "Vanoise -  Tarentaise".
+export function formatBookLine(book: BookSearchResult): string {
+  const parts = [`- [${book.document_id}] ${pickTitle(book.locales)}`];
+  const types = joinList(book.book_types);
+  const activities = joinList(book.activities);
+  if (book.author) parts.push(`Author: ${book.author}`);
+  if (types) parts.push(`Types: ${types}`);
+  if (activities) parts.push(`Activities: ${activities}`);
+  return parts.join(" | ");
+}
+
+// An outing in search_outings and in a document's recent outings: "- [id] <title> (<activities>) | <dates> |
+// Conditions: … | Max elevation: Xm | Elevation gain: Ym | <ratings> | Areas: <ranges> | Author: …".
+export function formatOutingLine(outing: OutingListItem): string {
+  const parts: string[] = [];
+  const push = (label: string, value: string | number | null | undefined, unit = ""): void => {
+    if (isPresent(value)) parts.push(`${label}${value}${unit}`);
+  };
+
+  push("", formatDateRange(outing.date_start, outing.date_end));
+  push("Conditions: ", outing.condition_rating);
+  push("Max elevation: ", outing.elevation_max, "m");
+  push("Elevation gain: ", outing.height_diff_up, "m");
+  parts.push(...formatRatingParts(outing));
+
+  const ranges = (outing.areas ?? []).filter((area) => area.area_type === "range");
+  if (ranges.length > 0) {
+    parts.push(`Areas: ${ranges.map((area) => `${pickTitle(area.locales)} [${area.document_id}]`).join(", ")}`);
+  }
+  push("Author: ", outing.author?.name);
+
+  const head = `- [${outing.document_id}] ${pickTitle(outing.locales)} (${outing.activities.join(", ")})`;
+  return [head, ...parts].join(" | ");
+}
+
+// The recent outings of a route or waypoint: the API sends the latest few and the total count, so the
+// heading gives both and, when some are not shown, "More: <more>" says how to list them all.
+export function formatRecentOutings(recent: OutingListResponse | null | undefined, more: string): string[] {
+  if (!recent || recent.documents.length === 0) return [];
+  const shown = recent.documents.length;
+  const lines = [`\n## Recent outings (${shown} of ${recent.total})`, ...recent.documents.map(formatOutingLine)];
+  if (recent.total > shown) lines.push(`More: ${more}`);
+  return lines;
 }
 
 export function formatTitledLine(document: TitledAssociation): string {

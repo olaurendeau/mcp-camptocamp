@@ -65,3 +65,7 @@ export function formatSearchPage({
   }
   return output.join("\n");
 }
+
+/** Tool-description sentence explaining `offset` and the footer of a paged search. */
+export const PAGING_NOTE =
+  "Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more results follow — or 'Next page: offset=N (limit at most M)' near the window's end, where limit must be lowered to M — or says when they lie beyond Camptocamp's 10,000-result window.";

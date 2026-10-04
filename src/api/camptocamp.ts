@@ -61,7 +61,9 @@ interface KeywordOrAreaSearchOptions {
   area_id?: number;
   limit?: number; // default DEFAULT_LIMIT
 }
-export type WaypointSearchOptions = KeywordOrAreaSearchOptions;
+export interface WaypointSearchOptions extends KeywordOrAreaSearchOptions {
+  offset?: number; // sent only when given
+}
 
 // The 20 route rating systems (Labande counts as two), with the search parameter of each, from
 // c2corg v6_api's route search mapping. Each takes a `min,max` range of values from the system's scale.
@@ -121,12 +123,19 @@ function keywordOrAreaParams(options: KeywordOrAreaSearchOptions): URLSearchPara
 interface KeywordSearchOptions {
   query: string;
   limit?: number; // default DEFAULT_LIMIT
+  offset?: number; // sent only when given
 }
 export type BookSearchOptions = KeywordSearchOptions;
 export type ArticleSearchOptions = KeywordSearchOptions;
 
 function keywordParams(options: KeywordSearchOptions): URLSearchParams {
-  return new URLSearchParams({ q: options.query, limit: String(options.limit ?? DEFAULT_LIMIT), pl: PREFERRED_LANG });
+  const params = new URLSearchParams({
+    q: options.query,
+    limit: String(options.limit ?? DEFAULT_LIMIT),
+    pl: PREFERRED_LANG,
+  });
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  return params;
 }
 
 export async function searchRoutes(options: RouteSearchOptions): Promise<RouteSearchResponse> {
@@ -150,7 +159,9 @@ export async function getRoute(id: number): Promise<RouteDetail> {
 }
 
 export async function searchWaypoints(options: WaypointSearchOptions): Promise<WaypointSearchResponse> {
-  return getJson({ path: "/waypoints", params: keywordOrAreaParams(options), schema: waypointSearchResponseSchema });
+  const params = keywordOrAreaParams(options);
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  return getJson({ path: "/waypoints", params, schema: waypointSearchResponseSchema });
 }
 
 export async function getWaypoint(id: number): Promise<WaypointDetail> {

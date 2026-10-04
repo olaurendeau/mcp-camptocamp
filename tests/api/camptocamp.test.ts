@@ -225,6 +225,131 @@ describe("getRoute", () => {
     });
   });
 
+  it("keeps the route's associations and main waypoint through the response schema", async () => {
+    // Trimmed from the live GET /routes/54085 response (2026-10-04): one document per association list, without
+    // geometry and areas; GET /routes/944120 supplied the article, as 54085 has none.
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        document_id: 54085,
+        locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+        activities: ["skitouring"],
+        main_waypoint_id: 37916,
+        associations: {
+          waypoints: [
+            {
+              document_id: 37916,
+              version: 6,
+              locales: [{ version: 36, lang: "fr", title: "Mont Pourri", summary: "Le Mont Pourri…" }],
+              quality: "great",
+              waypoint_type: "summit",
+              elevation: 3779,
+              type: "w",
+            },
+          ],
+          routes: [
+            {
+              document_id: 55834,
+              locales: [{ lang: "fr", title: "Versant W - Glacier du Geay → Grand Col", title_prefix: "Mont Pourri" }],
+              activities: ["snow_ice_mixed"],
+              global_rating: "PD",
+              risk_rating: null,
+              type: "r",
+            },
+          ],
+          books: [
+            {
+              document_id: 472409,
+              version: 2,
+              locales: [{ version: 1, lang: "fr", title: "Montagnes Magazine #396", summary: null }],
+              quality: "medium",
+              author: null,
+              activities: ["skitouring", "ice_climbing"],
+              book_types: ["magazine"],
+              type: "b",
+            },
+          ],
+          articles: [
+            {
+              document_id: 947724,
+              locales: [{ lang: "fr", title: "Les voies 9b et au-delà", summary: null }],
+              article_type: "collab",
+              type: "c",
+            },
+          ],
+          images: [{ document_id: 192710 }],
+          xreports: [],
+          recent_outings: {
+            total: 64,
+            documents: [
+              {
+                document_id: 1900552,
+                locales: [{ version: 1, lang: "fr", title: "Mont Pourri : Versant W par le Glacier du Geay" }],
+                activities: ["skitouring"],
+                condition_rating: "good",
+                date_end: "2026-04-26",
+                date_start: "2026-04-26",
+                public_transport: false,
+                ski_rating: "4.1",
+                areas: [{ document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: "range" }],
+                author: { name: "krok", user_id: 1573563 },
+                type: "o",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const result = await getRoute(54085);
+
+    expect(result.main_waypoint_id).toBe(37916);
+    expect(result.associations).toEqual({
+      waypoints: [
+        {
+          document_id: 37916,
+          locales: [{ lang: "fr", title: "Mont Pourri" }],
+          waypoint_type: "summit",
+          elevation: 3779,
+        },
+      ],
+      routes: [
+        {
+          document_id: 55834,
+          locales: [{ lang: "fr", title: "Versant W - Glacier du Geay → Grand Col", title_prefix: "Mont Pourri" }],
+          global_rating: "PD",
+          risk_rating: null,
+        },
+      ],
+      books: [
+        {
+          document_id: 472409,
+          locales: [{ lang: "fr", title: "Montagnes Magazine #396", summary: null }],
+          quality: "medium",
+          author: null,
+          activities: ["skitouring", "ice_climbing"],
+          book_types: ["magazine"],
+        },
+      ],
+      articles: [{ document_id: 947724, locales: [{ lang: "fr", title: "Les voies 9b et au-delà" }] }],
+      recent_outings: {
+        total: 64,
+        documents: [
+          {
+            document_id: 1900552,
+            locales: [{ lang: "fr", title: "Mont Pourri : Versant W par le Glacier du Geay" }],
+            activities: ["skitouring"],
+            condition_rating: "good",
+            date_end: "2026-04-26",
+            date_start: "2026-04-26",
+            ski_rating: "4.1",
+            areas: [{ document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: "range" }],
+            author: { name: "krok", user_id: 1573563 },
+          },
+        ],
+      },
+    });
+  });
+
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 404));
 
@@ -265,6 +390,43 @@ describe("searchWaypoints", () => {
   });
 });
 
+// AC9.1: the four keyword searches page with `offset`, sent only when given.
+describe("offset on searchWaypoints, searchAreas, searchBooks and searchArticles", () => {
+  const searches: Array<[string, (offset?: number) => Promise<unknown>, string]> = [
+    ["searchWaypoints", (offset) => searchWaypoints({ query: "pourri", limit: 2, offset }), "/waypoints"],
+    ["searchAreas", (offset) => searchAreas({ query: "valais", limit: 2, offset }), "/areas"],
+    ["searchBooks", (offset) => searchBooks({ query: "mont blanc", limit: 2, offset }), "/books"],
+    ["searchArticles", (offset) => searchArticles({ query: "crampons", limit: 2, offset }), "/articles"],
+  ];
+
+  it.each(searches)("%s sends offset", async (_name, call, path) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await call(2);
+
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.pathname).toBe(path);
+    expect(url.searchParams.get("offset")).toBe("2");
+    expect(url.searchParams.get("limit")).toBe("2");
+  });
+
+  it.each(searches)("%s sends no offset when none is given", async (_name, call) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await call();
+
+    expect(new URL(mockFetch.mock.calls[0][0] as string).searchParams.has("offset")).toBe(false);
+  });
+
+  it("searchWaypoints sends offset 0", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchWaypoints({ area_id: 14403, offset: 0 });
+
+    expect(new URL(mockFetch.mock.calls[0][0] as string).searchParams.get("offset")).toBe("0");
+  });
+});
+
 describe("getWaypoint", () => {
   it("fetches waypoint by ID", async () => {
     const mockData = {
@@ -285,6 +447,81 @@ describe("getWaypoint", () => {
     expect(result.document_id).toBe(321);
     expect(result.elevation).toBe(3835);
     expect(result.geometry?.geom).toContain("Point");
+  });
+
+  it("keeps the hut fields, the summary and the access period", async () => {
+    // Trimmed from the live GET /waypoints/273946?lang=fr response (2026-10-04): description and access cut
+    // to 80 characters, areas, associations, maps and maps_info dropped; the summary set to show it survives.
+    const mockData = {
+      document_id: 273946,
+      version: 4,
+      locales: [
+        {
+          version: 7,
+          lang: "fr",
+          title: "Refuge du Lac Blanc",
+          description: "Le Refuge du Lac Blanc est niché sur le plateau de Praz Bouchet, entouré de plus",
+          summary: "Refuge gardé en été.",
+          access: "Depuis Termignon la Vanoise, prendre la route de Bellecombe (D126) ou la navette",
+          access_period: "De début juin à fin septembre",
+          external_resources: null,
+          topic_id: 212047,
+        },
+      ],
+      geometry: { version: 3, geom: '{"type": "Point", "coordinates": [758908.605978137, 5671856.762174786]}' },
+      quality: "fine",
+      waypoint_type: "hut",
+      elevation: 2300,
+      capacity: 0,
+      capacity_staffed: 18,
+      url: "https://www.refugedulacblanc-vanoise.com",
+      phone: "+33 (0)6 82 38 11 98",
+      phone_custodian: "+33 (0)6 45 98 77 26",
+      custodianship: "accessible_when_wardened",
+      matress_unstaffed: false,
+      blanket_unstaffed: false,
+      gas_unstaffed: false,
+      heating_unstaffed: false,
+      available_langs: ["fr"],
+      protected: false,
+      type: "w",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getWaypoint(273946);
+
+    expect(result.capacity).toBe(0);
+    expect(result.capacity_staffed).toBe(18);
+    expect(result.custodianship).toBe("accessible_when_wardened");
+    expect(result.phone).toBe("+33 (0)6 82 38 11 98");
+    expect(result.phone_custodian).toBe("+33 (0)6 45 98 77 26");
+    expect(result.url).toBe("https://www.refugedulacblanc-vanoise.com");
+    expect(result.locales[0].summary).toBe("Refuge gardé en été.");
+    expect(result.locales[0].access_period).toBe("De début juin à fin septembre");
+  });
+
+  it("accepts null hut fields, as a summit or a bivouac sends them", async () => {
+    // Trimmed from the live GET /waypoints/1810808?lang=fr response (2026-10-04): a bivouac with every hut
+    // field null.
+    const mockData = {
+      document_id: 1810808,
+      locales: [{ lang: "fr", title: "Bivouac du col de la Temple", summary: null, access_period: null }],
+      waypoint_type: "bivouac",
+      elevation: 3321,
+      capacity: null,
+      capacity_staffed: null,
+      custodianship: null,
+      phone: null,
+      phone_custodian: null,
+      url: null,
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getWaypoint(1810808);
+
+    expect(result.capacity).toBeNull();
+    expect(result.custodianship).toBeNull();
+    expect(result.locales[0].access_period).toBeNull();
   });
 
   it("throws on non-OK response", async () => {

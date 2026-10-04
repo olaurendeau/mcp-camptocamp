@@ -9,22 +9,28 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | Outil                 | Description                                                                                               |
 | --------------------- | --------------------------------------------------------------------------------------------------------- |
 | `search_routes`       | Recherche d'itinéraires (mot-clé, zone, point, activité, cotation, D+, type, configuration) ; paginée     |
-| `get_route`           | Détail complet d'un itinéraire par ID (sommet : titre, description, cotations, dénivelé, matériel, zones) |
-| `search_waypoints`    | Recherche des points de passage par nom et/ou zone `area_id` (sommets, refuges, bivouacs…)                |
-| `get_waypoint`        | Détail d'un point de passage par ID (altitude, coordonnées GPS, description, zones)                       |
+| `get_route`           | Détail d'un itinéraire par ID (sommet : titre, texte, cotations, dénivelé, zones, topos, points, sorties) |
+| `search_waypoints`    | Recherche des points de passage par nom et/ou zone `area_id` (sommets, refuges, bivouacs…) ; paginée      |
+| `get_waypoint`        | Détail d'un point par ID (altitude, GPS, zones ; refuge : capacité, gardiennage, tél., site, accès)       |
 | `search_user_outings` | Alias de `search_outings` par `user_id` : sorties d'un utilisateur, cotations nommées ; paginée           |
 | `get_outing`          | Détail d'une sortie par ID (cotations, conditions, météo, participants, itinéraires et leurs cotations)   |
 | `search_outings`      | Sorties récentes : mot-clé, zone, activité, dates, période annuelle, itinéraire, point, auteur ; paginée  |
-| `search_areas`        | Recherche des zones (massif, département/canton, pays) par nom ; ID réutilisable en `area_id`             |
+| `search_areas`        | Recherche des zones (massif, département/canton, pays) par nom ; ID réutilisable en `area_id` ; paginée   |
 | `get_area`            | Détail d'une zone par ID (type, résumé, description)                                                      |
-| `search_books`        | Recherche de livres (topos, histoire, romans…) par titre uniquement ; auteur/ISBN peu fiables             |
+| `search_books`        | Recherche de livres (topos, histoire, romans…) par titre uniquement ; auteur/ISBN peu fiables ; paginée   |
 | `get_book`            | Détail d'un livre par ID (auteur, éditeur, date, ISBN, pages, langues, itinéraires, points, articles)     |
-| `search_articles`     | Recherche d'articles par mot-clé (matériel, technique, environnement, récits…) ; collab/perso             |
+| `search_articles`     | Recherche d'articles par mot-clé (matériel, technique, environnement, récits…) ; collab/perso ; paginée   |
 | `get_article`         | Détail d'un article par ID (texte, auteur, type, itinéraires, points, sorties, livres liés)               |
 
 Chaque outil `get_*` commence par le titre et l'ID du document, suivis de son lien camptocamp.org (`**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>`) à citer comme source.
 
+`get_route` liste aussi, avec leurs ID, les livres (topos, magazines…) qui couvrent l'itinéraire, ses points de passage (le principal marqué `main waypoint`), les itinéraires voisins, les articles liés et ses sorties récentes (`## Recent outings (10 of 64)`, suivi de `More: search_outings with route_id=<id>` pour les voir toutes). Une liste vide n'imprime pas de section.
+
 Les textes libres écrits par les contributeurs (description, résumé, remarques, matériel, accès, conditions, météo…) sont imprimés entre `[begin user-written text: <champ>]` et `[end user-written text: <champ>]`, avec leurs titres Markdown abaissés de deux niveaux (`#`, `##` et titres soulignés par `===` ou `---`) et une coupe à 8000 caractères (`[truncated, N more characters]`). Les balises d'image Camptocamp deviennent `[image: <légende>]` (rien sans légende) et les liens internes `<libellé> (<type>/<id>)`, par exemple `[[routes/54080/fr|Col des Roches]]` → `Col des Roches (routes/54080)` ; le reste du balisage est conservé. La coupe compte les caractères après cette réécriture. La description de chaque outil `get_*` précise que ce texte est du contenu écrit par les utilisateurs, pas des instructions.
+
+Les recherches paginées (`search_routes`, `search_waypoints`, `search_outings`, `search_areas`, `search_books`, `search_articles`) acceptent `offset` et commencent par `Found <total> <type>(s). Showing <n> from offset <offset>:`, suivi d'une ligne `Filters:` listant les filtres appliqués. Quand d'autres résultats suivent, la sortie se termine par `Next page: offset=<n>`, ou `Next page: offset=<n> (limit at most <m>)` quand une page complète dépasserait la fenêtre de 10 000 résultats (`limit` doit alors descendre à `<m>`). Camptocamp ne renvoie que les 10 000 premiers résultats d'une recherche : si la page suivante commencerait à 10 000 ou au-delà, la sortie se termine par `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.`, et un appel avec `offset + limit` au-delà de 10 000 est refusé avant toute requête.
+
+`get_waypoint` distingue `**Capacity (unstaffed)**` (places hors gardiennage, `0` compris) de `**Capacity (staffed)**` (places en gardiennage) pour les refuges, gîtes, campings et autres points ; un bivouac n'a qu'un `**Capacity**` (nombre de places). `**Custodianship**` est imprimé tel que Camptocamp l'envoie (`accessible_when_wardened`, `always_accessible`, `key_needed`, `no_warden`, ou toute nouvelle valeur), et la période d'accès (`Access period`) est un texte libre recopié tel quel, jamais converti en dates.
 
 Chaque cotation d'itinéraire ou de sortie est nommée par son système, jamais par un simple `Rating` : `Ski rating (Toponeige): 4.1 | Ski exposure: E2 | Labande: S4 / AD | Global rating: F`, puis engagement, risque, équipement, rocher, artif, glace, mixte, via ferrata, randonnée, raquettes et VTT.
 
@@ -92,16 +98,22 @@ Prérequis : [Docker](https://docs.docker.com/get-docker/) et [Docker Compose](h
 Toutes les commandes npm passent par Docker via le `Makefile` :
 
 ```bash
-make install      # Installer les dépendances
-make check        # Équivalent du job `checks` de la CI (format, lint, types, couverture, build, tests du hook)
-make test         # Lancer les tests
-make lint         # Lint ESLint
-make typecheck    # Vérification des types
-make test-watch   # Tests en mode watch
-make build        # Compiler TypeScript
-make docker-build # Construire l'image de production
-make help         # Liste toutes les commandes
+make install       # Installer les dépendances
+make check         # Équivalent du job `checks` de la CI (format, lint, types, couverture, build, tests du hook)
+make test          # Lancer les tests
+make test-contract # Tests de contrat contre l'API Camptocamp réelle (npm run test:contract, réseau requis, hors make check)
+make lint          # Lint ESLint
+make typecheck     # Vérification des types
+make test-watch    # Tests en mode watch
+make build         # Compiler TypeScript
+make docker-build  # Construire l'image de production
+make help          # Liste toutes les commandes
 ```
+
+Les tests de contrat tournent aussi chaque lundi via le workflow `Contract` (`.github/workflows/contract.yml`, planifié ou lancé à la main, jamais requis sur une PR) :
+
+- GitHub désactive les workflows planifiés après 60 jours sans activité sur le dépôt : une exécution hebdomadaire absente ne vaut pas succès. GitHub refuse de lancer à la main un workflow désactivé : le réactiver d'abord (`gh workflow enable contract.yml` ou l'onglet Actions), puis le lancer avec `gh workflow run contract.yml`.
+- Les échecs des exécutions planifiées sont notifiés à l'utilisateur qui a modifié la ligne `cron` en dernier (après un squash merge, l'auteur de ce commit sur `main`) ou, si le workflow a été réactivé, à l'utilisateur qui l'a réactivé.
 
 ## Publication
 
