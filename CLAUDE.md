@@ -23,6 +23,7 @@ src/
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
     ├── enums.ts          # Camptocamp's closed value lists: filters (activities, route types, configurations), CUSTODIANSHIPS meanings
     ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window; quote() escapes echoed user input (query, rating bounds) onto one line
+    ├── filters.ts        # Shared rating and range filters of search_routes and search_outings: inputs, checks, Filters text
     ├── text.ts           # formatUserText: rewrites image tags and internal links, delimits, demotes and caps user-written text
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
@@ -51,6 +52,7 @@ tests/
     ├── format.test.ts      # Shared formatting helper unit tests
     ├── ratings.test.ts     # Rating label order, Labande joining and rating scales
     ├── paging.test.ts      # Shared search paging unit tests
+    ├── filters.test.ts     # Shared rating and range filter checks and messages
     ├── text.test.ts        # formatUserText unit tests
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests

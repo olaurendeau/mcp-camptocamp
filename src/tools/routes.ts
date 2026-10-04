@@ -20,32 +20,15 @@ import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 import { ACTIVITIES, ROUTE_CONFIGURATIONS, ROUTE_TYPES, enumValue } from "./enums.js";
 import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
+import { describeRange, heightDiffUp, rangeFilter, ratingBound, ratingFilter, ratingScales } from "./filters.js";
 
 const RATING_SYSTEM_NAMES = Object.keys(ROUTE_RATING_SYSTEMS) as [RouteRatingField, ...RouteRatingField[]];
 
-const RATING_SCALES = Object.entries(ROUTE_RATING_SYSTEMS)
-  .map(([field, { scale }]) => `${field}: ${scale.join(", ")}`)
-  .join("; ");
+const RATING_SCALES = ratingScales(RATING_SYSTEM_NAMES);
 
 // A list filter: one value or more, every one from `values`; the API matches routes having any of them.
 function enumList<T extends string>(values: readonly [T, ...T[]], description: string) {
   return z.array(enumValue(values)).min(1).optional().describe(description);
-}
-
-// The longest scale value is 4 characters ("M12+"); the cap keeps an invalid value short in the error that echoes it.
-const MAX_RATING_LENGTH = 8;
-
-function ratingBound(description: string) {
-  return z.string().max(MAX_RATING_LENGTH).optional().describe(description);
-}
-
-function heightDiffUp(bound: string) {
-  return z
-    .number()
-    .int()
-    .min(0)
-    .optional()
-    .describe(`${bound} elevation gain in metres, inclusive (routes without an elevation gain are excluded)`);
 }
 
 export const searchRoutesSchema = z.object({
@@ -67,8 +50,8 @@ export const searchRoutesSchema = z.object({
     ),
   rating_min: ratingBound("Easiest rating to include, from the scale of rating_system (e.g. '3.1' for ski_rating)"),
   rating_max: ratingBound("Hardest rating to include, from the scale of rating_system (e.g. 'AD' for global_rating)"),
-  height_diff_up_min: heightDiffUp("Lowest"),
-  height_diff_up_max: heightDiffUp("Highest"),
+  height_diff_up_min: heightDiffUp("Lowest", "routes"),
+  height_diff_up_max: heightDiffUp("Highest", "routes"),
   route_types: enumList(ROUTE_TYPES, `Route types, matching any of: ${ROUTE_TYPES.join(", ")}`),
   configuration: enumList(
     ROUTE_CONFIGURATIONS,
@@ -84,53 +67,13 @@ export const getRouteSchema = z.object({
 export type SearchRoutesInput = z.infer<typeof searchRoutesSchema>;
 export type GetRouteInput = z.infer<typeof getRouteSchema>;
 
-// "3.1 → 4.1", "from 3.1" or "up to 4.1".
-function describeRange(min: string | number | undefined, max: string | number | undefined, unit = ""): string {
-  if (min !== undefined && max !== undefined) return `${min} → ${max}${unit}`;
-  return min !== undefined ? `from ${min}${unit}` : `up to ${max}${unit}`;
-}
-
-// R7: the API ignores an off-scale bound (`grat=XX` returns every route), so check both before any request.
-function ratingFilter(input: SearchRoutesInput): RouteSearchOptions["rating"] {
-  const { rating_system: system, rating_min: min, rating_max: max } = input;
-  if (system === undefined) {
-    if (min !== undefined || max !== undefined) {
-      throw new Error(`rating_min and rating_max need a rating_system, one of: ${RATING_SYSTEM_NAMES.join(", ")}`);
-    }
-    return undefined;
-  }
-  if (min === undefined && max === undefined) {
-    throw new Error("rating_system needs rating_min, rating_max or both");
-  }
-
-  const { scale } = ROUTE_RATING_SYSTEMS[system];
-  for (const [name, value] of [
-    ["rating_min", min],
-    ["rating_max", max],
-  ] as const) {
-    if (value !== undefined && !scale.includes(value)) {
-      throw new Error(`${name} ${quote(value)} is not a valid ${system} value; valid values: ${scale.join(", ")}`);
-    }
-  }
-  if (min !== undefined && max !== undefined && scale.indexOf(min) > scale.indexOf(max)) {
-    throw new Error("rating_min must not be above rating_max");
-  }
-  return { system, ...(min !== undefined && { min }), ...(max !== undefined && { max }) };
-}
-
-function heightDiffUpFilter(input: SearchRoutesInput): RouteSearchOptions["height_diff_up"] {
-  const { height_diff_up_min: min, height_diff_up_max: max } = input;
-  if (min !== undefined && max !== undefined && min > max) {
-    throw new Error("height_diff_up_min must not be above height_diff_up_max");
-  }
-  if (min === undefined && max === undefined) return undefined;
-  return { ...(min !== undefined && { min }), ...(max !== undefined && { max }) };
-}
-
 // The options for searchRoutes, after every check that needs more than one field; only given filters are set.
 function routeSearchOptions(input: SearchRoutesInput): RouteSearchOptions {
-  const rating = ratingFilter(input);
-  const heightDiff = heightDiffUpFilter(input);
+  const rating = ratingFilter(input, RATING_SYSTEM_NAMES);
+  const heightDiff = rangeFilter(input.height_diff_up_min, input.height_diff_up_max, [
+    "height_diff_up_min",
+    "height_diff_up_max",
+  ]);
   // A blank query counts as missing: the API treats `q=` like no `q` and returns the whole database.
   const query = input.query?.trim() ? input.query : undefined;
   const filters: Omit<RouteSearchOptions, "limit" | "offset"> = {
