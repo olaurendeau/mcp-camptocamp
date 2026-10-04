@@ -4,7 +4,8 @@ import { z } from "zod";
 // re-exports them under these names). Only the fields a formatter dereferences are required;
 // every other field is `.nullish()` because the API sends null for unset values (route 53914:
 // height_diff_down, risk_rating…) and leaves some fields out of list items. Plain `z.object`
-// strips unknown keys. These schemas are not parsed at runtime yet: the types only.
+// strips unknown keys. getJson parses every 200 body with these schemas, so a field missing
+// here never reaches a formatter: declare new fields here first.
 
 // Shared parts
 
@@ -46,6 +47,10 @@ export const authorSchema = z.object({
   name: z.string(),
   user_id: z.number(),
 });
+
+// A malformed author (no user_id, wrong type…) becomes null: the document stays readable,
+// only its Author line is left out.
+const optionalAuthorSchema = authorSchema.nullish().catch(null);
 
 function searchResponseSchema<T extends z.ZodTypeAny>(document: T) {
   return z.object({ documents: z.array(document), total: z.number() });
@@ -132,7 +137,7 @@ export const outingSearchResultSchema = z.object({
   global_rating: z.string().nullish(),
   hiking_rating: z.string().nullish(),
   rock_free_rating: z.string().nullish(),
-  author: authorSchema.nullish(),
+  author: optionalAuthorSchema,
 });
 export const outingSearchResponseSchema = searchResponseSchema(outingSearchResultSchema);
 
@@ -162,7 +167,7 @@ export const outingDetailSchema = z.object({
   rock_free_rating: z.string().nullish(),
   condition_rating: z.string().nullish(),
   participant_count: z.number().nullish(),
-  author: authorSchema.nullish(),
+  author: optionalAuthorSchema,
   associations: z.object({ routes: z.array(routeAssociationSchema).nullish() }).nullish(),
 });
 
@@ -184,7 +189,7 @@ export const outingListItemSchema = z.object({
   hiking_rating: z.string().nullish(),
   snowshoe_rating: z.string().nullish(),
   areas: z.array(titledAssociationSchema.extend({ area_type: z.string().nullish() })).nullish(),
-  author: authorSchema.nullish(),
+  author: optionalAuthorSchema,
 });
 export const outingListResponseSchema = searchResponseSchema(outingListItemSchema);
 
@@ -271,7 +276,7 @@ export const articleDetailSchema = z.object({
   categories: z.array(z.string()).nullish(),
   activities: z.array(z.string()).nullish(),
   quality: z.string().nullish(),
-  author: authorSchema.nullish(),
+  author: optionalAuthorSchema,
   associations: z
     .object({
       routes: z.array(routeAssociationSchema).nullish(),

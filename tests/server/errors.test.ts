@@ -107,6 +107,159 @@ describe("network errors", () => {
   });
 });
 
+// Trimmed real GET /routes?q=gamma&pl=fr document: the API also sends keys no formatter reads.
+const GAMMA_SEARCH_DOCUMENT = {
+  document_id: 57842,
+  version: 14,
+  protected: false,
+  type: "r",
+  available_langs: ["fr", "es"],
+  locales: [{ lang: "fr", title: "Voie Gamma", title_prefix: "Barre des Écrins", version: 6, topic_id: null }],
+  activities: ["mountain_climbing"],
+  elevation_max: 4102,
+  height_diff_difficulties: 1100,
+  global_rating: "ED",
+  rock_free_rating: "6b+",
+  quality: "fine",
+};
+
+// Trimmed real GET /routes/53914: unset values come as null.
+const ROUTE_53914 = {
+  document_id: 53914,
+  version: 9,
+  locales: [
+    { lang: "fr", title: "Martine is on the rock", title_prefix: "Aiguille Dibona", description: "Belle voie." },
+  ],
+  activities: ["rock_climbing"],
+  elevation_max: 3131,
+  height_diff_down: null,
+  global_rating: "TD",
+  rock_free_rating: "6a",
+  geometry: { version: 12, geom_detail: null },
+  areas: [
+    { document_id: 14403, locales: [{ lang: "fr", title: "Écrins" }], area_type: "range", available_langs: null },
+  ],
+};
+
+describe("malformed 200 responses", () => {
+  function expectUnexpected(text: string) {
+    expect(text.startsWith("Error: Camptocamp API error:")).toBe(true);
+    expect(text).toContain("unexpected response");
+    expect(text).not.toContain("Cannot read properties");
+  }
+
+  it("reports a body that is not JSON", async () => {
+    stubFetch(new Response("<html><body>Maintenance</body></html>", { status: 200, statusText: "OK" }));
+    const client = await connect();
+
+    const text = await callForText(client, "search_routes", { query: "gamma" });
+
+    expectUnexpected(text);
+    expect(text).toBe("Error: Camptocamp API error: unexpected response (not JSON)");
+  });
+
+  it("reports a search response without documents", async () => {
+    stubFetch(jsonResponse({ total: 1 }));
+    const client = await connect();
+
+    const text = await callForText(client, "search_routes", { query: "gamma" });
+
+    expectUnexpected(text);
+    expect(text).toBe("Error: Camptocamp API error: unexpected response (documents: Required)");
+  });
+
+  it("reports a route without locales", async () => {
+    stubFetch(jsonResponse({ ...ROUTE_53914, locales: undefined }));
+    const client = await connect();
+
+    const text = await callForText(client, "get_route", { id: 53914 });
+
+    expectUnexpected(text);
+    expect(text).toBe("Error: Camptocamp API error: unexpected response (locales: Required)");
+  });
+
+  it("reports a search document whose activities is not an array", async () => {
+    stubFetch(jsonResponse({ documents: [{ ...GAMMA_SEARCH_DOCUMENT, activities: "mountain_climbing" }], total: 1 }));
+    const client = await connect();
+
+    const text = await callForText(client, "search_routes", { query: "gamma" });
+
+    expectUnexpected(text);
+    expect(text).toBe(
+      "Error: Camptocamp API error: unexpected response (documents.0.activities: Expected array, received string)",
+    );
+  });
+});
+
+describe("unknown extra fields", () => {
+  async function callForOutput(name: string, args: Record<string, unknown>, body: unknown) {
+    stubFetch(jsonResponse(body));
+    const client = await connect();
+    const result = await client.callTool({ name, arguments: args });
+    expect(result.isError, name).toBeFalsy();
+    return (result.content as Array<{ type: string; text: string }>)[0].text;
+  }
+
+  it("change nothing in search_routes, at top level or in a document", async () => {
+    const plain = await callForOutput(
+      "search_routes",
+      { query: "gamma" },
+      { documents: [GAMMA_SEARCH_DOCUMENT], total: 1 },
+    );
+    const extended = await callForOutput(
+      "search_routes",
+      { query: "gamma" },
+      { documents: [{ ...GAMMA_SEARCH_DOCUMENT, new_field: { nested: [1, 2] } }], total: 1, facets: { act: 3 } },
+    );
+
+    expect(plain).toContain("Voie Gamma");
+    expect(extended).toBe(plain);
+  });
+
+  it("change nothing in get_route, at top level or in a nested area", async () => {
+    const plain = await callForOutput("get_route", { id: 53914 }, ROUTE_53914);
+    const extended = await callForOutput(
+      "get_route",
+      { id: 53914 },
+      {
+        ...ROUTE_53914,
+        cooked: { fr: "<p>html</p>" },
+        areas: ROUTE_53914.areas.map((area) => ({ ...area, protected: false, type: "a" })),
+      },
+    );
+
+    expect(plain).toContain("Martine is on the rock");
+    expect(extended).toBe(plain);
+  });
+});
+
+describe("malformed author", () => {
+  // A GET /outings/{id} body whose author lacks its user_id.
+  const outing = {
+    document_id: 1630012,
+    version: 2,
+    locales: [{ lang: "fr", title: "Arête des Cosmiques", conditions: "Bonne trace." }],
+    activities: ["mountain_climbing"],
+    date_start: "2024-07-14",
+    date_end: "2024-07-14",
+    author: { name: "Jean Dupont" },
+  };
+
+  it("is left out of get_outing, which still shows the outing", async () => {
+    stubFetch(jsonResponse(outing));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_outing", arguments: { id: 1630012 } });
+
+    expect(result.isError).toBeFalsy();
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    expect(text).toContain("Arête des Cosmiques");
+    expect(text).toContain("Bonne trace.");
+    expect(text).not.toContain("Author");
+    expect(text).not.toContain("undefined");
+  });
+});
+
 describe("timeout", () => {
   afterEach(() => {
     vi.useRealTimers();

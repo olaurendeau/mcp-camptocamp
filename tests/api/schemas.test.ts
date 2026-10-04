@@ -3,6 +3,9 @@ import {
   routeDetailSchema,
   routeSearchResponseSchema,
   outingListItemSchema,
+  outingSearchResultSchema,
+  outingDetailSchema,
+  articleDetailSchema,
   bookDetailSchema,
 } from "../../src/api/schemas.js";
 
@@ -21,7 +24,7 @@ const route53914 = {
   exposition_rock_rating: null,
   aid_rating: null,
   route_types: ["loop_hut"],
-  geometry: { version: "12", geom_detail: null },
+  geometry: { version: 12, geom_detail: null },
   areas: [
     {
       document_id: 14403,
@@ -63,6 +66,21 @@ describe("response schemas", () => {
       locales: [],
       associations: null,
     });
+  });
+
+  it("keep a well-formed author and drop a malformed one instead of failing the document", () => {
+    const item = { document_id: 1, locales: [], activities: ["hiking"] };
+    const author = { name: "o.laurendeau", user_id: 430052 };
+    expect(outingListItemSchema.parse({ ...item, author: { ...author, forum_username: "x" } }).author).toEqual(author);
+    expect(outingListItemSchema.parse({ ...item, author: null }).author).toBeNull();
+    expect(outingListItemSchema.parse(item).author).toBeUndefined();
+
+    for (const malformed of [{ name: "o.laurendeau" }, { user_id: 430052 }, { ...author, user_id: "430052" }, "x"]) {
+      expect(outingListItemSchema.parse({ ...item, author: malformed })).toEqual({ ...item, author: null });
+      expect(outingSearchResultSchema.parse({ ...item, author: malformed }).author).toBeNull();
+      expect(outingDetailSchema.parse({ ...item, author: malformed }).author).toBeNull();
+      expect(articleDetailSchema.parse({ document_id: 2, locales: [], author: malformed }).author).toBeNull();
+    }
   });
 
   it("reject a response missing a field the formatters dereference", () => {

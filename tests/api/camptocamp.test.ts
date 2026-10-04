@@ -35,6 +35,9 @@ beforeEach(() => {
   mockFetch.mockReset();
 });
 
+// The required fields of every detail schema; each schema drops the ones it does not declare.
+const MINIMAL_DETAIL = { document_id: 1, locales: [], activities: [], waypoint_type: "summit", area_type: "range" };
+
 describe("searchRoutes", () => {
   it("calls the correct URL and returns parsed response", async () => {
     const mockData = {
@@ -1467,7 +1470,7 @@ describe("locale parameters", () => {
   ];
 
   it.each(details)("%s sends no query string", async (_name, call, path) => {
-    mockFetch.mockResolvedValueOnce(makeResponse({ document_id: 675555, locales: [] }));
+    mockFetch.mockResolvedValueOnce(makeResponse({ ...MINIMAL_DETAIL, document_id: 675555 }));
 
     await call(675555);
 
@@ -1498,7 +1501,7 @@ describe("request headers and timeout signal", () => {
   ];
 
   it.each(calls)("%s sends the User-Agent and an AbortSignal", async (_name, call) => {
-    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0, document_id: 1, locales: [] }));
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0, ...MINIMAL_DETAIL }));
 
     await call();
 

@@ -8,11 +8,13 @@ import {
 } from "../../src/tools/articles.js";
 import * as api from "../../src/api/camptocamp.js";
 import type { ArticleDetail } from "../../src/api/camptocamp.js";
+import { articleDetailSchema, articleSearchResponseSchema } from "../../src/api/schemas.js";
+import { throughSchema } from "./through-schema.js";
 
 vi.mock("../../src/api/camptocamp.js");
 
-const mockSearchArticles = vi.mocked(api.searchArticles);
-const mockGetArticle = vi.mocked(api.getArticle);
+const mockSearchArticles = throughSchema(vi.mocked(api.searchArticles), articleSearchResponseSchema);
+const mockGetArticle = throughSchema(vi.mocked(api.getArticle), articleDetailSchema);
 
 function expectNoPlaceholder(text: string) {
   for (const word of ["undefined", "null"]) expect(text).not.toContain(word);
