@@ -1437,6 +1437,35 @@ describe("get_route associations", () => {
     ]);
   });
 
+  // Review of #188: the placeholder of a malformed main waypoint keeps the "main waypoint" marker.
+  it("keeps the main waypoint marker on the placeholder line of a malformed main waypoint", async () => {
+    const [summit, ...others] = route54085.associations.waypoints;
+    mockGetRoute.mockResolvedValueOnce({
+      ...route54085,
+      associations: { ...route54085.associations, waypoints: [{ ...summit, waypoint_type: null }, ...others] },
+    } as never);
+
+    expect(section(await handleGetRoute({ id: 54085 }), "## Associated waypoints")).toEqual([
+      "- [37916] (not shown: Camptocamp sent this item in an unexpected format) | main waypoint",
+      "- [104151] Refuge du Mont Pourri (hut) | 2373m",
+      "- [104593] Les Arcs (access) | 2120m",
+      "- [104602] Les Lanches (access) | 1530m",
+    ]);
+  });
+
+  it("marks no placeholder without a readable ID as the main waypoint of a route without one", async () => {
+    const { waypoints } = route54085.associations;
+    mockGetRoute.mockResolvedValueOnce({
+      ...route54085,
+      main_waypoint_id: undefined,
+      associations: { ...route54085.associations, waypoints: [{ ...waypoints[0], document_id: "37916" }] },
+    } as never);
+
+    expect(section(await handleGetRoute({ id: 54085 }), "## Associated waypoints")).toEqual([
+      "- (not shown: Camptocamp sent an item in an unexpected format)",
+    ]);
+  });
+
   it("prints a placeholder line in every list of get_route, without the ID when it is unreadable", async () => {
     const { routes, books, recent_outings } = route54085.associations;
     const [firstOuting, ...outings] = recent_outings.documents;
