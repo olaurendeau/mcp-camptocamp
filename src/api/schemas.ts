@@ -81,6 +81,38 @@ export const authorSchema = z.object({
 // only its Author line is left out.
 const optionalAuthorSchema = authorSchema.nullish().catch(null);
 
+// One malformed item of a list (an associated waypoint with `waypoint_type: null`…) must not fail the whole
+// response and hide the document's ratings and description (#129, decision D2 on #153): it becomes a
+// MalformedItem, printed as a placeholder line that keeps its ID when readable, so nothing disappears silently
+// and counts stay right. The list itself must still be an array, and the fields outside lists stay strict.
+export interface MalformedItem {
+  malformed: true;
+  document_id?: number;
+}
+
+export function isMalformed(item: object): item is MalformedItem {
+  return (item as Partial<MalformedItem>).malformed === true;
+}
+
+function readableId(raw: unknown): number | undefined {
+  if (typeof raw !== "object" || raw === null || !("document_id" in raw)) return undefined;
+  const id = raw.document_id;
+  return typeof id === "number" && Number.isSafeInteger(id) && id > 0 ? id : undefined;
+}
+
+// An array whose items are parsed one by one: a well-formed item goes through `item`, any other becomes a
+// MalformedItem. Schemas strip unknown keys, so a parsed item never carries `malformed`.
+export function tolerantArray<T extends z.ZodTypeAny>(item: T) {
+  return z.array(z.unknown()).transform((items) =>
+    items.map((raw): z.output<T> | MalformedItem => {
+      const parsed = item.safeParse(raw);
+      if (parsed.success) return parsed.data as z.output<T>;
+      const id = readableId(raw);
+      return id === undefined ? { malformed: true } : { malformed: true, document_id: id };
+    }),
+  );
+}
+
 // A Camptocamp account linked to an outing (associations.users). Its locales carry no title, only lang and version.
 export const userAssociationSchema = z.object({
   document_id: z.number(),
@@ -89,7 +121,7 @@ export const userAssociationSchema = z.object({
 export type UserAssociation = z.infer<typeof userAssociationSchema>;
 
 function searchResponseSchema<T extends z.ZodTypeAny>(document: T) {
-  return z.object({ documents: z.array(document), total: z.number() });
+  return z.object({ documents: tolerantArray(document), total: z.number() });
 }
 
 // Items of GET /outings?sort=-date_end… (search_outings, search_user_outings) and of a route or waypoint's
@@ -165,14 +197,14 @@ export const routeDetailSchema = z.object({
   main_waypoint_id: z.number().nullish(), // marks this waypoint among associations.waypoints
   // Typed because the live API sends it; never displayed.
   geometry: z.object({ geom_detail: z.string().nullish() }).nullish(),
-  areas: z.array(areaSummarySchema).nullish(),
+  areas: tolerantArray(areaSummarySchema).nullish(),
   // images and xreports are left out on purpose: no tool can follow them. Route 54085 sends empty lists.
   associations: z
     .object({
-      waypoints: z.array(waypointAssociationSchema).nullish(),
-      routes: z.array(routeAssociationSchema).nullish(),
-      books: z.array(bookSearchResultSchema).nullish(), // the same fields as a /books search result
-      articles: z.array(titledAssociationSchema).nullish(),
+      waypoints: tolerantArray(waypointAssociationSchema).nullish(),
+      routes: tolerantArray(routeAssociationSchema).nullish(),
+      books: tolerantArray(bookSearchResultSchema).nullish(), // the same fields as a /books search result
+      articles: tolerantArray(titledAssociationSchema).nullish(),
       // The 10 latest outings, shaped like /outings list items, and the route's outing count.
       recent_outings: searchResponseSchema(outingListItemSchema).nullish(),
     })
@@ -211,13 +243,13 @@ export const waypointDetailSchema = z.object({
   phone_custodian: z.string().nullish(),
   url: z.string().nullish(),
   geometry: z.object({ geom: z.string().nullish() }).nullish(), // GeoJSON Point as a string
-  areas: z.array(areaSummarySchema).nullish(),
+  areas: tolerantArray(areaSummarySchema).nullish(),
   // waypoints, waypoint_children, articles, images and xreports are not read. all_routes is the list Camptocamp
   // shows on the waypoint's page (27 for hut 104151); the response has no routes key.
   associations: z
     .object({
       all_routes: routeSearchResponseSchema.nullish(), // shaped like /routes search results, with their total
-      books: z.array(bookSearchResultSchema).nullish(), // the same fields as a /books search result
+      books: tolerantArray(bookSearchResultSchema).nullish(), // the same fields as a /books search result
       // The 10 latest outings, shaped like /outings list items, and the waypoint's outing count.
       recent_outings: searchResponseSchema(outingListItemSchema).nullish(),
     })
@@ -252,8 +284,8 @@ export const outingDetailSchema = z.object({
   // linked to the outing, in API order, and the first one is not necessarily its author (outing 1757161).
   associations: z
     .object({
-      routes: z.array(routeAssociationSchema).nullish(),
-      users: z.array(userAssociationSchema).nullish(),
+      routes: tolerantArray(routeAssociationSchema).nullish(),
+      users: tolerantArray(userAssociationSchema).nullish(),
     })
     .nullish(),
 });
@@ -302,9 +334,9 @@ export const bookDetailSchema = z.object({
   book_types: z.array(z.string()).nullish(),
   associations: z
     .object({
-      routes: z.array(routeAssociationSchema).nullish(),
-      waypoints: z.array(waypointAssociationSchema).nullish(),
-      articles: z.array(titledAssociationSchema).nullish(),
+      routes: tolerantArray(routeAssociationSchema).nullish(),
+      waypoints: tolerantArray(waypointAssociationSchema).nullish(),
+      articles: tolerantArray(titledAssociationSchema).nullish(),
     })
     .nullish(),
 });
@@ -337,11 +369,11 @@ export const articleDetailSchema = z.object({
   author: optionalAuthorSchema,
   associations: z
     .object({
-      routes: z.array(routeAssociationSchema).nullish(),
-      waypoints: z.array(waypointAssociationSchema).nullish(),
-      articles: z.array(titledAssociationSchema).nullish(),
-      outings: z.array(titledAssociationSchema).nullish(),
-      books: z.array(titledAssociationSchema).nullish(),
+      routes: tolerantArray(routeAssociationSchema).nullish(),
+      waypoints: tolerantArray(waypointAssociationSchema).nullish(),
+      articles: tolerantArray(titledAssociationSchema).nullish(),
+      outings: tolerantArray(titledAssociationSchema).nullish(),
+      books: tolerantArray(titledAssociationSchema).nullish(),
     })
     .nullish(),
 });

@@ -1396,6 +1396,61 @@ describe("get_route associations", () => {
     expect(result).not.toContain("undefined");
   });
 
+  // AC4.1–AC4.3 on #153: one malformed item no longer turns get_route into "unexpected response".
+  it("keeps the ratings and description of route 54085 when its hut has waypoint_type null", async () => {
+    const [summit, hut, ...access] = route54085.associations.waypoints;
+    mockGetRoute.mockResolvedValueOnce({
+      ...route54085,
+      locales: [{ ...route54085.locales[0], description: "Montée par le glacier du Geay." }],
+      associations: { ...route54085.associations, waypoints: [summit, { ...hut, waypoint_type: null }, ...access] },
+    } as never);
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(result).toContain("**Ski rating (Toponeige)**: 4.1");
+    expect(result).toContain("Montée par le glacier du Geay.");
+    expect(section(result, "## Associated waypoints")).toEqual([
+      "- [37916] Mont Pourri (summit) | 3779m | main waypoint",
+      "- [104151] (not shown: Camptocamp sent this item in an unexpected format)",
+      "- [104593] Les Arcs (access) | 2120m",
+      "- [104602] Les Lanches (access) | 1530m",
+    ]);
+  });
+
+  it("prints a placeholder line in every list of get_route, without the ID when it is unreadable", async () => {
+    const { routes, books, recent_outings } = route54085.associations;
+    const [firstOuting, ...outings] = recent_outings.documents;
+    mockGetRoute.mockResolvedValueOnce({
+      ...route54085,
+      areas: [{ document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: null }],
+      associations: {
+        ...route54085.associations,
+        routes: [{ ...routes[0], document_id: "55834" }],
+        books: [books[0], { ...books[1], locales: null }],
+        articles: [{ document_id: 405598, locales: [{ lang: "fr", title: null }] }],
+        recent_outings: { total: 64, documents: [{ ...firstOuting, activities: null }, ...outings] },
+      },
+    } as never);
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(section(result, "## Areas")).toEqual([
+      "- [14409] (not shown: Camptocamp sent this item in an unexpected format)",
+    ]);
+    expect(section(result, "## Associated routes")).toEqual([
+      "- (not shown: Camptocamp sent an item in an unexpected format)",
+    ]);
+    expect(section(result, "## Associated books")[1]).toBe(
+      "- [472409] (not shown: Camptocamp sent this item in an unexpected format)",
+    );
+    expect(section(result, "## Associated articles")).toEqual([
+      "- [405598] (not shown: Camptocamp sent this item in an unexpected format)",
+    ]);
+    const recent = section(result, "## Recent outings (10 of 64)");
+    expect(recent[0]).toBe("- [1900552] (not shown: Camptocamp sent this item in an unexpected format)");
+    expect(recent).toHaveLength(11);
+  });
+
   // Trimmed from the live GET /routes/944120 response (2026-10-04): a route with articles but no book,
   // sibling route or outing, and a virtual waypoint at elevation 0.
   const route944120 = {

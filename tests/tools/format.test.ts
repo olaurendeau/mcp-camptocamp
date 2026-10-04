@@ -17,6 +17,8 @@ import {
   formatBookLine,
   formatOutingLine,
   formatRecentOutings,
+  formatMalformed,
+  formatListItems,
 } from "../../src/tools/format.js";
 import type { AreaSearchResult } from "../../src/api/camptocamp.js";
 
@@ -525,6 +527,50 @@ describe("formatAreasSection", () => {
     expect(formatAreasSection([valaisCanton, ecrins])).toEqual([
       "\n## Areas",
       "- [14384] Valais (admin_limits)",
+      "- [14403] Écrins (range)",
+    ]);
+  });
+});
+
+// #129: a malformed list item (see tolerantArray in src/api/schemas.ts) prints a placeholder instead of failing.
+describe("formatMalformed", () => {
+  it("keeps the item's ID when it is readable", () => {
+    expect(formatMalformed({ malformed: true, document_id: 104151 })).toBe(
+      "[104151] (not shown: Camptocamp sent this item in an unexpected format)",
+    );
+  });
+
+  it("says an item was skipped when its ID is not readable", () => {
+    expect(formatMalformed({ malformed: true })).toBe("(not shown: Camptocamp sent an item in an unexpected format)");
+  });
+});
+
+describe("formatListItems", () => {
+  it("formats the well-formed items and prints a placeholder line for each malformed one, in API order", () => {
+    const items = [ecrins, { malformed: true, document_id: 14384 } as const, { malformed: true } as const];
+
+    expect(formatListItems(items, formatAreaLine)).toEqual([
+      "- [14403] Écrins (range)",
+      "- [14384] (not shown: Camptocamp sent this item in an unexpected format)",
+      "- (not shown: Camptocamp sent an item in an unexpected format)",
+    ]);
+  });
+
+  it("is used for the recent outings, whose counts stay those of the API", () => {
+    const documents = [outing1900552, { malformed: true, document_id: 1900761 } as const];
+
+    expect(formatRecentOutings({ documents, total: 64 }, "search_outings with route_id=54085")).toEqual([
+      "\n## Recent outings (2 of 64)",
+      OUTING_1900552_LINE,
+      "- [1900761] (not shown: Camptocamp sent this item in an unexpected format)",
+      "More: search_outings with route_id=54085",
+    ]);
+  });
+
+  it("is used for the areas section", () => {
+    expect(formatAreasSection([{ malformed: true }, ecrins])).toEqual([
+      "\n## Areas",
+      "- (not shown: Camptocamp sent an item in an unexpected format)",
       "- [14403] Écrins (range)",
     ]);
   });

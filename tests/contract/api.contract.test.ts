@@ -17,14 +17,23 @@ import {
   searchRoutes,
   searchWaypoints,
 } from "../../src/api/camptocamp.js";
+import { isMalformed, type MalformedItem } from "../../src/api/schemas.js";
+import type { ListOf } from "../../src/tools/format.js";
+import { handleGetRoute } from "../../src/tools/routes.js";
+import { handleGetWaypoint } from "../../src/tools/waypoints.js";
+import { handleGetOuting } from "../../src/tools/outings.js";
+import { handleGetBook } from "../../src/tools/books.js";
+import { handleGetArticle } from "../../src/tools/articles.js";
+import { wellFormed } from "../api/well-formed.js";
 
 interface Document {
   document_id: number;
   locales: { lang: string; title: string }[];
 }
 
+// A search document the schema could not parse is a MalformedItem; wellFormed fails the test on one.
 interface Search {
-  documents: Document[];
+  documents: readonly (Document | MalformedItem)[];
   total: number;
 }
 
@@ -45,7 +54,7 @@ function overlapsJune(start: string, end: string): boolean {
 function expectNonEmptySearch(result: Search): void {
   expect(result.documents.length).toBeGreaterThan(0);
   expect(result.total).toBeGreaterThanOrEqual(result.documents.length);
-  for (const document of result.documents) {
+  for (const document of wellFormed(result.documents)) {
     expect(document.document_id).toBeGreaterThan(0);
     expect(document.locales.length).toBeGreaterThan(0);
   }
@@ -127,7 +136,7 @@ describe("searches (AC8.2, AC8.3)", () => {
     const result = await searchOutings({ area_id: 14403 });
 
     expectNonEmptySearch(result);
-    for (const outing of result.documents) expect(outing.author).toEqual(AUTHOR);
+    for (const outing of wellFormed(result.documents)) expect(outing.author).toEqual(AUTHOR);
   });
 
   // `u=`, behind search_outings {user_id} and its search_user_outings alias. It matches the outings the user
@@ -136,12 +145,12 @@ describe("searches (AC8.2, AC8.3)", () => {
     const result = await searchOutings({ user_id: 430052 });
 
     expectNarrows(result, await allOutings());
-    for (const outing of result.documents) expect(outing.author).toEqual(AUTHOR);
+    for (const outing of wellFormed(result.documents)) expect(outing.author).toEqual(AUTHOR);
   });
 
   it("outings of user 466185 on 2025-03-31 include 1757161, written by user 944173", async () => {
     const result = await searchOutings({ user_id: 466185, date_from: "2025-03-31", date_to: "2025-03-31" });
-    const outing = result.documents.find((document) => document.document_id === 1757161);
+    const outing = wellFormed(result.documents).find((document) => document.document_id === 1757161);
 
     expect(outing, "outing 1757161 is no longer found by u=466185").toBeDefined();
     expect(outing?.author).toEqual({ ...AUTHOR, user_id: 944173 });
@@ -151,7 +160,7 @@ describe("searches (AC8.2, AC8.3)", () => {
   it("outing 1757161 lists its linked users 466185 and 944173", async () => {
     const outing = await getOuting(1757161);
 
-    expect(outing.associations?.users?.map((user) => user.document_id)).toEqual([466185, 944173]);
+    expect(wellFormed(outing.associations?.users).map((user) => user.document_id)).toEqual([466185, 944173]);
   });
 
   // `period=2020-06-01,2020-06-30`: the same days in every year.
@@ -160,7 +169,7 @@ describe("searches (AC8.2, AC8.3)", () => {
     const result = await searchOutings({ waypoint_id: 37916, period: { start: "06-01", end: "06-30" } });
 
     expectNarrows(result, await outingsAtWaypoint37916());
-    for (const outing of result.documents) {
+    for (const outing of wellFormed(result.documents)) {
       const start = outing.date_start ?? outing.date_end ?? "";
       const end = outing.date_end ?? outing.date_start ?? "";
       expect(overlapsJune(start, end), `outing ${outing.document_id} (${start} → ${end})`).toBe(true);
@@ -183,8 +192,10 @@ describe("searches (AC8.2, AC8.3)", () => {
   // (the detail of route 675555 has both it and en).
   it("route 675555 comes back from a search with its single en locale", async () => {
     const result = await searchRoutes({ query: "Dente del Resegone" });
-    const route = result.documents.find((document) => document.document_id === 675555);
-    const found = result.documents.map((document) => document.document_id).join(", ");
+    const route = wellFormed(result.documents).find((document) => document.document_id === 675555);
+    const found = wellFormed(result.documents)
+      .map((document) => document.document_id)
+      .join(", ");
 
     expect(route, `route 675555 is not in the results anymore (found: ${found}); pick another route`).toBeDefined();
     expect(
@@ -203,7 +214,11 @@ describe("search filters narrow live results", () => {
       const result = await searchRoutes({ area_id: VANOISE, activity: "skitouring" });
 
       expectNarrows(result, await routesInVanoise());
-      expectMostMatch(result.documents, (route) => route.activities.includes("skitouring"), "act=skitouring");
+      expectMostMatch(
+        wellFormed(result.documents),
+        (route) => route.activities.includes("skitouring"),
+        "act=skitouring",
+      );
     });
 
     it("trat: ski rating 3.1 → 4.1", async () => {
@@ -211,7 +226,11 @@ describe("search filters narrow live results", () => {
 
       expectNarrows(result, await routesInVanoise());
       const inRange = ["3.1", "3.2", "3.3", "4.1"];
-      expectMostMatch(result.documents, (route) => inRange.includes(route.ski_rating ?? ""), "trat=3.1,4.1");
+      expectMostMatch(
+        wellFormed(result.documents),
+        (route) => inRange.includes(route.ski_rating ?? ""),
+        "trat=3.1,4.1",
+      );
     });
 
     it("hdif: height difference up 1500 → 2000 m", async () => {
@@ -219,7 +238,7 @@ describe("search filters narrow live results", () => {
 
       expectNarrows(result, await routesInVanoise());
       const inRange = (up?: number | null) => up != null && up >= 1500 && up <= 2000;
-      expectMostMatch(result.documents, (route) => inRange(route.height_diff_up), "hdif=1500,2000");
+      expectMostMatch(wellFormed(result.documents), (route) => inRange(route.height_diff_up), "hdif=1500,2000");
     });
 
     // Route types and configuration are not in the search results: only the totals tell.
@@ -239,7 +258,7 @@ describe("search filters narrow live results", () => {
     ]);
 
     expectNarrows(result, unfiltered);
-    expectMostMatch(result.documents, (waypoint) => waypoint.waypoint_type === "hut", "wtyp=hut");
+    expectMostMatch(wellFormed(result.documents), (waypoint) => waypoint.waypoint_type === "hut", "wtyp=hut");
   });
 
   describe("books about Mont Blanc", () => {
@@ -247,14 +266,18 @@ describe("search filters narrow live results", () => {
       const result = await searchBooks({ query: "Mont Blanc", book_type: "topo" });
 
       expectNarrows(result, await mountBlancBooks());
-      expectMostMatch(result.documents, (book) => book.book_types?.includes("topo") ?? false, "btyp=topo");
+      expectMostMatch(wellFormed(result.documents), (book) => book.book_types?.includes("topo") ?? false, "btyp=topo");
     });
 
     it("act: activity skitouring", async () => {
       const result = await searchBooks({ query: "Mont Blanc", activity: "skitouring" });
 
       expectNarrows(result, await mountBlancBooks());
-      expectMostMatch(result.documents, (book) => book.activities?.includes("skitouring") ?? false, "act=skitouring");
+      expectMostMatch(
+        wellFormed(result.documents),
+        (book) => book.activities?.includes("skitouring") ?? false,
+        "act=skitouring",
+      );
     });
   });
 });
@@ -265,6 +288,79 @@ describe("authors survive parsing", () => {
     const article = await getArticle(716039);
 
     expect(article.author).toEqual(AUTHOR);
+  });
+});
+
+// AC4.5 on #153: a list item the schema cannot parse becomes a placeholder line instead of failing the response,
+// so shape drift in a list would go unnoticed. Each list must be non-empty with every item parsed, and the
+// handler's output must have no placeholder.
+describe("association lists keep every item (AC4.5)", () => {
+  function expectListsWellFormed(lists: Record<string, ListOf<object> | null | undefined>): void {
+    for (const [name, list] of Object.entries(lists)) {
+      expect(list?.length ?? 0, `${name} is empty: pick another document`).toBeGreaterThan(0);
+      expect(
+        list?.filter((item) => isMalformed(item)),
+        `${name}: items the schema could not parse`,
+      ).toEqual([]);
+    }
+  }
+
+  it("route 54085: waypoints, routes, books, recent outings, areas", async () => {
+    const route = await getRoute(54085);
+
+    const { waypoints, routes, books, recent_outings } = route.associations ?? {};
+    expectListsWellFormed({ waypoints, routes, books, recent_outings: recent_outings?.documents, areas: route.areas });
+    expect(await handleGetRoute({ id: 54085 })).not.toContain("not shown:");
+  });
+
+  it("waypoint 104151: routes, recent outings, areas", async () => {
+    const waypoint = await getWaypoint(104151);
+
+    const { all_routes, recent_outings } = waypoint.associations ?? {};
+    expectListsWellFormed({
+      all_routes: all_routes?.documents,
+      recent_outings: recent_outings?.documents,
+      areas: waypoint.areas,
+    });
+    expect(await handleGetWaypoint({ id: 104151 })).not.toContain("not shown:");
+  });
+
+  it("waypoint 37355: books", async () => {
+    const waypoint = await getWaypoint(37355);
+
+    expectListsWellFormed({ books: waypoint.associations?.books });
+    expect(await handleGetWaypoint({ id: 37355 })).not.toContain("not shown:");
+  });
+
+  it("outing 1757161: routes, users", async () => {
+    const outing = await getOuting(1757161);
+
+    const { routes, users } = outing.associations ?? {};
+    expectListsWellFormed({ routes, users });
+    expect(await handleGetOuting({ id: 1757161 })).not.toContain("not shown:");
+  });
+
+  it("book 14643: routes, waypoints", async () => {
+    const book = await getBook(14643);
+
+    const { routes, waypoints } = book.associations ?? {};
+    expectListsWellFormed({ routes, waypoints });
+    expect(await handleGetBook({ id: 14643 })).not.toContain("not shown:");
+  });
+
+  it("article 469577: routes, waypoints, articles, books", async () => {
+    const article = await getArticle(469577);
+
+    const { routes, waypoints, articles, books } = article.associations ?? {};
+    expectListsWellFormed({ routes, waypoints, articles, books });
+    expect(await handleGetArticle({ id: 469577 })).not.toContain("not shown:");
+  });
+
+  it("article 623671: outings", async () => {
+    const article = await getArticle(623671);
+
+    expectListsWellFormed({ outings: article.associations?.outings });
+    expect(await handleGetArticle({ id: 623671 })).not.toContain("not shown:");
   });
 });
 

@@ -354,6 +354,31 @@ describe("handleGetOuting", () => {
       ]);
     });
 
+    // AC4.3 on #153: a malformed account or route is a placeholder; the inline list has no "- " before it.
+    it("prints a placeholder for a malformed account and a malformed route", async () => {
+      const [marion, emag] = outing1757161.associations.users;
+      const [route] = outing1757161.associations.routes;
+      mockGetOuting.mockResolvedValueOnce({
+        ...outing1757161,
+        associations: {
+          ...outing1757161.associations,
+          users: [{ ...marion, name: null }, emag, { name: "anonymous" }],
+          routes: [{ ...route, locales: "Depuis Fionnay" }],
+        },
+      } as never);
+
+      const lines = (await handleGetOuting({ id: 1757161 })).split("\n");
+
+      expect(lines).toContain(
+        "**Participants with a Camptocamp account**: " +
+          "[466185] (not shown: Camptocamp sent this item in an unexpected format), emag (user ID: 944173), " +
+          "(not shown: Camptocamp sent an item in an unexpected format)",
+      );
+      expect(lines.slice(lines.indexOf("## Associated routes") + 1)).toEqual([
+        "- [45186] (not shown: Camptocamp sent this item in an unexpected format)",
+      ]);
+    });
+
     it("says in the get_outing description where the author is and what the listed accounts are (AC1.5)", () => {
       const description = outingToolDefinitions.find((t) => t.name === "get_outing")?.description ?? "";
 
@@ -552,6 +577,19 @@ describe("handleSearchOutings", () => {
   });
 
   describe("calls and header", () => {
+    it("prints a placeholder line for a malformed outing, the counts unchanged (AC4.3 on #153)", async () => {
+      mockSearchOutings.mockResolvedValueOnce({
+        documents: [{ ...cosmiques, activities: null }, skiTouring],
+        total: 346652,
+      } as never);
+
+      const lines = (await search({})).split("\n");
+
+      expect(lines[0]).toBe("Found 346652 outing(s), most recent first. Showing 2 from offset 0:");
+      expect(lines).toContain("- [1938453] (not shown: Camptocamp sent this item in an unexpected format)");
+      expect(lines.some((line) => line.startsWith("- [1890001] Pointe de la Réchasse"))).toBe(true);
+    });
+
     it("calls the API with defaults and prints no Filters line when no filter is set", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([cosmiques], 346652));
 

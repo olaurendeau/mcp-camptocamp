@@ -1507,3 +1507,66 @@ describe("get_waypoint associations", () => {
     expect(tool?.description).toContain("the books that cover it");
   });
 });
+
+// AC4.3 on #153: a malformed item of any waypoint list is one placeholder line; counts stay those of the API.
+describe("malformed list items", () => {
+  const PLACEHOLDER = "(not shown: Camptocamp sent this item in an unexpected format)";
+
+  it("print a placeholder line among the routes of hut 104151, still 27 of 27", async () => {
+    const [first, second, ...rest] = routes104151;
+    mockGetWaypoint.mockResolvedValueOnce({
+      ...hutWithRoutes104151,
+      associations: {
+        ...hutWithRoutes104151.associations,
+        all_routes: { documents: [first, { ...second, activities: "skitouring" }, ...rest], total: 27 },
+      },
+    } as never);
+
+    const routes = section(await handleGetWaypoint({ id: 104151 }), "## Routes (27 of 27)");
+
+    expect(routes).toHaveLength(27);
+    expect(routes[1]).toBe(`- [${second.document_id}] ${PLACEHOLDER}`);
+  });
+
+  it("print a placeholder line in the books, recent outings and areas of summit 37355", async () => {
+    const { books, recent_outings } = summit37355.associations;
+    const [firstOuting, ...outings] = recent_outings.documents;
+    mockGetWaypoint.mockResolvedValueOnce({
+      ...summit37355,
+      areas: [{ document_id: "14410", locales: [], area_type: "range" }],
+      associations: {
+        ...summit37355.associations,
+        books: [{ ...books[0], locales: [{ lang: "fr", title: null }] }, ...books.slice(1)],
+        recent_outings: { total: 1743, documents: [{ ...firstOuting, locales: null }, ...outings] },
+      },
+    } as never);
+
+    const result = await handleGetWaypoint({ id: 37355 });
+
+    expect(section(result, "## Areas")).toEqual(["- (not shown: Camptocamp sent an item in an unexpected format)"]);
+    expect(section(result, "## Associated books")[0]).toBe(`- [136059] ${PLACEHOLDER}`);
+    expect(section(result, "## Associated books")).toHaveLength(books.length);
+    expect(section(result, "## Recent outings (10 of 1743)")[0]).toBe(`- [1955437] ${PLACEHOLDER}`);
+  });
+
+  it("print a placeholder line in search_waypoints, with the total unchanged", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({
+      documents: [
+        {
+          document_id: 37916,
+          locales: [{ lang: "fr", title: "Mont Pourri" }],
+          waypoint_type: "summit",
+          elevation: 3779,
+        },
+        { document_id: 104151, locales: [{ lang: "fr", title: "Refuge du Mont Pourri" }], waypoint_type: null },
+      ],
+      total: 2,
+    } as never);
+
+    const lines = (await search({ query: "pourri" })).split("\n");
+
+    expect(lines[0]).toBe("Found 2 waypoint(s). Showing 2 from offset 0:");
+    expect(lines).toContain("- [37916] Mont Pourri (summit) | 3779m");
+    expect(lines).toContain(`- [104151] ${PLACEHOLDER}`);
+  });
+});

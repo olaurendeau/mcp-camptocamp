@@ -18,6 +18,7 @@ import {
   type RouteRatingField,
 } from "../../src/api/camptocamp.js";
 import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
+import { wellFormed } from "./well-formed.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -63,8 +64,8 @@ describe("searchRoutes", () => {
     expect(url).toContain("pl=fr");
 
     expect(result.total).toBe(1);
-    expect(result.documents[0].document_id).toBe(123);
-    expect(result.documents[0].locales[0].title).toBe("Voie normale Mont Blanc");
+    expect(wellFormed(result.documents)[0].document_id).toBe(123);
+    expect(wellFormed(result.documents)[0].locales[0].title).toBe("Voie normale Mont Blanc");
   });
 
   it("puts a custom limit in the URL", async () => {
@@ -117,7 +118,7 @@ describe("searchRoutes", () => {
 
     const result = await searchRoutes({ query: "voie normale" });
 
-    expect(result.documents[0]).toEqual({
+    expect(wellFormed(result.documents)[0]).toEqual({
       document_id: 55195,
       locales: [{ lang: "fr", title: "Versant SW", title_prefix: "Roccia Nera" }],
       activities: ["skitouring", "snow_ice_mixed"],
@@ -457,7 +458,7 @@ describe("searchWaypoints", () => {
     expect(url).toContain("q=Mont+Blanc");
 
     expect(result.total).toBe(1);
-    expect(result.documents[0].elevation).toBe(4808);
+    expect(wellFormed(result.documents)[0].elevation).toBe(4808);
   });
 
   it("throws on non-OK response", async () => {
@@ -895,7 +896,7 @@ describe("getOuting", () => {
 
     const result = outingDetailSchema.parse(await getOuting(1880674));
 
-    const route = result.associations?.routes?.[0];
+    const route = wellFormed(result.associations?.routes)[0];
     expect(route?.document_id).toBe(54085);
     expect(route?.locales[0].title_prefix).toBe("Mont Pourri");
     expect(route?.locales[1].title_prefix).toBe("Mont Pourri");
@@ -930,7 +931,7 @@ describe("getOuting", () => {
     const result = await getOuting(1880674);
 
     expect(result).toMatchObject({ ski_rating: "4.1", labande_global_rating: "AD" });
-    const route = result.associations?.routes?.[0];
+    const route = wellFormed(result.associations?.routes)[0];
     expect(route).toEqual({
       document_id: 54085,
       locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
@@ -1026,8 +1027,8 @@ describe("searchAreas", () => {
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/areas?q=ecrins&limit=10&pl=fr`);
     expect(result.total).toBe(1);
-    expect(result.documents[0].area_type).toBe("range");
-    expect(result.documents[0].locales[0].title).toBe("Écrins");
+    expect(wellFormed(result.documents)[0].area_type).toBe("range");
+    expect(wellFormed(result.documents)[0].locales[0].title).toBe("Écrins");
   });
 
   it("adds atyp only when an area type is given, keeping the real locale order", async () => {
@@ -1039,8 +1040,8 @@ describe("searchAreas", () => {
     expect(url).toBe(`${API}/areas?q=valais&limit=10&pl=fr&atyp=range`);
     expect(url.endsWith("&atyp=range")).toBe(true);
     expect(result.total).toBe(2);
-    expect(result.documents[0].locales[0].lang).toBe("sl");
-    expect(result.documents[0].locales[3]).toMatchObject({
+    expect(wellFormed(result.documents)[0].locales[0].lang).toBe("sl");
+    expect(wellFormed(result.documents)[0].locales[3]).toMatchObject({
       lang: "fr",
       title: "Valais E - Alpes Pennines E",
     });
@@ -1316,8 +1317,8 @@ describe("areas on route details", () => {
 
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/routes/54275`);
     expect(result.areas?.[0].document_id).toBe(14274);
-    expect(result.areas?.map((a) => a.area_type)).toEqual(["country", "admin_limits", "range"]);
-    expect(result.areas?.[1].locales[6]).toMatchObject({ lang: "fr", title: "Hautes-Alpes" });
+    expect(wellFormed(result.areas).map((a) => a.area_type)).toEqual(["country", "admin_limits", "range"]);
+    expect(wellFormed(result.areas)[1].locales[6]).toMatchObject({ lang: "fr", title: "Hautes-Alpes" });
   });
 });
 
@@ -1436,12 +1437,12 @@ describe("searchOutings", () => {
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?sort=-date_end&limit=10&offset=0&pl=fr`);
     expect(result.total).toBe(14);
-    expect(result.documents[0].areas?.[1].area_type).toBe("range");
-    expect(result.documents[0].condition_rating).toBe("average");
-    expect(result.documents[0].ski_rating).toBeUndefined();
-    expect(result.documents[1].ski_rating).toBe("3.1");
-    expect(result.documents[1].labande_global_rating).toBe("PD+");
-    expect(result.documents[1].global_rating).toBeUndefined();
+    expect(wellFormed(result.documents)[0].areas?.[1].area_type).toBe("range");
+    expect(wellFormed(result.documents)[0].condition_rating).toBe("average");
+    expect(wellFormed(result.documents)[0].ski_rating).toBeUndefined();
+    expect(wellFormed(result.documents)[1].ski_rating).toBe("3.1");
+    expect(wellFormed(result.documents)[1].labande_global_rating).toBe("PD+");
+    expect(wellFormed(result.documents)[1].global_rating).toBeUndefined();
   });
 
   it("sends every filter in order, before the sort", async () => {
@@ -1654,10 +1655,10 @@ describe("searchBooks", () => {
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books?q=vallot&limit=10&pl=fr`);
     expect(result.total).toBe(12);
-    expect(result.documents[0].author).toBe("Lucien Devies, Pierre Henry");
-    expect(result.documents[0].locales[0].summary).toBeNull();
-    expect(result.documents[2].author).toBeNull();
-    expect(result.documents[3].activities).toBeNull();
+    expect(wellFormed(result.documents)[0].author).toBe("Lucien Devies, Pierre Henry");
+    expect(wellFormed(result.documents)[0].locales[0].summary).toBeNull();
+    expect(wellFormed(result.documents)[2].author).toBeNull();
+    expect(wellFormed(result.documents)[3].activities).toBeNull();
   });
 
   it("puts a custom limit in the URL", async () => {
@@ -1757,8 +1758,8 @@ describe("getBook", () => {
     expect(result.isbn).toBeNull();
     expect(result.url).toBeNull();
     expect(result.publication_date).toBe("1978");
-    expect(result.associations?.routes?.[0].locales[1].title_prefix).toBe("Mont Blanc");
-    expect(result.associations?.waypoints?.[0].elevation).toBe(3670);
+    expect(wellFormed(result.associations?.routes)[0].locales[1].title_prefix).toBe("Mont Blanc");
+    expect(wellFormed(result.associations?.waypoints)[0].elevation).toBe(3670);
   });
 
   it("keeps a free-text isbn and null nb_pages, publication_date and activities", async () => {
@@ -1866,11 +1867,11 @@ describe("searchArticles", () => {
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=crampons&limit=10&pl=fr`);
     expect(result.total).toBe(3);
-    expect(result.documents[0].article_type).toBe("collab");
-    expect(result.documents[0].categories).toEqual(["gear"]);
-    expect(result.documents[0].locales[0].summary).toBeNull();
+    expect(wellFormed(result.documents)[0].article_type).toBe("collab");
+    expect(wellFormed(result.documents)[0].categories).toEqual(["gear"]);
+    expect(wellFormed(result.documents)[0].locales[0].summary).toBeNull();
     expect(result.documents).toHaveLength(3);
-    expect(result.documents[2].article_type).toBe("personal");
+    expect(wellFormed(result.documents)[2].article_type).toBe("personal");
   });
 
   it("keeps null activities", async () => {
@@ -1899,9 +1900,9 @@ describe("searchArticles", () => {
 
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=Du+lointain+nous+nous+rappellons&limit=10&pl=fr`);
     expect(result.total).toBe(1);
-    expect(result.documents[0].document_id).toBe(193302);
-    expect(result.documents[0].activities).toBeNull();
-    expect(result.documents[0].categories).toEqual(["stories"]);
+    expect(wellFormed(result.documents)[0].document_id).toBe(193302);
+    expect(wellFormed(result.documents)[0].activities).toBeNull();
+    expect(wellFormed(result.documents)[0].categories).toEqual(["stories"]);
   });
 
   it("puts a custom limit in the URL", async () => {
@@ -2064,9 +2065,9 @@ describe("getArticle", () => {
     const result = await getArticle(302774);
 
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles/302774`);
-    expect(result.associations?.routes?.[0].document_id).toBe(45148);
-    expect(result.associations?.routes?.[0].locales[0].title_prefix).toBe("Le Portalet");
-    expect(result.associations?.routes?.[0].locales[1].title).toBe("Face N");
+    expect(wellFormed(result.associations?.routes)[0].document_id).toBe(45148);
+    expect(wellFormed(result.associations?.routes)[0].locales[0].title_prefix).toBe("Le Portalet");
+    expect(wellFormed(result.associations?.routes)[0].locales[1].title).toBe("Face N");
   });
 
   it("throws on a 404 response", async () => {
