@@ -2,8 +2,8 @@ import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage } from "./paging.js";
 import { ACTIVITIES, enumValue } from "./enums.js";
-import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
-import type { OutingSearchResponse, OutingDetail, OutingListResponse } from "../api/camptocamp.js";
+import { getOuting, searchOutings } from "../api/camptocamp.js";
+import type { OutingDetail, OutingListResponse } from "../api/camptocamp.js";
 import {
   pickLocale,
   pickTitle,
@@ -13,13 +13,8 @@ import {
   formatAssociatedRouteLine,
   formatOutingLine,
 } from "./format.js";
-import { formatRatingLines, formatRatingParts } from "./ratings.js";
+import { formatRatingLines } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
-
-export const searchUserOutingsSchema = z.object({
-  user_id: documentId("Camptocamp user ID (e.g. 430052 for username o.laurendeau)"),
-  limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
-});
 
 export const getOutingSchema = z.object({
   id: documentId("Outing ID from Camptocamp"),
@@ -73,34 +68,14 @@ export const searchOutingsSchema = z.object({
   offset: searchOffset(),
 });
 
+// search_user_outings: the user_id (required here), limit and offset of search_outings, nothing else.
+export const searchUserOutingsSchema = searchOutingsSchema
+  .pick({ user_id: true, limit: true, offset: true })
+  .required({ user_id: true });
+
 export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
 export type GetOutingInput = z.infer<typeof getOutingSchema>;
 export type SearchOutingsInput = z.infer<typeof searchOutingsSchema>;
-
-function formatOutingSearchResult(response: OutingSearchResponse, userId: number): string {
-  if (response.documents.length === 0) {
-    return `No outings found for user ${userId}.`;
-  }
-
-  const lines: string[] = [
-    `Found ${response.total} outing(s) for user ${userId}. Showing ${response.documents.length}:\n`,
-  ];
-
-  for (const outing of response.documents) {
-    const title = pickTitle(outing.locales);
-    const activities = outing.activities.join(", ");
-    const date = formatDateRange(outing.date_start, outing.date_end);
-    const datePart = date ? ` | ${date}` : "";
-    const elevation = isPresent(outing.elevation_max) ? ` | Max elevation: ${outing.elevation_max}m` : "";
-    const ratings = formatRatingParts(outing)
-      .map((part) => ` | ${part}`)
-      .join("");
-
-    lines.push(`- [${outing.document_id}] ${title} (${activities})${datePart}${elevation}${ratings}`);
-  }
-
-  return lines.join("\n");
-}
 
 function formatOutingDetail(outing: OutingDetail): string {
   const locale = pickLocale(outing.locales);
@@ -206,9 +181,9 @@ export async function handleSearchOutings(input: SearchOutingsInput): Promise<st
   return formatOutingList(response, params);
 }
 
+// AC5.6: a thin alias, so its output is exactly that of search_outings for the same user.
 export async function handleSearchUserOutings(input: SearchUserOutingsInput): Promise<string> {
-  const response = await searchUserOutings(input);
-  return formatOutingSearchResult(response, input.user_id);
+  return handleSearchOutings(input);
 }
 
 export async function handleGetOuting(input: GetOutingInput): Promise<string> {
@@ -221,7 +196,7 @@ export const outingToolDefinitions = [
     name: "search_user_outings",
     title: "List a user's outings",
     description:
-      "List outings (trip reports) published by a Camptocamp user. Returns outings with ID, title, activities, date, max elevation, and every rating labelled by its grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD'). Use the user_id from the Camptocamp profile URL (e.g. u=430052).",
+      "List outings (trip reports) published by a Camptocamp user, most recent first: an alias of search_outings with only user_id (the number in the author's camptocamp.org profile URL), limit and offset, returning exactly what search_outings returns for that user_id. Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow. To filter a user's outings by area, activity, dates, period, route or waypoint, call search_outings with user_id. An unknown user ID yields no results, not an error.",
     inputSchema: searchUserOutingsSchema,
     handler: handleSearchUserOutings,
   },

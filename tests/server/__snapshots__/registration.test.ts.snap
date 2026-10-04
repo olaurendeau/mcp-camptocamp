@@ -452,8 +452,14 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "minimum": 1,
         "type": "integer",
       },
+      "offset": {
+        "default": 0,
+        "description": "Number of results to skip, for paging (offset + limit ≤ 10,000)",
+        "minimum": 0,
+        "type": "integer",
+      },
       "user_id": {
-        "description": "Camptocamp user ID (e.g. 430052 for username o.laurendeau)",
+        "description": "Camptocamp user ID of the outings' author (the number in their profile URL)",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991,
         "type": "integer",

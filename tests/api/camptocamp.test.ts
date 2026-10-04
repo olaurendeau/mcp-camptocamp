@@ -5,7 +5,6 @@ import {
   getRoute,
   searchWaypoints,
   getWaypoint,
-  searchUserOutings,
   getOuting,
   searchAreas,
   getArea,
@@ -572,52 +571,6 @@ describe("getWaypoint", () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 404));
 
     await expect(getWaypoint(999)).rejects.toThrow("Camptocamp API error: 404");
-  });
-});
-
-describe("searchUserOutings", () => {
-  it("calls the correct URL and returns parsed response", async () => {
-    const mockData = {
-      documents: [
-        {
-          document_id: 1915495,
-          locales: [{ lang: "fr", title: "Valle dell'Orco - Sergent : Nautilus" }],
-          activities: ["rock_climbing"],
-          date_start: "2026-06-14",
-          date_end: "2026-06-14",
-          global_rating: "TD",
-          author: { name: "o.laurendeau", user_id: 430052 },
-        },
-      ],
-      total: 42,
-    };
-
-    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
-
-    const result = await searchUserOutings({ user_id: 430052 });
-
-    const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain("/outings");
-    expect(url).toContain("u=430052");
-    expect(url).toContain("pl=fr");
-
-    expect(result.total).toBe(42);
-    expect(result.documents[0].document_id).toBe(1915495);
-    expect(result.documents[0].author?.name).toBe("o.laurendeau");
-  });
-
-  it("puts a custom limit in the URL", async () => {
-    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
-
-    await searchUserOutings({ user_id: 430052, limit: 5 });
-
-    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?u=430052&limit=5&pl=fr`);
-  });
-
-  it("throws on non-OK response", async () => {
-    mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
-
-    await expect(searchUserOutings({ user_id: 430052 })).rejects.toThrow("Camptocamp API error: 500");
   });
 });
 
@@ -1244,9 +1197,9 @@ describe("searchOutings", () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [OUTING_COSMIQUES, OUTING_SKITOURING], total: 2 }));
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [OUTING_COSMIQUES, OUTING_SKITOURING], total: 2 }));
 
-    // search_outings and search_user_outings read the same GET /outings list items.
+    // search_outings and its search_user_outings alias read the same GET /outings list items.
     const list = await searchOutings({});
-    const userList = await searchUserOutings({ user_id: 1910408 });
+    const userList = await searchOutings({ user_id: 1910408 });
 
     for (const { documents } of [list, userList]) {
       expect(documents[0]).toMatchObject({ global_rating: "AD", engagement_rating: "II" });
@@ -1379,6 +1332,15 @@ describe("searchOutings", () => {
     expect(params.get("u")).toBe("430052");
     expect(params.get("act")).toBe("rock_climbing");
     expect(params.has("period")).toBe(false);
+  });
+
+  // The request behind search_user_outings {user_id: 430052, offset: 480}, which replaced GET /outings?u=…&limit=…
+  it("pages a user's outings with offset, most recent first", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 494 }));
+
+    await searchOutings({ user_id: 430052, limit: 10, offset: 480 });
+
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?u=430052&sort=-date_end&limit=10&offset=480&pl=fr`);
   });
 
   it("throws on non-OK response", async () => {
@@ -1906,7 +1868,6 @@ describe("locale parameters", () => {
   const searches: Array<[string, () => Promise<unknown>, string]> = [
     ["searchRoutes", () => searchRoutes({ query: "gamma" }), "/routes?q=gamma&limit=10&pl=fr"],
     ["searchWaypoints", () => searchWaypoints({ query: "resegone" }), "/waypoints?q=resegone&limit=10&pl=fr"],
-    ["searchUserOutings", () => searchUserOutings({ user_id: 430052 }), "/outings?u=430052&limit=10&pl=fr"],
     [
       "searchOutings",
       () => searchOutings({ area_id: 14403 }),
@@ -1956,7 +1917,6 @@ describe("request headers and timeout signal", () => {
     ["getRoute", () => getRoute(53914)],
     ["searchWaypoints", () => searchWaypoints({ query: "resegone" })],
     ["getWaypoint", () => getWaypoint(37305)],
-    ["searchUserOutings", () => searchUserOutings({ user_id: 430052 })],
     ["getOuting", () => getOuting(1525071)],
     ["searchOutings", () => searchOutings({ area_id: 14403 })],
     ["searchAreas", () => searchAreas({ query: "valais" })],

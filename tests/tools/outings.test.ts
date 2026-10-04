@@ -5,101 +5,23 @@ import {
   handleSearchOutings,
   outingToolDefinitions,
   searchOutingsSchema,
+  searchUserOutingsSchema,
 } from "../../src/tools/outings.js";
 import { USER_TEXT_NOTE } from "../../src/tools/text.js";
 import type { z } from "zod";
 import * as api from "../../src/api/camptocamp.js";
 import type { OutingListItem, OutingListResponse } from "../../src/api/camptocamp.js";
-import { outingDetailSchema, outingListResponseSchema, outingSearchResponseSchema } from "../../src/api/schemas.js";
+import { outingDetailSchema, outingListResponseSchema } from "../../src/api/schemas.js";
 import { throughSchema } from "./through-schema.js";
 import { BARE_RATING } from "./bare-rating.js";
 
 vi.mock("../../src/api/camptocamp.js");
 
-const mockSearchUserOutings = throughSchema(vi.mocked(api.searchUserOutings), outingSearchResponseSchema);
 const mockGetOuting = throughSchema(vi.mocked(api.getOuting), outingDetailSchema);
 const mockSearchOutings = throughSchema(vi.mocked(api.searchOutings), outingListResponseSchema);
 
 beforeEach(() => {
   vi.clearAllMocks();
-});
-
-describe("handleSearchUserOutings", () => {
-  it("formats results correctly", async () => {
-    mockSearchUserOutings.mockResolvedValueOnce({
-      total: 2,
-      documents: [
-        {
-          document_id: 1,
-          locales: [{ lang: "fr", title: "Sortie en Vanoise" }],
-          activities: ["hiking"],
-          date_start: "2026-07-01",
-          date_end: "2026-07-01",
-          elevation_max: 3000,
-          global_rating: "PD",
-        },
-        {
-          document_id: 2,
-          locales: [{ lang: "fr", title: "Escalade aux Calanques" }],
-          activities: ["rock_climbing"],
-          date_start: "2026-06-10",
-          date_end: "2026-06-12",
-          rock_free_rating: "6a",
-        },
-      ],
-    });
-
-    const result = await handleSearchUserOutings({ user_id: 430052, limit: 10 });
-
-    expect(mockSearchUserOutings).toHaveBeenCalledWith({ user_id: 430052, limit: 10 });
-    expect(result).toContain("Found 2 outing(s) for user 430052");
-    expect(result).toContain("[1] Sortie en Vanoise");
-    expect(result).toContain("2026-07-01");
-    expect(result).toContain("3000m");
-    expect(result).toContain(
-      "- [1] Sortie en Vanoise (hiking) | 2026-07-01 | Max elevation: 3000m | Global rating: PD\n",
-    );
-    expect(result).toContain(
-      "- [2] Escalade aux Calanques (rock_climbing) | 2026-06-10 → 2026-06-12 | Rock free rating: 6a",
-    );
-    expect(result).not.toMatch(BARE_RATING);
-    expect(result).not.toContain("undefined");
-  });
-
-  it("returns empty message when no results", async () => {
-    mockSearchUserOutings.mockResolvedValueOnce({ total: 0, documents: [] });
-
-    const result = await handleSearchUserOutings({ user_id: 430052, limit: 10 });
-
-    expect(result).toBe("No outings found for user 430052.");
-  });
-
-  it("falls back to the first locale, then to Untitled, and omits missing fields", async () => {
-    mockSearchUserOutings.mockResolvedValueOnce({
-      total: 2,
-      documents: [
-        {
-          document_id: 3,
-          locales: [{ lang: "en", title: "Gran Paradiso" }],
-          activities: ["skitouring"],
-          date_start: "2026-04-02",
-        },
-        {
-          document_id: 4,
-          locales: [],
-          activities: ["hiking"],
-        },
-      ],
-    });
-
-    const result = await handleSearchUserOutings({ user_id: 430052, limit: 10 });
-
-    expect(result).toContain("- [3] Gran Paradiso (skitouring) | 2026-04-02\n");
-    expect(result).toContain("- [4] Untitled (hiking)");
-    expect(result).not.toContain("Max elevation");
-    expect(result).not.toContain("Rating");
-    expect(result).not.toContain("undefined");
-  });
 });
 
 describe("handleGetOuting", () => {
@@ -388,7 +310,7 @@ describe("zero values and partial dates", () => {
   });
 
   it("prints the end date of an outing without a start date and an elevation of 0 in search_user_outings", async () => {
-    mockSearchUserOutings.mockResolvedValueOnce({
+    mockSearchOutings.mockResolvedValueOnce({
       total: 1,
       documents: [
         {
@@ -402,9 +324,9 @@ describe("zero values and partial dates", () => {
       ],
     });
 
-    const result = await handleSearchUserOutings({ user_id: 430052, limit: 10 });
+    const result = await handleSearchUserOutings({ user_id: 430052, limit: 10, offset: 0 });
 
-    expect(result.split("\n").slice(2)).toEqual([
+    expect(result.split("\n").slice(3)).toEqual([
       "- [5] Psicobloc au Moulon (rock_climbing) | 2026-08-10 | Max elevation: 0m",
     ]);
   });
@@ -951,6 +873,109 @@ describe("handleSearchOutings", () => {
   });
 });
 
+// AC5.6: search_user_outings is a thin alias of search_outings restricted to user_id, limit and offset.
+describe("handleSearchUserOutings", () => {
+  // Trimmed from GET /outings?u=430052&sort=-date_end&limit=2&offset=480&pl=fr (2026-10-04, total 494).
+  const ponteil: OutingListItem = {
+    document_id: 712152,
+    locales: [{ lang: "fr", title: "Le Ponteil : La diagonale de gauche" }],
+    activities: ["rock_climbing"],
+    condition_rating: "excellent",
+    date_end: "2014-05-05",
+    date_start: "2014-05-05",
+    elevation_max: 1596,
+    height_diff_up: 150,
+    global_rating: "TD-",
+    equipment_rating: "P1+",
+    rock_free_rating: "6a",
+    areas: [
+      { document_id: 14274, area_type: "country", locales: [{ lang: "fr", title: "France" }] },
+      { document_id: 14403, area_type: "range", locales: [{ lang: "fr", title: "Écrins" }] },
+      { document_id: 14361, area_type: "admin_limits", locales: [{ lang: "fr", title: "Hautes-Alpes" }] },
+    ],
+    author: { name: "o.laurendeau", user_id: 430052 },
+  };
+  // The next one, with the fields Camptocamp leaves null on older outings.
+  const ponteilEarlier: OutingListItem = {
+    document_id: 789774,
+    locales: [{ lang: "fr", title: "Le Ponteil : Délit de grattage" }],
+    activities: ["rock_climbing"],
+    condition_rating: null,
+    date_end: "2014-05-01",
+    date_start: "2014-05-01",
+    elevation_max: null,
+    height_diff_up: null,
+    global_rating: "D+",
+    areas: null,
+    author: { name: "o.laurendeau", user_id: 430052 },
+  };
+
+  /** Calls the alias as the MCP server does: with input parsed by its own schema. */
+  function searchUser(input: z.input<typeof searchUserOutingsSchema>): Promise<string> {
+    return handleSearchUserOutings(searchUserOutingsSchema.parse(input));
+  }
+
+  it("returns exactly what search_outings returns for the same user", async () => {
+    mockSearchOutings.mockResolvedValue(listResponse([ponteil, ponteilEarlier], 494));
+
+    const alias = await searchUser({ user_id: 430052 });
+    const outings = await search({ user_id: 430052 });
+
+    expect(alias).toBe(outings);
+    expect(mockSearchOutings).toHaveBeenNthCalledWith(1, { user_id: 430052, limit: 10, offset: 0 });
+    expect(mockSearchOutings).toHaveBeenNthCalledWith(2, { user_id: 430052, limit: 10, offset: 0 });
+    expect(alias.split("\n").slice(0, 2)).toEqual([
+      "Found 494 outing(s), most recent first. Showing 2 from offset 0:",
+      "Filters: user 430052",
+    ]);
+    expect(alias).toContain(
+      "- [712152] Le Ponteil : La diagonale de gauche (rock_climbing) | 2014-05-05 | Conditions: excellent | Max elevation: 1596m | Elevation gain: 150m",
+    );
+    expect(alias).toContain(
+      "- [789774] Le Ponteil : Délit de grattage (rock_climbing) | 2014-05-01 | Global rating: D+",
+    );
+    expect(alias).toMatch(/Next page: offset=2$/);
+    expect(alias).not.toMatch(BARE_RATING);
+    expect(alias).not.toContain("undefined");
+  });
+
+  it("passes offset through to searchOutings, reaching outing 712152 at offset 480", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([ponteil, ponteilEarlier], 494));
+
+    const result = await searchUser({ user_id: 430052, offset: 480, limit: 2 });
+
+    expect(mockSearchOutings).toHaveBeenCalledOnce();
+    expect(mockSearchOutings).toHaveBeenCalledWith({ user_id: 430052, limit: 2, offset: 480 });
+    expect(result).toContain("Showing 2 from offset 480:");
+    expect(result).toContain("- [712152] Le Ponteil : La diagonale de gauche");
+    expect(result).toMatch(/Next page: offset=482$/);
+  });
+
+  it("says no outings found for an unknown user", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+
+    expect(await searchUser({ user_id: 999999999 })).toBe("No outings found matching user 999999999.");
+  });
+
+  it("refuses a page beyond the 10,000-result window without calling the API", async () => {
+    await expect(searchUser({ user_id: 430052, offset: 9995, limit: 10 })).rejects.toThrow("10,000");
+    expect(mockSearchOutings).not.toHaveBeenCalled();
+  });
+
+  it("accepts only user_id, limit and offset, with search_outings' defaults", () => {
+    expect(Object.keys(searchUserOutingsSchema.shape).sort()).toEqual(["limit", "offset", "user_id"]);
+    expect(searchUserOutingsSchema.parse({ user_id: 430052 })).toEqual({ user_id: 430052, limit: 10, offset: 0 });
+    expect(searchUserOutingsSchema.safeParse({ user_id: 430052, offset: -1 }).success).toBe(false);
+    expect(searchUserOutingsSchema.safeParse({ limit: 10 }).success).toBe(false);
+    // Other search_outings filters are not part of the alias: they are dropped, never sent.
+    expect(searchUserOutingsSchema.parse({ user_id: 430052, query: "x", area_id: 14403 })).toEqual({
+      user_id: 430052,
+      limit: 10,
+      offset: 0,
+    });
+  });
+});
+
 describe("outingToolDefinitions", () => {
   it("appends search_outings after the existing outing tools", () => {
     expect(outingToolDefinitions.map((t) => t.name)).toEqual(["search_user_outings", "get_outing", "search_outings"]);
@@ -980,11 +1005,21 @@ describe("outingToolDefinitions", () => {
   });
 
   // AC5.7: no tool exposes a real user's ID or username as an example.
-  it("gives no real user as an example in the search_outings definition", () => {
-    const definition = outingToolDefinitions.find((t) => t.name === "search_outings");
-    const text = JSON.stringify({ d: definition?.description, s: definition?.inputSchema.shape });
+  it.each(outingToolDefinitions.map((t) => [t.name, t] as const))(
+    "gives no real user as an example in the %s definition",
+    (_name, definition) => {
+      const text = JSON.stringify({ n: definition.name, d: definition.description, s: definition.inputSchema.shape });
 
-    expect(text).not.toContain("430052");
-    expect(text).not.toContain("o.laurendeau");
+      expect(text).not.toContain("430052");
+      expect(text).not.toContain("o.laurendeau");
+    },
+  );
+
+  it("describes search_user_outings as an alias of search_outings with offset paging", () => {
+    const description = outingToolDefinitions.find((t) => t.name === "search_user_outings")?.description ?? "";
+
+    for (const phrase of ["search_outings", "user_id", "offset", "Next page: offset=N", "labelled by grading system"]) {
+      expect(description).toContain(phrase);
+    }
   });
 });

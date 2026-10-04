@@ -4,7 +4,6 @@ import type {
   RouteDetail,
   WaypointSearchResponse,
   WaypointDetail,
-  OutingSearchResponse,
   OutingDetail,
   OutingListResponse,
   AreaSearchResponse,
@@ -19,7 +18,6 @@ import {
   routeDetailSchema,
   waypointSearchResponseSchema,
   waypointDetailSchema,
-  outingSearchResponseSchema,
   outingDetailSchema,
   outingListResponseSchema,
   areaSearchResponseSchema,
@@ -38,8 +36,6 @@ export type {
   WaypointSearchResult,
   WaypointSearchResponse,
   WaypointDetail,
-  OutingSearchResult,
-  OutingSearchResponse,
   OutingDetail,
   OutingListItem,
   OutingListResponse,
@@ -175,20 +171,6 @@ export async function searchWaypoints(options: WaypointSearchOptions): Promise<W
 
 export async function getWaypoint(id: number): Promise<WaypointDetail> {
   return getJson({ path: `/waypoints/${id}`, document: { type: "waypoint", id }, schema: waypointDetailSchema });
-}
-
-export interface UserOutingSearchOptions {
-  user_id: number;
-  limit?: number; // default DEFAULT_LIMIT
-}
-
-export async function searchUserOutings(options: UserOutingSearchOptions): Promise<OutingSearchResponse> {
-  const params = new URLSearchParams({
-    u: String(options.user_id),
-    limit: String(options.limit ?? DEFAULT_LIMIT),
-    pl: PREFERRED_LANG,
-  });
-  return getJson({ path: "/outings", params, schema: outingSearchResponseSchema });
 }
 
 export async function getOuting(id: number): Promise<OutingDetail> {

@@ -123,7 +123,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_route`           | Route detail by ID (summit : title, text, ratings, elevation, areas, books, waypoints, outings…)                 |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`, by `waypoint_type`; paged with `offset`     |
 | `get_waypoint`        | Waypoint by ID (altitude, GPS, areas; huts: capacity, custodianship, phones, website, access period)             |
-| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings                    |
+| `search_user_outings` | Alias of `search_outings` by `user_id`: a user's outings, newest first, labelled ratings, paged                  |
 | `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings)             |
 | `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged             |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
@@ -156,9 +156,9 @@ Locale: searches send `pl=fr`, which returns one locale per document, French whe
   - `associations`: `waypoints` (the one matching `main_waypoint_id` is marked), `routes`, `books`, `articles`, and `recent_outings {documents, total}` (the latest 10, shaped like `/outings` list items); `images` and `xreports` are not read.
 - `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}][&wtyp={waypoint_type}][&offset={n}]` (at least one of `q` and `a`)
 - `GET /waypoints/{id}`
-- `GET /outings?u={user_id}&limit=10&pl=fr`
 - `GET /outings/{id}`
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]`
+  - `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
 - `GET /areas?q={query}&limit=10&pl=fr[&atyp={type}][&offset={n}]`
 - `GET /areas/{id}`
