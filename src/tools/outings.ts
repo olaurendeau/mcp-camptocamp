@@ -3,7 +3,7 @@ import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage } from "./paging.js";
 import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
 import type { OutingSearchResponse, OutingDetail, OutingListItem, OutingListResponse } from "../api/camptocamp.js";
-import { pickLocale, pickTitle, formatHeader, formatTitledLine } from "./format.js";
+import { pickLocale, pickTitle, formatHeader, formatRouteLine } from "./format.js";
 
 export const searchUserOutingsSchema = z.object({
   user_id: documentId("Camptocamp user ID (e.g. 430052 for username o.laurendeau)"),
@@ -148,7 +148,7 @@ function formatOutingDetail(outing: OutingDetail): string {
 
   const routes = outing.associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...routes.map(formatTitledLine));
+    lines.push("\n## Associated routes", ...routes.map(formatRouteLine));
   }
 
   return lines.join("\n");
@@ -253,7 +253,7 @@ export const outingToolDefinitions = [
     name: "get_outing",
     title: "Get outing details",
     description:
-      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including description, conditions, weather, participants, and associated routes.",
+      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including description, conditions, weather, participants, and associated routes (named '<summit> : <route title>').",
     inputSchema: getOutingSchema,
     handler: handleGetOuting,
   },

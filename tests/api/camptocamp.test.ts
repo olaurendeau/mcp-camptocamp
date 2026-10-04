@@ -18,6 +18,7 @@ import {
   ROUTE_RATING_PARAMS,
   type RouteRatingField,
 } from "../../src/api/camptocamp.js";
+import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -99,6 +100,42 @@ describe("getRoute", () => {
 
     expect(result.document_id).toBe(456);
     expect(result.global_rating).toBe("TD");
+  });
+
+  it("keeps the route's title_prefix through the response schema", async () => {
+    // Trimmed from the live GET /routes/54085 response (2026-10-04): the fr locale only, its texts cut
+    // to their first line; ratings, orientations, associations, maps and areas left out.
+    const mockData = {
+      document_id: 54085,
+      version: 6,
+      locales: [
+        {
+          version: 29,
+          lang: "fr",
+          title: "Versant W par le Glacier du Geay",
+          summary: "Le Mont Pourri est le second sommet de la Vanoise et comporte un système glaciaire important.",
+          description: "[img=192710 right]Mont Pourri, itinéraire 1[/img]",
+          title_prefix: "Mont Pourri",
+          topic_id: null,
+        },
+      ],
+      quality: "medium",
+      main_waypoint_id: 37916,
+      activities: ["skitouring"],
+      elevation_min: 2370,
+      elevation_max: 3779,
+      height_diff_up: 1425,
+      height_diff_down: null,
+      durations: ["1"],
+      protected: false,
+      type: "r",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = routeDetailSchema.parse(await getRoute(54085));
+
+    expect(result.locales[0].title_prefix).toBe("Mont Pourri");
+    expect(result.locales[0].title).toBe("Versant W par le Glacier du Geay");
   });
 
   it("throws on non-OK response", async () => {
@@ -244,6 +281,82 @@ describe("getOuting", () => {
     expect(result.document_id).toBe(1915495);
     expect(result.global_rating).toBe("TD");
     expect(result.locales[0].weather).toBe("Beau");
+  });
+
+  it("keeps an associated route's title_prefix through the response schema", async () => {
+    // Trimmed from the live GET /outings/1880674 response (2026-10-04): locale texts cut, other texts, snow and hut
+    // fields, geometry, areas and the users, images, articles and xreports associations left out; the
+    // route association keeps its fr and en locales and drops geometry and areas.
+    const mockData = {
+      document_id: 1880674,
+      version: 2,
+      locales: [
+        {
+          version: 3,
+          lang: "fr",
+          title: "Mont Pourri : Versant W par le Glacier du Geay",
+          description: "Super sortie sauvage sans passer par la station des Arcs !",
+          summary: null,
+          weather: "Grand beau, sans vent",
+          topic_id: null,
+        },
+      ],
+      quality: "fine",
+      activities: ["skitouring"],
+      condition_rating: "good",
+      date_end: "2026-03-08",
+      date_start: "2026-03-07",
+      elevation_max: 3779,
+      elevation_min: 2370,
+      height_diff_down: null,
+      height_diff_up: 1600,
+      participant_count: 2,
+      ski_rating: "4.1",
+      labande_global_rating: "AD",
+      associations: {
+        routes: [
+          {
+            document_id: 54085,
+            version: 6,
+            locales: [
+              {
+                version: 29,
+                lang: "fr",
+                title: "Versant W par le Glacier du Geay",
+                summary:
+                  "Le Mont Pourri est le second sommet de la Vanoise et comporte un système glaciaire important.",
+                title_prefix: "Mont Pourri",
+              },
+              {
+                version: 2,
+                lang: "en",
+                title: "Normal route from Glacier du Geay",
+                summary: null,
+                title_prefix: "Mont Pourri",
+              },
+            ],
+            quality: "medium",
+            activities: ["skitouring"],
+            elevation_min: 2370,
+            elevation_max: 3779,
+            ski_rating: "4.1",
+            available_langs: ["fr", "de", "en", "it"],
+            protected: false,
+            type: "r",
+          },
+        ],
+      },
+      protected: false,
+      type: "o",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = outingDetailSchema.parse(await getOuting(1880674));
+
+    const route = result.associations?.routes?.[0];
+    expect(route?.document_id).toBe(54085);
+    expect(route?.locales[0].title_prefix).toBe("Mont Pourri");
+    expect(route?.locales[1].title_prefix).toBe("Mont Pourri");
   });
 
   it("throws on non-OK response", async () => {

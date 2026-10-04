@@ -4,6 +4,7 @@ import {
   pickTitle,
   joinList,
   formatHeader,
+  formatRouteName,
   formatRouteLine,
   formatWaypointLine,
   formatTitledLine,
@@ -122,6 +123,37 @@ describe("formatHeader", () => {
   });
 });
 
+describe("formatRouteName", () => {
+  it("joins the summit name and the route title", () => {
+    // Route 54085 of GET /routes/54085 (2026-10-04).
+    expect(
+      formatRouteName({ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }),
+    ).toBe("Mont Pourri : Versant W par le Glacier du Geay");
+  });
+
+  it.each([
+    ["empty", ""],
+    ["blank", "   "],
+    ["null", null],
+    ["missing", undefined],
+  ])("writes the title alone when title_prefix is %s", (_label, title_prefix) => {
+    expect(formatRouteName({ lang: "fr", title: "Tour du Mont Pourri en 5 jours", title_prefix })).toBe(
+      "Tour du Mont Pourri en 5 jours",
+    );
+  });
+
+  it("trims the summit name and the title", () => {
+    expect(formatRouteName({ lang: "fr", title: "  Voie normale ", title_prefix: " Castell Vidre  " })).toBe(
+      "Castell Vidre : Voie normale",
+    );
+    expect(formatRouteName({ lang: "fr", title: " Voie normale  ", title_prefix: "  " })).toBe("Voie normale");
+  });
+
+  it('writes "Untitled" without a locale', () => {
+    expect(formatRouteName(undefined)).toBe("Untitled");
+  });
+});
+
 describe("formatRouteLine", () => {
   it("prefixes the fr title with its title_prefix", () => {
     expect(formatRouteLine(areteDesBosses)).toBe("- [53781] Mont Blanc : Arête des Bosses");
@@ -139,6 +171,17 @@ describe("formatRouteLine", () => {
       "- [1] T",
     );
     expect(formatRouteLine({ document_id: 2, locales: [{ lang: "fr", title: "T" }] })).toBe("- [2] T");
+  });
+
+  it("never writes a dangling separator for a blank title_prefix", () => {
+    // Route 1678194 of GET /routes?w=37916 (2026-10-04) has no summit name; "   " stands for a blank one.
+    const line = formatRouteLine({
+      document_id: 1678194,
+      locales: [{ lang: "fr", title: "Tour du Mont Pourri en 5 jours", title_prefix: "   " }],
+    });
+    expect(line).toBe("- [1678194] Tour du Mont Pourri en 5 jours");
+    expect(line).not.toContain("] : ");
+    expect(line).not.toContain("]  : ");
   });
 
   it('writes "Untitled" without locales', () => {
