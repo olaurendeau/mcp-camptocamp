@@ -14,12 +14,18 @@ describe("assertResultWindow", () => {
   });
 
   it("throws the search_outings message when offset + limit passes 10,000", () => {
-    expect(() => assertResultWindow(9995, 10)).toThrow(WINDOW_MESSAGE);
+    expect(() => {
+      assertResultWindow(9995, 10);
+    }).toThrow(WINDOW_MESSAGE);
   });
 
   it("accepts offset + limit of exactly 10,000", () => {
-    expect(() => assertResultWindow(9990, 10)).not.toThrow();
-    expect(() => assertResultWindow(0, 10)).not.toThrow();
+    expect(() => {
+      assertResultWindow(9990, 10);
+    }).not.toThrow();
+    expect(() => {
+      assertResultWindow(0, 10);
+    }).not.toThrow();
   });
 });
 

@@ -535,7 +535,7 @@ describe("type filters on searchWaypoints and searchBooks", () => {
   });
 
   it("sends neither wtyp, btyp nor act when not given", async () => {
-    mockFetch.mockImplementation(async () => makeResponse({ documents: [], total: 0 }));
+    mockFetch.mockImplementation(() => Promise.resolve(makeResponse({ documents: [], total: 0 })));
 
     await searchWaypoints({ query: "pourri" });
     await searchBooks({ query: "vanoise" });

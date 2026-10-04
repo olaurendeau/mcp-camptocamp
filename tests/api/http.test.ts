@@ -19,7 +19,9 @@ const TIMED_OUT = new Error("Camptocamp API error: request timed out after 15 s"
 /** A fetch that never answers on its own and rejects like undici once its signal aborts. */
 function fetchSettlingOnAbort(_url: string, init: RequestInit): Promise<Response> {
   return new Promise((_resolve, reject) => {
-    init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+    init.signal?.addEventListener("abort", () => {
+      reject(init.signal?.reason as Error);
+    });
   });
 }
 
@@ -27,7 +29,9 @@ function fetchSettlingOnAbort(_url: string, init: RequestInit): Promise<Response
 function responseStalledUntilAbort(init: RequestInit, responseInit: ResponseInit): Response {
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
-      init.signal?.addEventListener("abort", () => controller.error(init.signal?.reason));
+      init.signal?.addEventListener("abort", () => {
+        controller.error(init.signal?.reason);
+      });
     },
   });
   return new Response(body, responseInit);
@@ -272,7 +276,9 @@ function jsonOfSize(bytes: number): string {
 
 describe("getJson response size cap", () => {
   it("rejects a Content-Length over 10 MiB without reading the body", async () => {
-    const { stream, pullSpy, cancelSpy } = lazyBody((controller) => controller.close());
+    const { stream, pullSpy, cancelSpy } = lazyBody((controller) => {
+      controller.close();
+    });
     mockFetch.mockResolvedValueOnce(
       new Response(stream, { status: 200, statusText: "OK", headers: { "Content-Length": String(20 * MiB) } }),
     );
@@ -294,7 +300,9 @@ describe("getJson response size cap", () => {
   });
 
   it("still says too large when cancelling a body refused by its Content-Length fails", async () => {
-    const { stream, pullSpy, cancelSpy } = lazyBody((controller) => controller.close(), failingCancel);
+    const { stream, pullSpy, cancelSpy } = lazyBody((controller) => {
+      controller.close();
+    }, failingCancel);
     mockFetch.mockResolvedValueOnce(
       new Response(stream, { status: 200, statusText: "OK", headers: { "Content-Length": String(20 * MiB) } }),
     );
@@ -367,7 +375,9 @@ describe("getJson response size cap", () => {
   });
 
   it("keeps the status of an error whose Content-Length is over 10 MiB, without reading the body", async () => {
-    const { stream, pullSpy, cancelSpy } = lazyBody((controller) => controller.close());
+    const { stream, pullSpy, cancelSpy } = lazyBody((controller) => {
+      controller.close();
+    });
     mockFetch.mockResolvedValueOnce(
       new Response(stream, {
         status: 500,
