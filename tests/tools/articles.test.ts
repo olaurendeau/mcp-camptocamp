@@ -1125,3 +1125,37 @@ describe("get_article lang", () => {
     expect(result).toContain("\n## Associated routes\n- [45148] Le Portalet : Face N\n- [53804] Travesía Midi-Plan\n");
   });
 });
+
+// #200 (from the #202 review): search_articles parses lang with the real list and names each article in it.
+describe("search_articles lang", () => {
+  // Derived from GET /articles?q=avalanche&pl=en and &pl=de (2026-10-04; pl=de falls back to fr), one locale
+  // each: both locales merged (summaries left out), so the line shows which one lang picks.
+  const serac = {
+    document_id: 1729857,
+    locales: [
+      { lang: "fr", title: "Zoom sur 2 récits de la base SERAC - Avalanches en cascade de glace" },
+      { lang: "en", title: "Zoom on a story of the SERAC base - Avalanches on icefalls" },
+    ],
+    article_type: "personal",
+    categories: ["mountain_environment"],
+    activities: ["ice_climbing"],
+    available_langs: ["fr", "en"],
+  };
+  const details = "| Type: personal | Categories: mountain_environment | Activities: ice_climbing";
+
+  it.each([
+    [
+      "en",
+      { lang: "en" as const },
+      `- [1729857] Zoom on a story of the SERAC base - Avalanches on icefalls ${details}`,
+    ],
+    ["no lang", {}, `- [1729857] Zoom sur 2 récits de la base SERAC - Avalanches en cascade de glace ${details}`],
+  ])("names each article in the requested language (%s)", async (_label, lang, line) => {
+    mockSearchArticles.mockResolvedValueOnce({ total: 1, documents: [serac] });
+
+    const result = await search({ query: "avalanche", ...lang });
+
+    expect(mockSearchArticles).toHaveBeenCalledWith(expect.objectContaining({ query: "avalanche", ...lang }));
+    expect(result.split("\n").at(-1)).toBe(line);
+  });
+});
