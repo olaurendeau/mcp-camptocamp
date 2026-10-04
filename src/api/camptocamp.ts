@@ -1,4 +1,5 @@
-const BASE_URL = "https://api.camptocamp.org";
+import { getJson } from "./http.js";
+
 const DEFAULT_LANG = "fr";
 const DEFAULT_LIMIT = 10;
 
@@ -84,20 +85,12 @@ export async function searchRoutes(
   params.set("limit", String(limit));
   params.set("lang", lang);
   if (areaId !== undefined) params.set("a", String(areaId));
-  const response = await fetch(`${BASE_URL}/routes?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<RouteSearchResponse>;
+  return getJson<RouteSearchResponse>({ path: "/routes", params });
 }
 
 export async function getRoute(id: number, lang = DEFAULT_LANG): Promise<RouteDetail> {
   const params = new URLSearchParams({ lang });
-  const response = await fetch(`${BASE_URL}/routes/${id}?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<RouteDetail>;
+  return getJson<RouteDetail>({ path: `/routes/${id}`, params });
 }
 
 export async function searchWaypoints(
@@ -111,20 +104,12 @@ export async function searchWaypoints(
   params.set("limit", String(limit));
   params.set("lang", lang);
   if (areaId !== undefined) params.set("a", String(areaId));
-  const response = await fetch(`${BASE_URL}/waypoints?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<WaypointSearchResponse>;
+  return getJson<WaypointSearchResponse>({ path: "/waypoints", params });
 }
 
 export async function getWaypoint(id: number, lang = DEFAULT_LANG): Promise<WaypointDetail> {
   const params = new URLSearchParams({ lang });
-  const response = await fetch(`${BASE_URL}/waypoints/${id}?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<WaypointDetail>;
+  return getJson<WaypointDetail>({ path: `/waypoints/${id}`, params });
 }
 
 export interface OutingSearchResult {
@@ -187,20 +172,12 @@ export async function searchUserOutings(
   lang = DEFAULT_LANG,
 ): Promise<OutingSearchResponse> {
   const params = new URLSearchParams({ u: String(userId), limit: String(limit), lang });
-  const response = await fetch(`${BASE_URL}/outings?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<OutingSearchResponse>;
+  return getJson<OutingSearchResponse>({ path: "/outings", params });
 }
 
 export async function getOuting(id: number, lang = DEFAULT_LANG): Promise<OutingDetail> {
   const params = new URLSearchParams({ lang });
-  const response = await fetch(`${BASE_URL}/outings/${id}?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<OutingDetail>;
+  return getJson<OutingDetail>({ path: `/outings/${id}`, params });
 }
 
 export type AreaType = "range" | "admin_limits" | "country";
@@ -237,20 +214,12 @@ export async function searchAreas(
 ): Promise<AreaSearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit), lang });
   if (areaType !== undefined) params.set("atyp", areaType);
-  const response = await fetch(`${BASE_URL}/areas?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<AreaSearchResponse>;
+  return getJson<AreaSearchResponse>({ path: "/areas", params });
 }
 
 export async function getArea(id: number, lang = DEFAULT_LANG): Promise<AreaDetail> {
   const params = new URLSearchParams({ lang });
-  const response = await fetch(`${BASE_URL}/areas/${id}?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<AreaDetail>;
+  return getJson<AreaDetail>({ path: `/areas/${id}`, params });
 }
 
 // The API treats `date=X,` as the single day X, so open-ended ranges use these bounds.
@@ -313,11 +282,7 @@ export async function searchOutings(params: OutingSearchParams = {}, lang = DEFA
   search.set("limit", String(params.limit ?? DEFAULT_LIMIT));
   search.set("offset", String(params.offset ?? 0));
   search.set("lang", lang);
-  const response = await fetch(`${BASE_URL}/outings?${search}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<OutingListResponse>;
+  return getJson<OutingListResponse>({ path: "/outings", params: search });
 }
 
 export interface BookSearchResult {
@@ -374,20 +339,12 @@ export async function searchBooks(
   lang = DEFAULT_LANG,
 ): Promise<BookSearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit), lang });
-  const response = await fetch(`${BASE_URL}/books?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<BookSearchResponse>;
+  return getJson<BookSearchResponse>({ path: "/books", params });
 }
 
 export async function getBook(id: number, lang = DEFAULT_LANG): Promise<BookDetail> {
   const params = new URLSearchParams({ lang });
-  const response = await fetch(`${BASE_URL}/books/${id}?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<BookDetail>;
+  return getJson<BookDetail>({ path: `/books/${id}`, params });
 }
 
 export interface ArticleSearchResult {
@@ -441,18 +398,10 @@ export async function searchArticles(
   lang = DEFAULT_LANG,
 ): Promise<ArticleSearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit), lang });
-  const response = await fetch(`${BASE_URL}/articles?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<ArticleSearchResponse>;
+  return getJson<ArticleSearchResponse>({ path: "/articles", params });
 }
 
 export async function getArticle(id: number, lang = DEFAULT_LANG): Promise<ArticleDetail> {
   const params = new URLSearchParams({ lang });
-  const response = await fetch(`${BASE_URL}/articles/${id}?${params}`);
-  if (!response.ok) {
-    throw new Error(`Camptocamp API error: ${response.status} ${response.statusText}`);
-  }
-  return response.json() as Promise<ArticleDetail>;
+  return getJson<ArticleDetail>({ path: `/articles/${id}`, params });
 }
