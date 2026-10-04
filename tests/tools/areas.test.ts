@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   handleSearchAreas,
   handleGetArea,
-  formatAreasSection,
   searchAreasSchema,
   getAreaSchema,
   areaToolDefinitions,
@@ -239,22 +238,6 @@ describe("handleGetArea", () => {
     mockGetArea.mockRejectedValueOnce(new Error("Camptocamp API error: 404 Not Found"));
 
     await expect(handleGetArea({ id: 999999999 })).rejects.toThrow("Camptocamp API error: 404");
-  });
-});
-
-describe("formatAreasSection", () => {
-  it("returns an empty list when areas are missing or empty", () => {
-    expect(formatAreasSection(undefined)).toEqual([]);
-    expect(formatAreasSection(null)).toEqual([]);
-    expect(formatAreasSection([])).toEqual([]);
-  });
-
-  it("returns a heading and one line per area in API order", () => {
-    expect(formatAreasSection([valaisCanton, ecrins])).toEqual([
-      "\n## Areas",
-      "- [14384] Valais (admin_limits)",
-      "- [14403] Écrins (range)",
-    ]);
   });
 });
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { searchAreas, getArea } from "../api/camptocamp.js";
-import type { AreaSearchResponse, AreaSearchResult, AreaDetail } from "../api/camptocamp.js";
+import type { AreaSearchResponse, AreaDetail } from "../api/camptocamp.js";
+import { pickLocale, formatHeader, formatAreaLine } from "./format.js";
 
 export const searchAreasSchema = z.object({
   query: z.string().describe("Area name in any language (e.g. 'Écrins', 'Valais', 'Wallis')"),
@@ -18,20 +19,6 @@ export const getAreaSchema = z.object({
 export type SearchAreasInput = z.infer<typeof searchAreasSchema>;
 export type GetAreaInput = z.infer<typeof getAreaSchema>;
 
-function pickLocale<T extends { lang: string }>(locales: T[]): T | undefined {
-  return locales.find((l) => l.lang === "fr") ?? locales[0];
-}
-
-export function formatAreaLine(area: AreaSearchResult): string {
-  const title = pickLocale(area.locales)?.title ?? "Untitled";
-  return `- [${area.document_id}] ${title} (${area.area_type})`;
-}
-
-export function formatAreasSection(areas?: AreaSearchResult[] | null): string[] {
-  if (!areas || areas.length === 0) return [];
-  return ["\n## Areas", ...areas.map(formatAreaLine)];
-}
-
 function formatAreaSearchResult(response: AreaSearchResponse): string {
   if (response.documents.length === 0) {
     return "No areas found.";
@@ -46,7 +33,7 @@ function formatAreaDetail(area: AreaDetail): string {
   const locale = pickLocale(area.locales);
   const lines: string[] = [];
 
-  lines.push(`# ${locale?.title ?? "Untitled"} (ID: ${area.document_id})`);
+  lines.push(formatHeader(locale?.title ?? "Untitled", area.document_id));
   lines.push(`\n**Type**: ${area.area_type}`);
 
   if (locale?.summary) {

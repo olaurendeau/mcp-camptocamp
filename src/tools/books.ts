@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { searchBooks, getBook } from "../api/camptocamp.js";
 import type { BookSearchResponse, BookDetail } from "../api/camptocamp.js";
+import {
+  pickLocale,
+  pickTitle,
+  joinList,
+  formatHeader,
+  formatRouteLine,
+  formatWaypointLine,
+  formatTitledLine,
+} from "./format.js";
 
 export const searchBooksSchema = z.object({
   query: z.string().describe("Search query matched against book titles (e.g. 'Vallot', 'Mont Blanc')"),
@@ -14,15 +23,6 @@ export const getBookSchema = z.object({
 export type SearchBooksInput = z.infer<typeof searchBooksSchema>;
 export type GetBookInput = z.infer<typeof getBookSchema>;
 
-// The detail response does not always list `fr` first (book 373877 returns it, fr, en), so look it up.
-function pickLocale<T extends { lang: string }>(locales: T[]): T | undefined {
-  return locales.find((l) => l.lang === "fr") ?? locales[0];
-}
-
-function joinList(values?: string[] | null): string | undefined {
-  return values && values.length > 0 ? values.join(", ") : undefined;
-}
-
 function formatBookSearchResult(response: BookSearchResponse): string {
   if (response.documents.length === 0) {
     return "No books found.";
@@ -31,7 +31,7 @@ function formatBookSearchResult(response: BookSearchResponse): string {
   const lines: string[] = [`Found ${response.total} book(s). Showing ${response.documents.length}:\n`];
 
   for (const book of response.documents) {
-    const title = pickLocale(book.locales)?.title ?? "Untitled";
+    const title = pickTitle(book.locales);
     const types = joinList(book.book_types);
     const activities = joinList(book.activities);
     const parts = [`- [${book.document_id}] ${title}`];
@@ -46,7 +46,7 @@ function formatBookSearchResult(response: BookSearchResponse): string {
 
 function formatBookDetail(book: BookDetail): string {
   const locale = pickLocale(book.locales);
-  const lines: string[] = [`# ${locale?.title ?? "Untitled"} (ID: ${book.document_id})`];
+  const lines: string[] = [formatHeader(locale?.title ?? "Untitled", book.document_id)];
 
   const fields: Array<[string, string | number | null | undefined]> = [
     ["Author", book.author],
@@ -76,31 +76,17 @@ function formatBookDetail(book: BookDetail): string {
 
   const routes = book.associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes");
-    for (const route of routes) {
-      const routeLocale = pickLocale(route.locales);
-      const title = routeLocale?.title ?? "Untitled";
-      const name = routeLocale?.title_prefix ? `${routeLocale.title_prefix} : ${title}` : title;
-      lines.push(`- [${route.document_id}] ${name}`);
-    }
+    lines.push("\n## Associated routes", ...routes.map(formatRouteLine));
   }
 
   const waypoints = book.associations?.waypoints;
   if (waypoints && waypoints.length > 0) {
-    lines.push("\n## Associated waypoints");
-    for (const wp of waypoints) {
-      const title = pickLocale(wp.locales)?.title ?? "Untitled";
-      const elevation = wp.elevation != null ? ` | ${wp.elevation}m` : "";
-      lines.push(`- [${wp.document_id}] ${title} (${wp.waypoint_type})${elevation}`);
-    }
+    lines.push("\n## Associated waypoints", ...waypoints.map(formatWaypointLine));
   }
 
   const articles = book.associations?.articles;
   if (articles && articles.length > 0) {
-    lines.push("\n## Associated articles");
-    for (const article of articles) {
-      lines.push(`- [${article.document_id}] ${pickLocale(article.locales)?.title ?? "Untitled"}`);
-    }
+    lines.push("\n## Associated articles", ...articles.map(formatTitledLine));
   }
 
   return lines.join("\n");

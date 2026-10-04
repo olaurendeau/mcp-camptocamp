@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { searchArticles, getArticle } from "../api/camptocamp.js";
 import type { ArticleSearchResponse, ArticleDetail } from "../api/camptocamp.js";
+import {
+  pickLocale,
+  pickTitle,
+  joinList,
+  formatHeader,
+  formatRouteLine,
+  formatWaypointLine,
+  formatTitledLine,
+} from "./format.js";
 
 export const searchArticlesSchema = z.object({
   query: z.string().describe("Search query (e.g. 'crampons', 'avalanche', 'rappel')"),
@@ -15,23 +24,6 @@ export type SearchArticlesInput = z.infer<typeof searchArticlesSchema>;
 export type GetArticleInput = z.infer<typeof getArticleSchema>;
 
 type Associations = NonNullable<ArticleDetail["associations"]>;
-type RouteAssociation = NonNullable<Associations["routes"]>[number];
-
-// `lang=fr` does not filter locales: 716039 lists `en` before `fr`, and some articles have no `fr` at all.
-function pickLocale<T extends { lang: string }>(locales: T[]): T | undefined {
-  return locales.find((l) => l.lang === "fr") ?? locales[0];
-}
-
-function joinList(values?: string[] | null): string {
-  return values && values.length > 0 ? values.join(", ") : "";
-}
-
-function formatRouteLine(route: RouteAssociation): string {
-  const locale = pickLocale(route.locales);
-  const title = locale?.title ?? "Untitled";
-  const name = locale?.title_prefix ? `${locale.title_prefix} : ${title}` : title;
-  return `- [${route.document_id}] ${name}`;
-}
 
 function formatArticleSearchResult(response: ArticleSearchResponse): string {
   if (response.documents.length === 0) {
@@ -41,7 +33,7 @@ function formatArticleSearchResult(response: ArticleSearchResponse): string {
   const lines: string[] = [`Found ${response.total} article(s). Showing ${response.documents.length}:\n`];
 
   for (const article of response.documents) {
-    const title = pickLocale(article.locales)?.title ?? "Untitled";
+    const title = pickTitle(article.locales);
     const categories = joinList(article.categories);
     const activities = joinList(article.activities);
     const parts = [`- [${article.document_id}] ${title}`];
@@ -56,7 +48,7 @@ function formatArticleSearchResult(response: ArticleSearchResponse): string {
 
 function formatArticleDetail(article: ArticleDetail): string {
   const locale = pickLocale(article.locales);
-  const lines: string[] = [`# ${locale?.title ?? "Untitled"} (ID: ${article.document_id})`];
+  const lines: string[] = [formatHeader(locale?.title ?? "Untitled", article.document_id)];
 
   // A collab article has many editors, so its creator is not labelled as the author (#11, D3).
   const authorLabel = article.article_type === "personal" ? "Author" : "Created by";
@@ -92,12 +84,7 @@ function formatArticleDetail(article: ArticleDetail): string {
 
   const waypoints = associations?.waypoints;
   if (waypoints && waypoints.length > 0) {
-    lines.push("\n## Associated waypoints");
-    for (const wp of waypoints) {
-      const title = pickLocale(wp.locales)?.title ?? "Untitled";
-      const elevation = wp.elevation != null ? ` | ${wp.elevation}m` : "";
-      lines.push(`- [${wp.document_id}] ${title} (${wp.waypoint_type})${elevation}`);
-    }
+    lines.push("\n## Associated waypoints", ...waypoints.map(formatWaypointLine));
   }
 
   const titled: Array<[string, Associations["articles"]]> = [
@@ -107,10 +94,7 @@ function formatArticleDetail(article: ArticleDetail): string {
   ];
   for (const [kind, documents] of titled) {
     if (documents && documents.length > 0) {
-      lines.push(`\n## Associated ${kind}`);
-      for (const doc of documents) {
-        lines.push(`- [${doc.document_id}] ${pickLocale(doc.locales)?.title ?? "Untitled"}`);
-      }
+      lines.push(`\n## Associated ${kind}`, ...documents.map(formatTitledLine));
     }
   }
 
