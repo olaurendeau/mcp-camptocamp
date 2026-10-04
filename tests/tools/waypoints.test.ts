@@ -335,6 +335,76 @@ describe("search_waypoints paging", () => {
   });
 });
 
+// AC9.2, R7: waypoint type filter, checked against Camptocamp's closed list.
+describe("search_waypoints waypoint_type filter", () => {
+  const WAYPOINT_TYPE_LIST =
+    "summit, pass, lake, waterfall, locality, bisse, canyon, access, climbing_outdoor, climbing_indoor, hut, gite, shelter, bivouac, camp_site, base_camp, local_product, paragliding_takeoff, paragliding_landing, cave, waterpoint, weather_station, webcam, virtual, slackline_spot, misc";
+
+  // The live GET /waypoints?q=pourri&wtyp=hut&limit=10&pl=fr response (2026-10-04), without the
+  // geometry, areas and the fields no tool reads.
+  const POURRI_HUTS = {
+    total: 1,
+    documents: [
+      {
+        document_id: 104151,
+        locales: [{ lang: "fr", title: "Refuge du Mont Pourri", summary: null }],
+        quality: "medium",
+        waypoint_type: "hut",
+        elevation: 2373,
+      },
+    ],
+  };
+
+  it("forwards waypoint_type and names it in the Filters line", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce(POURRI_HUTS);
+
+    const result = await search({ query: "pourri", waypoint_type: "hut" });
+
+    expect(mockSearchWaypoints).toHaveBeenCalledWith({ query: "pourri", limit: 10, offset: 0, waypoint_type: "hut" });
+    expect(result.split("\n")).toEqual([
+      "Found 1 waypoint(s). Showing 1 from offset 0:",
+      'Filters: query "pourri", waypoint type hut',
+      "",
+      "- [104151] Refuge du Mont Pourri (hut) | 2373m",
+    ]);
+  });
+
+  it("names the area and the type in the empty-result line", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({ total: 0, documents: [] });
+
+    expect(await search({ area_id: 14409, waypoint_type: "webcam" })).toBe(
+      "No waypoints found matching area 14409, waypoint type webcam.",
+    );
+  });
+
+  it("does not count waypoint_type alone as a filter", async () => {
+    await expect(search({ waypoint_type: "hut" })).rejects.toThrow(
+      "search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.",
+    );
+    expect(mockSearchWaypoints).not.toHaveBeenCalled();
+  });
+
+  it("accepts each of the 26 waypoint types", () => {
+    const types = WAYPOINT_TYPE_LIST.split(", ");
+    expect(types).toHaveLength(26);
+    for (const waypoint_type of types) {
+      expect(searchWaypointsSchema.safeParse({ query: "pourri", waypoint_type }).success).toBe(true);
+    }
+  });
+
+  it("rejects an unknown waypoint_type, listing the 26 valid values", () => {
+    const parsed = searchWaypointsSchema.safeParse({ query: "pourri", waypoint_type: "refuge" });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues).toEqual([
+      expect.objectContaining({ path: ["waypoint_type"], message: `must be one of: ${WAYPOINT_TYPE_LIST}` }),
+    ]);
+  });
+
+  it("lists the valid values in the field description", () => {
+    expect(searchWaypointsSchema.shape.waypoint_type.description).toContain(WAYPOINT_TYPE_LIST);
+  });
+});
+
 // Real `areas` of waypoint 104143 (GET /waypoints/104143?lang=fr): fr is not the first locale for
 // France and Hautes-Alpes, and Écrins has only fr. Untyped version/protected/type fields omitted.
 const areasOf104143: api.AreaSearchResult[] = [

@@ -427,6 +427,49 @@ describe("offset on searchWaypoints, searchAreas, searchBooks and searchArticles
   });
 });
 
+// AC9.2, AC9.3: type and activity filters, sent only when given.
+describe("type filters on searchWaypoints and searchBooks", () => {
+  function sentParams(): Record<string, string> {
+    return Object.fromEntries(new URL(mockFetch.mock.calls[0][0] as string).searchParams);
+  }
+
+  it("searchWaypoints sends waypoint_type as wtyp", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchWaypoints({ query: "pourri", waypoint_type: "hut" });
+
+    expect(sentParams()).toEqual({ q: "pourri", limit: "10", pl: "fr", wtyp: "hut" });
+  });
+
+  it("searchBooks sends book_type as btyp and activity as act", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchBooks({ query: "vanoise", book_type: "topo", activity: "skitouring" });
+
+    expect(sentParams()).toEqual({ q: "vanoise", limit: "10", pl: "fr", btyp: "topo", act: "skitouring" });
+  });
+
+  it("searchBooks sends act without btyp", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchBooks({ query: "vanoise", activity: "hiking" });
+
+    expect(sentParams()).toEqual({ q: "vanoise", limit: "10", pl: "fr", act: "hiking" });
+  });
+
+  it("sends neither wtyp, btyp nor act when not given", async () => {
+    mockFetch.mockImplementation(async () => makeResponse({ documents: [], total: 0 }));
+
+    await searchWaypoints({ query: "pourri" });
+    await searchBooks({ query: "vanoise" });
+
+    for (const [url] of mockFetch.mock.calls) {
+      const params = new URL(url as string).searchParams;
+      for (const name of ["wtyp", "btyp", "act"]) expect(params.has(name)).toBe(false);
+    }
+  });
+});
+
 describe("getWaypoint", () => {
   it("fetches waypoint by ID", async () => {
     const mockData = {
