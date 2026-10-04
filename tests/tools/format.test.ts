@@ -168,6 +168,11 @@ describe("formatHeader", () => {
       "**URL**: https://www.camptocamp.org/areas/14403",
     ]);
   });
+
+  it("accepts only the six document type segments as path (checked by the typecheck)", () => {
+    // @ts-expect-error "route" is not a camptocamp.org segment: the link would be dead.
+    expect(formatHeader("Écrins", 14403, "route")[1]).toBe("**URL**: https://www.camptocamp.org/route/14403");
+  });
 });
 
 describe("formatRouteName", () => {

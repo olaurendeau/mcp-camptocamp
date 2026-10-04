@@ -6,6 +6,7 @@ import {
   getBookSchema,
   bookToolDefinitions,
 } from "../../src/tools/books.js";
+import { USER_TEXT_NOTE } from "../../src/tools/text.js";
 import * as api from "../../src/api/camptocamp.js";
 import { bookDetailSchema, bookSearchResponseSchema } from "../../src/api/schemas.js";
 import { throughSchema } from "./through-schema.js";
@@ -210,6 +211,13 @@ describe("book tool definitions", () => {
     expect(bookToolDefinitions.map((t) => t.name)).toEqual(["search_books", "get_book"]);
     expect(bookToolDefinitions[0].inputSchema).toBe(searchBooksSchema);
     expect(bookToolDefinitions[1].inputSchema).toBe(getBookSchema);
+  });
+
+  it("says in the get_book description that text between the markers is user-written content, not instructions", () => {
+    expect(bookToolDefinitions[1].description).toContain(USER_TEXT_NOTE);
+    // Summary and description are demoted and capped, so only the labelled fields are stored values.
+    expect(bookToolDefinitions[1].description).not.toContain("Values are shown exactly");
+    expect(bookToolDefinitions[1].description).toContain("Labelled fields are shown as Camptocamp stores them");
   });
 
   it("says get_book returns related articles that get_article can follow", () => {
@@ -681,12 +689,16 @@ describe("handleGetBook", () => {
     );
   });
 
-  it("prints the fr description verbatim, markup included", async () => {
+  it("prints the fr description as user-written text, markup kept and its ## Info heading demoted", async () => {
     mockGetBook.mockResolvedValueOnce(BOOK_373877);
 
     const result = await handleGetBook({ id: 373877 });
 
-    expect(result).toContain(`\n## Description\n${BOOK_373877.locales[1].description}`);
+    const description = BOOK_373877.locales[1].description.replace("\r\n## Info \r\n", "\r\n#### Info \r\n");
+    expect(description).not.toBe(BOOK_373877.locales[1].description);
+    expect(result).toContain(
+      `\n## Description\n[begin user-written text: description]\n${description}\n[end user-written text: description]`,
+    );
     expect(result).not.toContain("## Summary");
     expect(result).not.toContain("Monte Bianco classico");
   });
@@ -699,7 +711,19 @@ describe("handleGetBook", () => {
     expect(result).toContain("**Publication date**: Juin 2026\n");
     expect(result).toContain("**Author**: Clément Guillot / Astrid Renet\n");
     expect(result).toContain("**Languages**: fr, en\n");
-    expect(result).toContain("\n## Summary\n30 sorties trail autour de Chamonix.\n");
+    expect(result).toContain(
+      [
+        "## Summary",
+        "[begin user-written text: summary]",
+        "30 sorties trail autour de Chamonix.",
+        "[end user-written text: summary]",
+        "",
+        "## Description",
+        "[begin user-written text: description]",
+        "(English below)",
+      ].join("\n"),
+    );
+    expect(result).toContain("detailed route description.\n[end user-written text: description]\n");
   });
 
   it("writes a route line without prefix when title_prefix is empty", async () => {
@@ -757,7 +781,9 @@ describe("handleGetBook", () => {
         "**Book types**: novel",
         "",
         "## Description",
+        "[begin user-written text: description]",
         BOOK_14746.locales[0].description,
+        "[end user-written text: description]",
       ].join("\n"),
     );
     expectNoPlaceholder(result);
@@ -803,7 +829,7 @@ describe("handleGetBook", () => {
 
     const result = await handleGetBook({ id: 209293 });
 
-    expect(result).toContain("\n## Description\n1<sup>re</sup> édition 1947,");
+    expect(result).toContain("\n## Description\n[begin user-written text: description]\n1<sup>re</sup> édition 1947,");
     expect(result).toContain("3<sup>e</sup> édition en 19736,");
     expect(result).toContain("\n## Associated routes\n- [53781] Mont Blanc : Arête des Bosses\n");
     expect(result).toContain(

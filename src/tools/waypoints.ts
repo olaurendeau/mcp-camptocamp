@@ -3,6 +3,7 @@ import { documentId, searchQuery } from "./inputs.js";
 import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointSearchResponse, WaypointDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, isPresent, formatHeader, formatWaypointLine, formatAreasSection } from "./format.js";
+import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchWaypointsSchema = z.object({
   query: searchQuery("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')", {
@@ -63,13 +64,8 @@ function formatWaypointDetail(waypoint: WaypointDetail): string {
 
   lines.push(...formatAreasSection(waypoint.areas));
 
-  if (locale?.description) {
-    lines.push(`\n## Description\n${locale.description}`);
-  }
-
-  if (locale?.access) {
-    lines.push(`\n## Access\n${locale.access}`);
-  }
+  lines.push(...formatUserText("description", "Description", locale?.description));
+  lines.push(...formatUserText("access", "Access", locale?.access));
 
   return lines.join("\n");
 }
@@ -102,7 +98,8 @@ export const waypointToolDefinitions = [
     name: "get_waypoint",
     title: "Get waypoint details",
     description:
-      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, description, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source.",
+      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, description, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      USER_TEXT_NOTE,
     inputSchema: getWaypointSchema,
     handler: handleGetWaypoint,
   },

@@ -12,6 +12,7 @@ import {
   formatAssociatedRouteLine,
 } from "./format.js";
 import { formatRatingLines, formatRatingParts } from "./ratings.js";
+import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchUserOutingsSchema = z.object({
   user_id: documentId("Camptocamp user ID (e.g. 430052 for username o.laurendeau)"),
@@ -122,29 +123,12 @@ function formatOutingDetail(outing: OutingDetail): string {
   if (isPresent(outing.height_diff_up)) lines.push(`**Elevation gain**: ${outing.height_diff_up}m`);
   if (isPresent(outing.height_diff_down)) lines.push(`**Elevation loss**: ${outing.height_diff_down}m`);
 
-  if (locale?.description) {
-    lines.push(`\n## Description\n${locale.description}`);
-  }
-
-  if (locale?.route_description) {
-    lines.push(`\n## Route description\n${locale.route_description}`);
-  }
-
-  if (locale?.conditions) {
-    lines.push(`\n## Conditions\n${locale.conditions}`);
-  }
-
-  if (locale?.weather) {
-    lines.push(`\n## Weather\n${locale.weather}`);
-  }
-
-  if (locale?.timing) {
-    lines.push(`\n## Timing\n${locale.timing}`);
-  }
-
-  if (locale?.participants) {
-    lines.push(`\n## Participants\n${locale.participants}`);
-  }
+  lines.push(...formatUserText("description", "Description", locale?.description));
+  lines.push(...formatUserText("route_description", "Route description", locale?.route_description));
+  lines.push(...formatUserText("conditions", "Conditions", locale?.conditions));
+  lines.push(...formatUserText("weather", "Weather", locale?.weather));
+  lines.push(...formatUserText("timing", "Timing", locale?.timing));
+  lines.push(...formatUserText("participants", "Participants", locale?.participants));
 
   const routes = outing.associations?.routes;
   if (routes && routes.length > 0) {
@@ -243,7 +227,8 @@ export const outingToolDefinitions = [
     name: "get_outing",
     title: "Get outing details",
     description:
-      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including every rating labelled by its grading system (e.g. 'Ski rating (Toponeige)', 'Labande', 'Global rating'), description, conditions, weather, participants, and associated routes (named '<summit> : <route title>', followed by their ratings). The second line is the document's camptocamp.org URL, to cite as the source.",
+      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including every rating labelled by its grading system (e.g. 'Ski rating (Toponeige)', 'Labande', 'Global rating'), description, conditions, weather, participants, and associated routes (named '<summit> : <route title>', followed by their ratings). The second line is the document's camptocamp.org URL, to cite as the source. " +
+      USER_TEXT_NOTE,
     inputSchema: getOutingSchema,
     handler: handleGetOuting,
   },

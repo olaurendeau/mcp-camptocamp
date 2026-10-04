@@ -4,6 +4,7 @@ import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteSearchResponse, RouteDetail } from "../api/camptocamp.js";
 import { pickLocale, isPresent, formatHeader, formatRouteName, formatRouteLine, formatAreasSection } from "./format.js";
 import { formatRatingLines } from "./ratings.js";
+import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchRoutesSchema = z.object({
   query: searchQuery("Search query for routes (e.g. 'Mont Blanc voie normale')", { allowBlank: true }).optional(),
@@ -46,17 +47,9 @@ function formatRouteDetail(route: RouteDetail): string {
 
   lines.push(...formatAreasSection(route.areas));
 
-  if (locale?.description) {
-    lines.push(`\n## Description\n${locale.description}`);
-  }
-
-  if (locale?.remarks) {
-    lines.push(`\n## Remarks\n${locale.remarks}`);
-  }
-
-  if (locale?.gear) {
-    lines.push(`\n## Gear\n${locale.gear}`);
-  }
+  lines.push(...formatUserText("description", "Description", locale?.description));
+  lines.push(...formatUserText("remarks", "Remarks", locale?.remarks));
+  lines.push(...formatUserText("gear", "Gear", locale?.gear));
 
   return lines.join("\n");
 }
@@ -89,7 +82,8 @@ export const routeToolDefinitions = [
     name: "get_route",
     title: "Get route details",
     description:
-      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, every rating labelled by its grading system (Toponeige ski rating, Labande, global rating, rock, ice, hiking…), elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source.",
+      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, every rating labelled by its grading system (Toponeige ski rating, Labande, global rating, rock, ice, hiking…), elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      USER_TEXT_NOTE,
     inputSchema: getRouteSchema,
     handler: handleGetRoute,
   },

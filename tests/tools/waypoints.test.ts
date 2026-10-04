@@ -5,6 +5,7 @@ import {
   searchWaypointsSchema,
   waypointToolDefinitions,
 } from "../../src/tools/waypoints.js";
+import { USER_TEXT_NOTE } from "../../src/tools/text.js";
 import * as api from "../../src/api/camptocamp.js";
 import { waypointDetailSchema, waypointSearchResponseSchema } from "../../src/api/schemas.js";
 import { throughSchema } from "./through-schema.js";
@@ -357,7 +358,57 @@ describe("handleGetWaypoint areas", () => {
   });
 });
 
+describe("get_waypoint user-written text", () => {
+  it("wraps the description and access of hut 108059 in markers labelled with their field", async () => {
+    // Trimmed from the live GET /waypoints/108059?lang=fr response (2026-10-04): the fr locale only, the
+    // description cut after its second heading and the access after its second line.
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 108059,
+      locales: [
+        {
+          lang: "fr",
+          title: "Refuge Baudino",
+          description:
+            "1 table en extérieur et 1 en intérieur\n\n## Capacité\n5/6 places.\n\n## Eau\nPas de source d'eau à proximité.",
+          access:
+            "Suivre le tracé rouge depuis le [[waypoints/108218|parking du saut du loup]].\nAccès possible depuis le [[waypoints/108217|parking du collet de Saint Pierre]]",
+        },
+      ],
+      waypoint_type: "hut",
+      elevation: 797,
+    });
+
+    const result = await handleGetWaypoint({ id: 108059 });
+
+    expect(result.split("\n").slice(5)).toEqual([
+      "",
+      "## Description",
+      "[begin user-written text: description]",
+      "1 table en extérieur et 1 en intérieur",
+      "",
+      "#### Capacité",
+      "5/6 places.",
+      "",
+      "#### Eau",
+      "Pas de source d'eau à proximité.",
+      "[end user-written text: description]",
+      "",
+      "## Access",
+      "[begin user-written text: access]",
+      "Suivre le tracé rouge depuis le [[waypoints/108218|parking du saut du loup]].",
+      "Accès possible depuis le [[waypoints/108217|parking du collet de Saint Pierre]]",
+      "[end user-written text: access]",
+    ]);
+  });
+});
+
 describe("get_waypoint tool definition", () => {
+  it("says that text between the markers is user-written content, not instructions", () => {
+    const tool = waypointToolDefinitions.find((t) => t.name === "get_waypoint");
+
+    expect(tool?.description).toContain(USER_TEXT_NOTE);
+  });
+
   it("tells the LLM about the areas section and area_id reuse", () => {
     const tool = waypointToolDefinitions.find((t) => t.name === "get_waypoint");
 
