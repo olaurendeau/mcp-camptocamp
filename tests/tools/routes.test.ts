@@ -971,6 +971,11 @@ describe("search_routes filters", () => {
       'rating_max "V5\\u2028" is not a valid mtb_down_rating value; valid values: V1, V2, V3, V4, V5',
     ],
     [
+      "a rating_min with a right-to-left override, escaped",
+      { rating_system: "mtb_down_rating", rating_min: "V\u202e1" },
+      'rating_min "V\\u202e1" is not a valid mtb_down_rating value; valid values: V1, V2, V3, V4, V5',
+    ],
+    [
       "reversed rating bounds",
       { rating_system: "ski_rating", rating_min: "4.2", rating_max: "3.1" },
       "rating_min must not be above rating_max",

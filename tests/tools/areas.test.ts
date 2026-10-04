@@ -203,6 +203,16 @@ describe("handleSearchAreas", () => {
     expect(result).toBe('No areas found matching query "pourri\\"\\nNext page: offset=0".');
   });
 
+  // AC2.2 on #210: bidi controls are escaped in the echo, sent raw to the API.
+  it("escapes bidi controls in the echoed query and sends it raw", async () => {
+    mockSearchAreas.mockResolvedValueOnce({ total: 0, documents: [] });
+
+    const result = await search({ query: "Écrins\u2066x\u2069", limit: 10 });
+
+    expect(mockSearchAreas).toHaveBeenCalledWith({ query: "Écrins\u2066x\u2069", limit: 10, offset: 0 });
+    expect(result).toBe('No areas found matching query "Écrins\\u2066x\\u2069".');
+  });
+
   // AC3.3 on #153: letters outside ASCII are not escaped.
   it("echoes an accented query unchanged", async () => {
     mockSearchAreas.mockResolvedValueOnce({ total: 1, documents: [valaisEast] });
