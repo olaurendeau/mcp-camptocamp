@@ -22,7 +22,7 @@ src/
     ├── inputs.ts         # Shared zod inputs: bounded document IDs, 200-char queries
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY), shared by every route/outing line
     ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
-    ├── text.ts           # formatUserText: delimits, demotes and caps user-written text
+    ├── text.ts           # formatUserText: rewrites image tags and internal links, delimits, demotes and caps user-written text
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
     ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
@@ -88,8 +88,8 @@ docker compose build mcp
 
 The contract tests also run every Monday through the `Contract` workflow (`.github/workflows/contract.yml`, schedule and manual dispatch only, never a required check):
 
-- GitHub disables scheduled workflows after 60 days without repository activity, so a missing weekly run is not a pass: re-enable the workflow in the Actions tab. It can always be run by hand with `gh workflow run contract.yml`.
-- Failures of scheduled runs are notified to the user who last modified the cron line (after a squash merge, the author of that commit on `main`), that is the repository owner.
+- GitHub disables scheduled workflows after 60 days without repository activity, so a missing weekly run is not a pass. GitHub refuses manual runs of a disabled workflow, so re-enable it first (`gh workflow enable contract.yml` or the Actions tab), then run it by hand with `gh workflow run contract.yml`.
+- Failures of scheduled runs are notified to the user who last modified the cron line (after a squash merge, the author of that commit on `main`), or, once the workflow has been re-enabled, to the user who re-enabled it.
 
 ## Workflow
 
@@ -141,7 +141,7 @@ Base URL: `https://api.camptocamp.org`
 
 Every request goes through `getJson` in `src/api/http.ts` with `User-Agent: mcp-camptocamp/<version> (+https://github.com/olaurendeau/mcp-camptocamp)`, a 15 s timeout and a 10 MiB body cap; every 200 body is parsed with the zod schemas of `src/api/schemas.ts`.
 
-Locale: searches send `pl=fr`, which returns one locale per document, French when it exists, otherwise the best other language. Detail requests send no query string: `pl` is ignored there and `lang` is a no-op everywhere, so `pickLocale` in `src/tools/format.ts` picks the same one in details: `fr`, then `en`, `it`, `de`, `es`, `ca`, `eu`, `sl`, `zh`, then any other.
+Locale: searches send `pl=fr`, which returns one locale per document, French when it exists, otherwise another language chosen by Camptocamp. Detail requests send no query string: `pl` is ignored there and `lang` is a no-op everywhere, so `pickLocale` in `src/tools/format.ts` picks one: `fr`, then `en`, `it`, `de`, `es`, `ca`, `eu`, `sl`, `zh`, then any other. This order is decision D1 on #57; only `[it, en]` → `en` (route 675555) was checked live against the search fallback.
 
 - `GET /routes?limit=10&pl=fr[&q={query}][&a={area_id}][&w={waypoint_id}][&act={activity}][&{rating param}={min},{max}][&hdif={min},{max}][&rtyp={types}][&conf={configurations}][&offset={n}]`
   - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.

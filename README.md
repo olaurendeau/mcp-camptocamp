@@ -104,8 +104,8 @@ make help          # Liste toutes les commandes
 
 Les tests de contrat tournent aussi chaque lundi via le workflow `Contract` (`.github/workflows/contract.yml`, planifié ou lancé à la main, jamais requis sur une PR) :
 
-- GitHub désactive les workflows planifiés après 60 jours sans activité sur le dépôt : une exécution hebdomadaire absente ne vaut pas succès. Le réactiver dans l'onglet Actions ; il peut toujours être lancé à la main avec `gh workflow run contract.yml`.
-- Les échecs des exécutions planifiées sont notifiés à l'utilisateur qui a modifié la ligne `cron` en dernier (après un squash merge, l'auteur de ce commit sur `main`), c'est-à-dire le propriétaire du dépôt.
+- GitHub désactive les workflows planifiés après 60 jours sans activité sur le dépôt : une exécution hebdomadaire absente ne vaut pas succès. GitHub refuse de lancer à la main un workflow désactivé : le réactiver d'abord (`gh workflow enable contract.yml` ou l'onglet Actions), puis le lancer avec `gh workflow run contract.yml`.
+- Les échecs des exécutions planifiées sont notifiés à l'utilisateur qui a modifié la ligne `cron` en dernier (après un squash merge, l'auteur de ce commit sur `main`) ou, si le workflow a été réactivé, à l'utilisateur qui l'a réactivé.
 
 ## Publication
 
