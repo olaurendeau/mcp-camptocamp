@@ -2028,6 +2028,66 @@ describe("searchArticles", () => {
   });
 });
 
+// AC3.2, AC3.3 of #210: the article filters are acat (category), atyp (type) and act (activity), and the
+// query is optional.
+describe("article filters on searchArticles", () => {
+  function sentUrl(): URL {
+    return new URL(mockFetch.mock.calls[0][0] as string);
+  }
+
+  it("sends q, acat, atyp and act with the values given", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchArticles({
+      query: "avalanche",
+      category: "mountain_environment",
+      article_type: "collab",
+      activity: "skitouring",
+    });
+
+    const params = sentUrl().searchParams;
+    expect(sentUrl().pathname).toBe("/articles");
+    expect(params.get("q")).toBe("avalanche");
+    expect(params.get("acat")).toBe("mountain_environment");
+    expect(params.get("atyp")).toBe("collab");
+    expect(params.get("act")).toBe("skitouring");
+  });
+
+  it("sends no q without a query", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchArticles({ category: "c2c_meetings", limit: 2 });
+
+    expect(sentUrl().searchParams.has("q")).toBe(false);
+    expect(Object.fromEntries(sentUrl().searchParams)).toEqual({ limit: "2", pl: "fr", acat: "c2c_meetings" });
+  });
+
+  it.each<[string, Parameters<typeof searchArticles>[0], string[]]>([
+    ["only a category", { category: "gear" }, ["atyp", "act"]],
+    ["only an article type", { article_type: "personal" }, ["acat", "act"]],
+    ["only an activity", { activity: "skitouring" }, ["acat", "atyp"]],
+    ["a query alone", { query: "crampons" }, ["acat", "atyp", "act"]],
+  ])("does not send the filters that are not set: %s", async (_name, options, absent) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchArticles(options);
+
+    for (const name of absent) expect(sentUrl().searchParams.has(name), name).toBe(false);
+  });
+
+  it("leaves the searchAreas and searchBooks URLs unchanged", async () => {
+    mockFetch.mockImplementation(() => Promise.resolve(makeResponse({ documents: [], total: 0 })));
+
+    await searchAreas({ query: "ecrins", limit: 2, offset: 4 });
+    await searchBooks({ query: "vanoise", limit: 2, offset: 4 });
+
+    expect(mockFetch.mock.calls.map(([url]) => url as string)).toEqual([
+      `${API}/areas?q=ecrins&limit=2&pl=fr&offset=4`,
+      `${API}/books?q=vanoise&limit=2&pl=fr&offset=4`,
+    ]);
+  });
+});
+
 describe("getArticle", () => {
   it("calls the exact article URL and keeps the author and associated articles", async () => {
     // Trimmed from the live GET /articles/226838?lang=fr response (2026-10-03): fr description cut to its

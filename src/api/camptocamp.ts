@@ -96,7 +96,7 @@ function keywordOrAreaParams(options: KeywordOrAreaSearchOptions): URLSearchPara
   return params;
 }
 
-// Options of searchAreas, searchBooks and searchArticles: a required keyword.
+// Options of searchAreas and searchBooks: a required keyword.
 interface KeywordSearchOptions {
   query: string;
   limit?: number; // default DEFAULT_LIMIT
@@ -107,14 +107,20 @@ export interface BookSearchOptions extends KeywordSearchOptions {
   book_type?: string;
   activity?: string;
 }
-export type ArticleSearchOptions = KeywordSearchOptions;
+// The keyword is optional once a filter is given. Each filter is sent only when given: `acat` and `act`
+// match an article having that value among its categories or activities.
+export type ArticleSearchOptions = Omit<KeywordSearchOptions, "query"> & {
+  query?: string; // sent as q only when given
+  category?: string; // acat
+  article_type?: string; // atyp
+  activity?: string; // act
+};
 
-function keywordParams(options: KeywordSearchOptions): URLSearchParams {
-  const params = new URLSearchParams({
-    q: options.query,
-    limit: String(options.limit ?? DEFAULT_LIMIT),
-    pl: options.lang ?? DEFAULT_LANG,
-  });
+function keywordParams(options: Omit<KeywordSearchOptions, "query"> & { query?: string }): URLSearchParams {
+  const params = new URLSearchParams();
+  if (options.query !== undefined) params.set("q", options.query);
+  params.set("limit", String(options.limit ?? DEFAULT_LIMIT));
+  params.set("pl", options.lang ?? DEFAULT_LANG);
   if (options.offset !== undefined) params.set("offset", String(options.offset));
   return params;
 }
@@ -242,7 +248,11 @@ export async function getBook(id: number): Promise<BookDetail> {
 }
 
 export async function searchArticles(options: ArticleSearchOptions): Promise<ArticleSearchResponse> {
-  return getJson({ path: "/articles", params: keywordParams(options), schema: articleSearchResponseSchema });
+  const params = keywordParams(options);
+  if (options.category !== undefined) params.set("acat", options.category);
+  if (options.article_type !== undefined) params.set("atyp", options.article_type);
+  if (options.activity !== undefined) params.set("act", options.activity);
+  return getJson({ path: "/articles", params, schema: articleSearchResponseSchema });
 }
 
 export async function getArticle(id: number): Promise<ArticleDetail> {
