@@ -93,6 +93,24 @@ export const ROUTE_RATING_PARAMS = {
 export type RouteRatingField = keyof typeof ROUTE_RATING_PARAMS;
 export const ROUTE_RATING_FIELDS = Object.keys(ROUTE_RATING_PARAMS) as RouteRatingField[];
 
+// The 12 rating systems the outing search filters on, with the same parameters as routes (v6_api's outing
+// search mapping). The API silently ignores the 8 others (`srat`, `sexpo`, … return the unfiltered total).
+export const OUTING_RATING_FIELDS = [
+  "ski_rating",
+  "labande_global_rating",
+  "global_rating",
+  "engagement_rating",
+  "equipment_rating",
+  "ice_rating",
+  "rock_free_rating",
+  "via_ferrata_rating",
+  "hiking_rating",
+  "snowshoe_rating",
+  "mtb_up_rating",
+  "mtb_down_rating",
+] as const satisfies readonly RouteRatingField[];
+export type OutingRatingField = (typeof OUTING_RATING_FIELDS)[number];
+
 export interface RouteSearchOptions extends KeywordOrAreaSearchOptions {
   waypoint_id?: number;
   activity?: string;
@@ -211,6 +229,10 @@ export interface OutingSearchParams {
   waypoint_id?: number;
   user_id?: number;
   period?: { start: string; end: string }; // MM-DD, start on or before end
+  rating?: { system: OutingRatingField; min?: string; max?: string };
+  condition_at_least?: string; // excellent, good, average, poor or awful
+  elevation_max?: { min?: number; max?: number };
+  height_diff_up?: { min?: number; max?: number };
   limit?: number; // default DEFAULT_LIMIT
   offset?: number; // default 0
 }
@@ -221,6 +243,17 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
   if (params.query) search.set("q", params.query);
   if (params.area_id !== undefined) search.set("a", String(params.area_id));
   if (params.activity !== undefined) search.set("act", params.activity);
+  if (params.rating !== undefined) {
+    const range = rangeParam(params.rating.min, params.rating.max);
+    if (range !== undefined) search.set(ROUTE_RATING_PARAMS[params.rating.system], range);
+  }
+  // Conditions go from excellent down to awful, and `ocond=v` alone matches every outing with a condition:
+  // "v or better" is the range excellent → v.
+  if (params.condition_at_least !== undefined) search.set("ocond", `excellent,${params.condition_at_least}`);
+  const elevationMax = rangeParam(params.elevation_max?.min, params.elevation_max?.max);
+  if (elevationMax !== undefined) search.set("oalt", elevationMax);
+  const heightDiffUp = rangeParam(params.height_diff_up?.min, params.height_diff_up?.max);
+  if (heightDiffUp !== undefined) search.set("odif", heightDiffUp);
   if (params.date_from !== undefined || params.date_to !== undefined) {
     search.set("date", `${params.date_from ?? DATE_MIN},${params.date_to ?? DATE_MAX}`);
   }
