@@ -129,7 +129,7 @@ describe("tool calls", () => {
     expect(result.content).toEqual([
       {
         type: "text",
-        text: "Found 1 route(s). Showing 1:\n\n- [53914] Arête des Cosmiques (mountain_climbing) | Max elevation: 3842m",
+        text: "Found 1 route(s). Showing 1:\n\n- [53914] Aiguille du Midi : Arête des Cosmiques (mountain_climbing) | Max elevation: 3842m",
       },
     ]);
   });
