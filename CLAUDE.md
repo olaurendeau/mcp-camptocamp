@@ -86,6 +86,11 @@ docker compose run --rm dev npm run test:watch
 docker compose build mcp
 ```
 
+The contract tests also run every Monday through the `Contract` workflow (`.github/workflows/contract.yml`, schedule and manual dispatch only, never a required check):
+
+- GitHub disables scheduled workflows after 60 days without repository activity, so a missing weekly run is not a pass: re-enable the workflow in the Actions tab. It can always be run by hand with `gh workflow run contract.yml`.
+- Failures of scheduled runs are notified to the user who last modified the cron line (after a squash merge, the author of that commit on `main`), that is the repository owner.
+
 ## Workflow
 
 Every change lands through a PR; the rules and thresholds live in [CONTRIBUTING.md](CONTRIBUTING.md).

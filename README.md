@@ -102,6 +102,11 @@ make docker-build  # Construire l'image de production
 make help          # Liste toutes les commandes
 ```
 
+Les tests de contrat tournent aussi chaque lundi via le workflow `Contract` (`.github/workflows/contract.yml`, planifié ou lancé à la main, jamais requis sur une PR) :
+
+- GitHub désactive les workflows planifiés après 60 jours sans activité sur le dépôt : une exécution hebdomadaire absente ne vaut pas succès. Le réactiver dans l'onglet Actions ; il peut toujours être lancé à la main avec `gh workflow run contract.yml`.
+- Les échecs des exécutions planifiées sont notifiés à l'utilisateur qui a modifié la ligne `cron` en dernier (après un squash merge, l'auteur de ce commit sur `main`), c'est-à-dire le propriétaire du dépôt.
+
 ## Publication
 
 La publication est automatisée : le tag `vX.Y.Z` déclenche le workflow `publish.yml`, qui publie sur npm, GHCR et le [registre MCP officiel](https://modelcontextprotocol.io/registry). Aucune publication manuelle : le processus (PR de bump, merge, tag) est décrit dans la section [Release de `CONTRIBUTING.md`](CONTRIBUTING.md#release).
