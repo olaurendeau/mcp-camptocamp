@@ -183,10 +183,10 @@ export const waypointToolDefinitions = [
     name: "get_waypoint",
     title: "Get waypoint details",
     description:
-      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, capacity (for huts, gîtes and camp sites: places outside the wardened period, then places when wardened; for a bivouac: its number of places), custodianship, phones and website, summary, description, access, access period (free text, as written), the areas it belongs to (range, admin_limits, country), then its routes (at most 50, in search_routes format; a 'More: search_routes with waypoint_id=N' line follows when there are more), the books that cover it, and its most recent outings with their total ('More: search_outings with waypoint_id=N' lists them all). " +
-      CUSTODIANSHIP_NOTE +
-      " " +
+      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude and GPS coordinates. " +
       VIRTUAL_WAYPOINT_NOTE +
+      " It also gives capacity (for huts, gîtes and camp sites: places outside the wardened period, then places when wardened; for a bivouac: its number of places), custodianship, phones and website, summary, description, access, access period (free text, as written), the areas it belongs to (range, admin_limits, country), then its routes (at most 50, in search_routes format; a 'More: search_routes with waypoint_id=N' line follows when there are more), the books that cover it, and its most recent outings with their total ('More: search_outings with waypoint_id=N' lists them all). " +
+      CUSTODIANSHIP_NOTE +
       " Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,
     inputSchema: getWaypointSchema,

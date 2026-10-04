@@ -1474,7 +1474,10 @@ describe("get_route associations", () => {
 
     const result = await handleGetRoute({ id: 944120 });
 
-    expect(section(result, "## Associated waypoints")).toContain("- [1947492] Ouvertures 2013 (virtual)");
+    expect(section(result, "## Associated waypoints")).toEqual([
+      "- [189454] Oliana (climbing_outdoor) | 500m | main waypoint",
+      "- [1947492] Ouvertures 2013 (virtual)",
+    ]);
     expect(result).not.toContain("7999m");
   });
 

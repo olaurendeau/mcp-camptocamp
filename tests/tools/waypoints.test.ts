@@ -684,6 +684,12 @@ describe("virtual waypoints", () => {
 
     expect(tool?.description).toContain(VIRTUAL_SENTENCE);
   });
+
+  it("gives the get_waypoint note right after the GPS coordinates", () => {
+    const tool = waypointToolDefinitions.find((t) => t.name === "get_waypoint");
+
+    expect(tool?.description).toContain(`altitude and GPS coordinates. ${VIRTUAL_SENTENCE}`);
+  });
 });
 
 describe("get_waypoint hut details", () => {
