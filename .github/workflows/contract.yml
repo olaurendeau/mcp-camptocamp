@@ -1,0 +1,29 @@
+name: Contract
+
+# Live contract tests against api.camptocamp.org: they detect upstream response shape changes.
+# Weekly and manual only, never on pull requests, so this workflow cannot become a required check.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Live contract tests
+        run: npm run test:contract
