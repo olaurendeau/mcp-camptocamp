@@ -432,6 +432,70 @@ describe("handleGetOuting", () => {
   });
 });
 
+// AC1.7 on #210: get_outing names the sections written only in other languages.
+describe("get_outing Text in other languages", () => {
+  // Derived from outing 170463 of GET /outings/170463 (2026-10-05): its en and fr locales with every free-text
+  // field, each cut after its first sentence, punctuation as sent; nulls kept as sent. Edited: the en weather, live text in both locales, is
+  // set to null here, since every live text of this outing is written in both languages.
+  const benedetti = {
+    document_id: 170463,
+    locales: [
+      {
+        lang: "en",
+        title: "Mont Blanc : West face, Benedetti couloir",
+        description: "Magnificent ski-mountaineering traverse, highly recommendable.",
+        route_description: null,
+        conditions: "Good conditions on the Three Monts route, lots of tracks.",
+        weather: null,
+        timing: "08.30 Aiguille du Midi. 13.00 summit of Mont Blanc. 14.30 Gonella path. ",
+        participants: "Andreas Fransson ",
+      },
+      {
+        lang: "fr",
+        title: "Mont Blanc : Face W, couloir Benedetti",
+        description: "Magnifique traversée de ski-alpinisme, hautement recommandable.",
+        route_description: null,
+        conditions: "De bonnes conditions sur la route des Trois Monts, beaucoup de traces.",
+        weather: "Beau temps, chaud. Quelques nuages en milieu de journée, mais pas surla face ouest.",
+        timing: "08h30 Aiguille du Midi. 13h00 sommet du Mont-Blanc. 14h30 Gonella",
+        participants: "Andreas Fransson",
+      },
+    ],
+    activities: ["skitouring"],
+    date_start: "2009-05-25",
+    date_end: "2009-05-25",
+    elevation_max: 4810,
+    height_diff_up: 1400,
+    condition_rating: "good",
+    ski_rating: "5.2",
+  };
+
+  it("names the weather the en locale lacks and fr has, right after the URL line", async () => {
+    mockGetOuting.mockResolvedValueOnce(benedetti);
+
+    const lines = (await handleGetOuting({ id: 170463, lang: "en" })).split("\n");
+
+    expect(lines.slice(0, 5)).toEqual([
+      "# Mont Blanc : West face, Benedetti couloir (ID: 170463)",
+      "**URL**: https://www.camptocamp.org/outings/170463",
+      "**Text in other languages**: weather (fr)",
+      "",
+      "**Activities**: skitouring",
+    ]);
+    expect(lines).not.toContain("## Weather");
+    expect(lines.join("\n")).not.toContain("Beau temps");
+  });
+
+  it("prints no Text line in fr, which has every section en has", async () => {
+    mockGetOuting.mockResolvedValueOnce(benedetti);
+
+    const result = await handleGetOuting({ id: 170463 });
+
+    expect(result).not.toContain("Text in other languages");
+    expect(result).toContain("## Weather\n[begin user-written text: weather]\nBeau temps");
+  });
+});
+
 describe("zero values and partial dates", () => {
   it("prints 0 for participant_count, the elevations and the height differences in get_outing", async () => {
     mockGetOuting.mockResolvedValueOnce({

@@ -1999,6 +1999,196 @@ describe("get_route lang", () => {
   });
 });
 
+// Route 54085 of GET /routes/54085 (2026-10-05): its four locales with every free-text field, each cut after its
+// first line or sentence, punctuation as sent; a text cut elsewhere ends with "…". Nulls kept as sent. fr has no
+// gear; de, en and it have no summary, route_history or external_resources.
+const route54085Texts = {
+  document_id: 54085,
+  locales: [
+    {
+      lang: "fr",
+      title: "Versant W par le Glacier du Geay",
+      title_prefix: "Mont Pourri",
+      summary: "Le Mont Pourri est le second sommet de la Vanoise et comporte un système glaciaire important.",
+      description: "[img=192710 right]Mont Pourri, itinéraire 1[/img]",
+      slope: "40°",
+      remarks: "- Orientation générale W puis NW.",
+      gear: null,
+      route_history:
+        "- Premier parcours de la partie du [[routes/54080/fr|Col des Roches]] au sommet : 4 octobre 1860 - Michel Croz. ",
+      external_resources:
+        "- *Mont Pourri or Mont Thuriaz* par W. A. B. Coolidge, [*Alpine Journal*, vol. 9, 1878, n<sup>o</sup>62, p.97-98](https://books.google.fr/books?id=N6dJAAAAYAAJ&pg=PA97&hl=fr&source=gbs_toc_r&cad=3#v=onepage&q&f=false) : chronique de l'ascension de 1878 (en anglais).",
+    },
+    {
+      lang: "de",
+      title: "Voie normale du Glacier du Geay",
+      title_prefix: "Mont Pourri",
+      summary: null,
+      description: "Zustieg zur Mont-Pourri Hütte über das Ponturin-Tal (Peisey-Nancroix): …",
+      slope: "40°",
+      remarks: "Großer Höhenunterschied beim zweiten Vanoise-Gipfel.\r",
+      gear: "Seil und Gletscherausrüstung, Steigeisen für den Gipfel.",
+      route_history: null,
+      external_resources: null,
+    },
+    {
+      lang: "en",
+      title: "Normal route from Glacier du Geay",
+      title_prefix: "Mont Pourri",
+      summary: null,
+      description: "Access to Mont Pourri refuge via Vallée du Ponturin (Peisey-Nancroix): …",
+      slope: "40°",
+      remarks: "A large HD for the summit second of Vanoise.\r",
+      gear: "Rope and glacier equipment, crampons for the summit.",
+      route_history: null,
+      external_resources: null,
+    },
+    {
+      lang: "it",
+      title: "Voie normale du Glacier du Geay",
+      title_prefix: "Mont Pourri",
+      summary: null,
+      description: "Accesso al rifugio del Mont Pourri dalla valle del Ponturin (Peisey-Nancroix): …",
+      slope: "40°",
+      remarks: "Un notevole dislivello per la seconda cima di Vanoise.\r",
+      gear: "Corda e attrezzatura da ghiacciaio, ramponi per la vetta.",
+      route_history: null,
+      external_resources: null,
+    },
+  ],
+  activities: ["skitouring"],
+  elevation_max: 3779,
+  ski_rating: "4.1",
+};
+
+// Route 675555 of GET /routes/675555 (2026-10-05): locales [it, en], every free-text field cut after its first
+// line or sentence, punctuation as sent; nulls kept as sent; neither locale has a slope key. it has no summary or gear.
+const route675555Texts = {
+  document_id: 675555,
+  locales: [
+    {
+      lang: "it",
+      title: "Via Ferrata Gamma 2",
+      title_prefix: "Resegone",
+      summary: null,
+      description:
+        "## Attacco\r\nDai **Piani d'Erna 1330m**, prendere il sentiero numero 1 che porta alla via normale del Resegone.",
+      remarks:
+        'E\' considerata una delle ferrate più impegnative delle alpi insieme alla "Costantini" e alla "Tabaretta".',
+      gear: null,
+      route_history: null,
+      external_resources: null,
+    },
+    {
+      lang: "en",
+      title: "Via ferrata Gamma 2 - al Dente del Resegone",
+      title_prefix: "Resegone",
+      summary:
+        'Very fun climbing in a variety of interesting situations, long + committing, big views, rather difficult -- especially for "free" rock-climbing moves, Gamma 2 ranks with the very best in the Dolomites.',
+      description: "Good things about this route ...",
+      remarks:
+        '- Could be preceded by climbing the interesting "via ferrata Gamma 1 al Pizzo d\'Erna" (instead of riding up the funivia lift).',
+      gear: "- via ferrata kit (see under Remarks for special concerns or modifications).",
+      route_history: null,
+      external_resources: null,
+    },
+  ],
+  activities: ["via_ferrata"],
+  elevation_max: 1809,
+  via_ferrata_rating: "K5",
+};
+
+// AC1.3–AC1.5 on #210: the sections written only in other languages, named after the Language line or the URL.
+describe("get_route Text in other languages", () => {
+  it("names the gear route 54085 has only in de, en and it, and prints no Gear section (AC1.3)", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085Texts);
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(result.split("\n").slice(0, 3)).toEqual([
+      "# Mont Pourri : Versant W par le Glacier du Geay (ID: 54085)",
+      "**URL**: https://www.camptocamp.org/routes/54085",
+      "**Text in other languages**: gear (de, en, it)",
+    ]);
+    expect(result).not.toContain("## Gear");
+    expect(result).not.toContain("Seil und Gletscherausrüstung");
+    expect(result).toContain("## Route history");
+  });
+
+  it("names the sections route 54085 has only in fr for lang en, and still prints the en gear (AC1.4)", async () => {
+    mockGetRoute.mockResolvedValueOnce(route54085Texts);
+
+    const result = await handleGetRoute({ id: 54085, lang: "en" });
+
+    expect(result.split("\n").slice(0, 3)).toEqual([
+      "# Mont Pourri : Normal route from Glacier du Geay (ID: 54085)",
+      "**URL**: https://www.camptocamp.org/routes/54085",
+      "**Text in other languages**: summary (fr), route_history (fr), external_resources (fr)",
+    ]);
+    expect(result).toContain("## Gear\n[begin user-written text: gear]\nRope and glacier equipment");
+    expect(result).not.toContain("## Summary");
+    expect(result).not.toContain("Le Mont Pourri est le second sommet");
+  });
+
+  it("names the summary and gear route 675555 has only in en, for lang it (AC1.5)", async () => {
+    mockGetRoute.mockResolvedValueOnce(route675555Texts);
+
+    const result = await handleGetRoute({ id: 675555, lang: "it" });
+
+    expect(result.split("\n").slice(0, 3)).toEqual([
+      "# Resegone : Via Ferrata Gamma 2 (ID: 675555)",
+      "**URL**: https://www.camptocamp.org/routes/675555",
+      "**Text in other languages**: summary (en), gear (en)",
+    ]);
+    expect(result).not.toContain("**Language**");
+    expect(result).not.toContain("via ferrata kit");
+  });
+
+  it("compares with the en locale shown for route 675555 without lang: Language line, no Text line (AC1.5)", async () => {
+    mockGetRoute.mockResolvedValueOnce(route675555Texts);
+
+    const result = await handleGetRoute({ id: 675555 });
+
+    expect(result.split("\n").slice(0, 4)).toEqual([
+      "# Resegone : Via ferrata Gamma 2 - al Dente del Resegone (ID: 675555)",
+      "**URL**: https://www.camptocamp.org/routes/675555",
+      "**Language**: en (no fr version; available: it, en)",
+      "",
+    ]);
+    expect(result).not.toContain("Text in other languages");
+  });
+
+  it("prints the line once, never on an association line (AC1.9)", async () => {
+    // route54085Texts with the areas and associations of route54085Locales (same live response).
+    mockGetRoute.mockResolvedValueOnce({
+      ...route54085Texts,
+      areas: route54085Locales.areas,
+      associations: route54085Locales.associations,
+    });
+
+    const result = await handleGetRoute({ id: 54085, lang: "de" });
+
+    expect(result.match(/Text in other languages/g)).toEqual(["Text in other languages"]);
+    expect(result).toContain("\n## Associated routes\n- [46624] Mont Pourri : Traverse über den Grand Col");
+  });
+
+  it("puts the Text line right after the Language line when both are printed (AC1.6)", async () => {
+    // Edited from the live route 675555: en remarks set to null, so the en locale shown for de lacks a section.
+    mockGetRoute.mockResolvedValueOnce({
+      ...route675555Texts,
+      locales: [route675555Texts.locales[0], { ...route675555Texts.locales[1], remarks: null }],
+    });
+
+    const result = await handleGetRoute({ id: 675555, lang: "de" });
+
+    expect(result.split("\n").slice(1, 4)).toEqual([
+      "**URL**: https://www.camptocamp.org/routes/675555",
+      "**Language**: en (no de version; available: it, en)",
+      "**Text in other languages**: remarks (it)",
+    ]);
+  });
+});
+
 // AC5.2 on #153: search_routes sends the requested language to searchRoutes (pl=<lang>) and names each route
 // in the locale Camptocamp returns for it.
 describe("search_routes lang", () => {

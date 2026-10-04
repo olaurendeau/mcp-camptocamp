@@ -17,6 +17,7 @@ import {
   formatRecentOutings,
   formatListItems,
   formatLanguageLine,
+  formatOtherLanguagesLine,
 } from "./format.js";
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { formatUserTexts, USER_TEXT_NOTE, type TextSection } from "./text.js";
@@ -25,7 +26,7 @@ import type { Lang } from "./enums.js";
 import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
 import { describeRange, heightDiffUp, rangeFilter, ratingBound, ratingFilter, ratingScales } from "./filters.js";
 
-// The free-text sections get_route prints, in print order.
+// The free-text sections get_route prints, in print order; a field name the locale lacks fails the typecheck.
 const ROUTE_TEXT = [
   ["summary", "Summary"],
   ["description", "Description"],
@@ -34,7 +35,7 @@ const ROUTE_TEXT = [
   ["gear", "Gear"],
   ["route_history", "Route history"],
   ["external_resources", "External resources"],
-] as const satisfies readonly TextSection<string>[];
+] as const satisfies readonly TextSection<keyof RouteDetail["locales"][number]>[];
 
 const RATING_SYSTEM_NAMES = Object.keys(ROUTE_RATING_SYSTEMS) as [RouteRatingField, ...RouteRatingField[]];
 
@@ -202,6 +203,7 @@ function formatRouteDetail(route: RouteDetail, lang?: Lang): string {
 
   lines.push(...formatHeader(formatRouteName(locale), route.document_id, "routes"));
   lines.push(...formatLanguageLine(route.locales, lang));
+  lines.push(...formatOtherLanguagesLine(route.locales, locale, ROUTE_TEXT));
   lines.push(`\n**Activities**: ${route.activities.join(", ")}`);
 
   lines.push(...formatRatingLines(route));

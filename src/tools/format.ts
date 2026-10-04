@@ -15,6 +15,7 @@ import type {
   WaypointAssociation,
 } from "../api/schemas.js";
 import { formatRatingParts } from "./ratings.js";
+import { hasUserText, type TextSection } from "./text.js";
 import type { Lang } from "./enums.js";
 
 // Locale fallback order after the requested language: the API's own `pl` fallback (#141 on #153). The live
@@ -45,6 +46,26 @@ export function formatLanguageLine(locales: { lang: string }[], lang = "fr"): st
   if (!picked || picked.lang === lang) return [];
   const available = locales.map((locale) => locale.lang).join(", ");
   return [`**Language**: ${picked.lang} (no ${lang} version; available: ${available})`];
+}
+
+// A locale with free-text fields F, each possibly missing or null.
+type TextLocale<F extends string> = { lang: string } & Partial<Record<F, string | null>>;
+
+// The free-text sections the shown locale has no text for and other locales have (D1 on #210):
+// `**Text in other languages**: gear (de, en, it), …`, fields in section order with their API names, languages
+// in API order. `shown` is the locale pickLocale picked, so a fallback is compared, not the requested language.
+// No other locale's text is printed, and there is no line when no field qualifies.
+export function formatOtherLanguagesLine<F extends string>(
+  locales: readonly TextLocale<F>[],
+  shown: TextLocale<F> | undefined,
+  sections: readonly TextSection<F>[],
+): string[] {
+  const fields = sections.flatMap(([field]) => {
+    if (hasUserText(shown?.[field])) return [];
+    const langs = locales.filter((locale) => locale !== shown && hasUserText(locale[field])).map((l) => l.lang);
+    return langs.length > 0 ? [`${field} (${langs.join(", ")})`] : [];
+  });
+  return fields.length > 0 ? [`**Text in other languages**: ${fields.join(", ")}`] : [];
 }
 
 // A list as tolerantArray parses it: each item is well-formed or a MalformedItem.

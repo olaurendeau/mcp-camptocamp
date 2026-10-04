@@ -14,6 +14,7 @@ import {
   formatBookLine,
   formatListItems,
   formatLanguageLine,
+  formatOtherLanguagesLine,
 } from "./format.js";
 import { formatUserTexts, SUMMARY_AND_DESCRIPTION, USER_TEXT_NOTE } from "./text.js";
 import { ACTIVITIES, BOOK_TYPES, enumValue } from "./enums.js";
@@ -45,6 +46,7 @@ function formatBookDetail(book: BookDetail, lang?: Lang): string {
   const lines: string[] = [
     ...formatHeader(pickTitle(book.locales, lang), book.document_id, "books"),
     ...formatLanguageLine(book.locales, lang),
+    ...formatOtherLanguagesLine(book.locales, locale, SUMMARY_AND_DESCRIPTION),
   ];
 
   const fields: Array<[string, string | number | null | undefined]> = [
