@@ -443,3 +443,30 @@ describe("malformed search documents (AC4.3 on #153)", () => {
     expect(lines).toContain("- [14384] (not shown: Camptocamp sent this item in an unexpected format)");
   });
 });
+
+// #200 (from the #202 review): search_areas parses lang with the real list and names each area in it.
+describe("search_areas lang", () => {
+  // Derived from GET /areas?q=Valais&pl=fr and &pl=de (2026-10-04), one locale each: both locales merged, so
+  // the line shows which one lang picks.
+  const valais: AreaSearchResult = {
+    document_id: 14384,
+    locales: [
+      { lang: "fr", title: "Valais" },
+      { lang: "de", title: "Wallis" },
+    ],
+    area_type: "admin_limits",
+    available_langs: ["zh", "fr", "ca", "de", "en", "es", "eu", "it"],
+  };
+
+  it.each([
+    ["de", { lang: "de" as const }, "- [14384] Wallis (admin_limits)"],
+    ["no lang", {}, "- [14384] Valais (admin_limits)"],
+  ])("names each area in the requested language (%s)", async (_label, lang, line) => {
+    mockSearchAreas.mockResolvedValueOnce({ total: 1, documents: [valais] });
+
+    const result = await search({ query: "Valais", ...lang });
+
+    expect(mockSearchAreas).toHaveBeenCalledWith(expect.objectContaining({ query: "Valais", ...lang }));
+    expect(result.split("\n").at(-1)).toBe(line);
+  });
+});
