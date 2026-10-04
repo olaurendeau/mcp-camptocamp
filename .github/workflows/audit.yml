@@ -1,0 +1,35 @@
+name: Dependency audit
+
+# Full npm audit, dev dependencies included. Weekly and manual only, never on pull requests,
+# so this workflow cannot become a required check (the PR gate is the `audit` job in ci.yml).
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-audit
+  cancel-in-progress: false
+
+jobs:
+  full-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      # Stricter than the PR gate (high): a moderate or worse advisory in what users install fails the run.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+      # vitest 2 pulls in known dev-only advisories (2 critical, 1 high, 3 moderate through vite, esbuild
+      # and @vitest/mocker; the Vitest UI and the Vite dev server are unused). No audit level passes them,
+      # so this step reports without failing the run until #138 upgrades vitest. Then remove continue-on-error.
+      - name: Audit all dependencies (report only until #138)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: npm audit --audit-level=high

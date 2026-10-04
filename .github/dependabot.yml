@@ -1,0 +1,64 @@
+# Dependabot version updates, weekly on Monday morning (Paris), grouped to keep the PR queue short.
+# Security updates are enabled in the repository settings and always arrive as their own PRs.
+# Every Dependabot PR goes through the usual cycle: required checks, then agent review, then squash merge.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    # Wait a week before proposing a freshly published version (supply-chain hardening).
+    # Security updates are not delayed.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+    # Minor and patch updates land as one PR per dependency type.
+    # Major updates stay one PR per package: each one is a human decision (CONTRIBUTING.md).
+    groups:
+      npm-production:
+        dependency-type: production
+        update-types: [minor, patch]
+      npm-development:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: ci(deps)
+    # All action bumps, majors included, in a single PR.
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: build(deps)
+    # Moving to another Node.js major is a release decision, not a routine bump.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
