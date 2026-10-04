@@ -24,9 +24,38 @@ export type TitledAssociation = z.infer<typeof titledAssociationSchema>;
 // Route locales also carry the summit name, shown as "prefix : title" wherever a route is named.
 const routeLocaleSchema = localeSchema.extend({ title_prefix: z.string().nullish() });
 
+// The 20 rating fields of routes and outings, every one printed with its system's label (src/tools/ratings.ts).
+// An unset rating comes as null (route 53914's risk_rating) or is left out (route 54085 has only its ski ratings).
+export const ratingFieldsSchema = z.object({
+  ski_rating: z.string().nullish(),
+  ski_exposition: z.string().nullish(),
+  labande_ski_rating: z.string().nullish(),
+  labande_global_rating: z.string().nullish(),
+  global_rating: z.string().nullish(),
+  engagement_rating: z.string().nullish(),
+  risk_rating: z.string().nullish(),
+  equipment_rating: z.string().nullish(),
+  rock_free_rating: z.string().nullish(),
+  rock_required_rating: z.string().nullish(),
+  exposition_rock_rating: z.string().nullish(),
+  aid_rating: z.string().nullish(),
+  ice_rating: z.string().nullish(),
+  mixed_rating: z.string().nullish(),
+  via_ferrata_rating: z.string().nullish(),
+  hiking_rating: z.string().nullish(),
+  hiking_mtb_exposition: z.string().nullish(),
+  snowshoe_rating: z.string().nullish(),
+  mtb_up_rating: z.string().nullish(),
+  mtb_down_rating: z.string().nullish(),
+});
+export type RatingFields = z.infer<typeof ratingFieldsSchema>;
+const ratingFields = ratingFieldsSchema.shape;
+
+// Routes associated with an outing, a book or an article carry their ratings too.
 export const routeAssociationSchema = z.object({
   document_id: z.number(),
   locales: z.array(routeLocaleSchema),
+  ...ratingFields,
 });
 export type RouteAssociation = z.infer<typeof routeAssociationSchema>;
 
@@ -63,9 +92,9 @@ export const routeSearchResultSchema = z.object({
   locales: z.array(routeLocaleSchema),
   activities: z.array(z.string()),
   elevation_max: z.number().nullish(),
+  height_diff_up: z.number().nullish(),
   height_diff_difficulties: z.number().nullish(),
-  rock_free_rating: z.string().nullish(),
-  global_rating: z.string().nullish(),
+  ...ratingFields,
 });
 export const routeSearchResponseSchema = searchResponseSchema(routeSearchResultSchema);
 
@@ -84,15 +113,8 @@ export const routeDetailSchema = z.object({
   elevation_min: z.number().nullish(),
   height_diff_up: z.number().nullish(),
   height_diff_down: z.number().nullish(),
-  rock_free_rating: z.string().nullish(),
-  rock_required_rating: z.string().nullish(),
-  global_rating: z.string().nullish(),
-  engagement_rating: z.string().nullish(),
-  equipment_rating: z.string().nullish(),
+  ...ratingFields,
   // Not displayed yet; typed because the live API sends them, often as null.
-  risk_rating: z.string().nullish(),
-  exposition_rock_rating: z.string().nullish(),
-  aid_rating: z.string().nullish(),
   durations: z.array(z.string()).nullish(),
   main_waypoint_id: z.number().nullish(),
   geometry: z.object({ geom_detail: z.string().nullish() }).nullish(),
@@ -134,9 +156,7 @@ export const outingSearchResultSchema = z.object({
   date_end: z.string().nullish(),
   elevation_max: z.number().nullish(),
   height_diff_up: z.number().nullish(),
-  global_rating: z.string().nullish(),
-  hiking_rating: z.string().nullish(),
-  rock_free_rating: z.string().nullish(),
+  ...ratingFields,
   author: optionalAuthorSchema,
 });
 export const outingSearchResponseSchema = searchResponseSchema(outingSearchResultSchema);
@@ -160,11 +180,7 @@ export const outingDetailSchema = z.object({
   elevation_min: z.number().nullish(),
   height_diff_up: z.number().nullish(),
   height_diff_down: z.number().nullish(),
-  global_rating: z.string().nullish(),
-  engagement_rating: z.string().nullish(),
-  equipment_rating: z.string().nullish(),
-  hiking_rating: z.string().nullish(),
-  rock_free_rating: z.string().nullish(),
+  ...ratingFields,
   condition_rating: z.string().nullish(),
   participant_count: z.number().nullish(),
   author: optionalAuthorSchema,
@@ -181,13 +197,7 @@ export const outingListItemSchema = z.object({
   condition_rating: z.string().nullish(),
   elevation_max: z.number().nullish(),
   height_diff_up: z.number().nullish(),
-  global_rating: z.string().nullish(),
-  ski_rating: z.string().nullish(),
-  labande_global_rating: z.string().nullish(),
-  rock_free_rating: z.string().nullish(),
-  ice_rating: z.string().nullish(),
-  hiking_rating: z.string().nullish(),
-  snowshoe_rating: z.string().nullish(),
+  ...ratingFields,
   areas: z.array(titledAssociationSchema.extend({ area_type: z.string().nullish() })).nullish(),
   author: optionalAuthorSchema,
 });

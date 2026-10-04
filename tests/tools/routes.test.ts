@@ -50,7 +50,7 @@ describe("handleSearchRoutes", () => {
     expect(result).toContain("Found 2 route(s)");
     expect(result).toContain("[57842] Barre des Écrins : Voie Gamma");
     expect(result).toContain("4102m");
-    expect(result).toContain("Rating: ED");
+    expect(result).toContain("| Max elevation: 4102m | Global rating: ED | Rock free rating: 6b+");
     expect(result).toContain("[53914] Arête des Cosmiques");
     expect(result).not.toContain("undefined");
   });
@@ -461,9 +461,10 @@ describe("handleGetRoute with the API's null fields", () => {
         "",
         "**Activities**: rock_climbing",
         "**Global rating**: TD",
-        "**Rock free rating**: 6b+",
         "**Engagement**: I",
         "**Equipment**: P1+",
+        "**Rock free rating**: 6b+",
+        "**Rock required rating**: 6a",
         "**Max elevation**: 3131m",
         "**Min elevation**: 2719m",
         "**Elevation gain**: 412m",
@@ -560,6 +561,109 @@ describe("summit names", () => {
     const result = await handleGetRoute({ id: 54085 });
 
     expect(result.split("\n")[0]).toBe("# Mont Pourri : Versant W par le Glacier du Geay (ID: 54085)");
+  });
+});
+
+// The bare label "Rating:" (rule R4 of #58) must not appear; "Global rating:", "**Global rating**:" may.
+const BARE_RATING = /(^|[^a-z) ])Rating: /m;
+
+describe("rating labels", () => {
+  it("labels every rating of a search line by its system and adds the elevation gain", async () => {
+    // Trimmed from the live GET /routes?q=voie normale&limit=10&pl=fr response (2026-10-04): three of the ten
+    // documents, reduced to the typed fields; the API leaves unset ratings out of list items.
+    mockSearchRoutes.mockResolvedValueOnce({
+      total: 1213,
+      documents: [
+        {
+          document_id: 430919,
+          locales: [{ lang: "fr", title: "Voie normale", title_prefix: "Castell Vidre" }],
+          activities: ["rock_climbing"],
+          elevation_max: 1629,
+          height_diff_up: 150,
+          height_diff_difficulties: 80,
+          global_rating: "AD+",
+          engagement_rating: "I",
+          risk_rating: "X1",
+          equipment_rating: "P1",
+          rock_free_rating: "5b",
+          rock_required_rating: "5b",
+          exposition_rock_rating: "E1",
+          aid_rating: "A0",
+        },
+        {
+          document_id: 55195,
+          locales: [{ lang: "fr", title: "Versant SW", title_prefix: "Roccia Nera" }],
+          activities: ["skitouring", "snow_ice_mixed"],
+          elevation_max: 4075,
+          height_diff_up: 650,
+          height_diff_difficulties: 650,
+          ski_rating: "4.1",
+          ski_exposition: "E4",
+          global_rating: "F",
+          engagement_rating: "II",
+        },
+        {
+          document_id: 54085,
+          locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+          activities: ["skitouring"],
+          elevation_max: 3779,
+          height_diff_up: 1425,
+          height_diff_difficulties: 900,
+          ski_rating: "4.1",
+          ski_exposition: "E2",
+          labande_ski_rating: "S4",
+          labande_global_rating: "AD",
+        },
+      ],
+    });
+
+    const result = await handleSearchRoutes({ query: "voie normale", limit: 10 });
+
+    const lines = result.split("\n");
+    const castellVidre = lines.find((l) => l.startsWith("- [430919]"));
+    for (const part of ["Rock free rating: 5b", "Rock required rating: 5b", "Rock exposure: E1", "Aid rating: A0"]) {
+      expect(castellVidre).toContain(part);
+    }
+    expect(lines.find((l) => l.startsWith("- [55195]"))).toContain(
+      "Ski rating (Toponeige): 4.1 | Ski exposure: E4 | Global rating: F | Engagement: II",
+    );
+    expect(lines.find((l) => l.startsWith("- [54085]"))).toBe(
+      "- [54085] Mont Pourri : Versant W par le Glacier du Geay (skitouring) | Max elevation: 3779m | " +
+        "Elevation gain: 1425m | Ski rating (Toponeige): 4.1 | Ski exposure: E2 | Labande: S4 / AD",
+    );
+    expect(result).not.toMatch(BARE_RATING);
+  });
+
+  it("prints every rating of route 54085 in get_route, labelled by system", async () => {
+    // Trimmed from the live GET /routes/54085 response (2026-10-04): the fr locale only, without texts; untyped
+    // fields (orientations, maps, associations, geometry) left out. The API sends only the ski ratings of this
+    // ski route; route 53914 below has unset rock ratings sent as null.
+    mockGetRoute.mockResolvedValueOnce({
+      document_id: 54085,
+      locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+      activities: ["skitouring"],
+      elevation_min: 2370,
+      elevation_max: 3779,
+      height_diff_up: 1425,
+      height_diff_down: null,
+      ski_rating: "4.1",
+      ski_exposition: "E2",
+      labande_ski_rating: "S4",
+      labande_global_rating: "AD",
+    });
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    const lines = result.split("\n");
+    const activities = lines.indexOf("**Activities**: skitouring");
+    expect(lines.slice(activities + 1, activities + 4)).toEqual([
+      "**Ski rating (Toponeige)**: 4.1",
+      "**Ski exposure**: E2",
+      "**Labande**: S4 / AD",
+    ]);
+    expect(lines[activities + 4]).toBe("**Max elevation**: 3779m");
+    expect(result).not.toMatch(BARE_RATING);
+    expect(result).not.toContain("null");
   });
 });
 

@@ -7,7 +7,7 @@ import {
   pickTitle,
   joinList,
   formatHeader,
-  formatRouteLine,
+  formatAssociatedRouteLine,
   formatWaypointLine,
   formatTitledLine,
 } from "./format.js";
@@ -80,7 +80,7 @@ function formatArticleDetail(article: ArticleDetail): string {
 
   const routes = associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...routes.map(formatRouteLine));
+    lines.push("\n## Associated routes", ...routes.map(formatAssociatedRouteLine));
   }
 
   const waypoints = associations?.waypoints;

@@ -22,6 +22,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+// The bare label "Rating:" (rule R4 of #58) must not appear; "Global rating:", "**Global rating**:" may.
+const BARE_RATING = /(^|[^a-z) ])Rating: /m;
+
 describe("handleSearchUserOutings", () => {
   it("formats results correctly", async () => {
     mockSearchUserOutings.mockResolvedValueOnce({
@@ -54,9 +57,13 @@ describe("handleSearchUserOutings", () => {
     expect(result).toContain("[1] Sortie en Vanoise");
     expect(result).toContain("2026-07-01");
     expect(result).toContain("3000m");
-    expect(result).toContain("Rating: PD");
-    expect(result).toContain("[2] Escalade aux Calanques");
-    expect(result).toContain("2026-06-10 → 2026-06-12");
+    expect(result).toContain(
+      "- [1] Sortie en Vanoise (hiking) | 2026-07-01 | Max elevation: 3000m | Global rating: PD\n",
+    );
+    expect(result).toContain(
+      "- [2] Escalade aux Calanques (rock_climbing) | 2026-06-10 → 2026-06-12 | Rock free rating: 6a",
+    );
+    expect(result).not.toMatch(BARE_RATING);
     expect(result).not.toContain("undefined");
   });
 
@@ -223,10 +230,10 @@ describe("handleGetOuting", () => {
     expect(result).not.toContain("## Associated routes");
   });
 
-  it("prints the summit name on associated route lines", async () => {
+  it("prints the summit name and the ratings on associated route lines", async () => {
     // Trimmed from the live GET /outings/1880674 response (2026-10-04): texts and untyped fields (snow,
     // frequentation, hut_status…) left out; the route association reduced to its locales' lang, title
-    // and title_prefix. Route 1678194, with a blank title_prefix, is added to check the trimming.
+    // and title_prefix, and its ratings. Route 1678194, with a blank title_prefix, is added to check the trimming.
     mockGetOuting.mockResolvedValueOnce({
       document_id: 1880674,
       locales: [{ lang: "fr", title: "Mont Pourri : Versant W par le Glacier du Geay" }],
@@ -239,6 +246,8 @@ describe("handleGetOuting", () => {
       height_diff_down: null,
       condition_rating: "good",
       participant_count: 2,
+      ski_rating: "4.1",
+      labande_global_rating: "AD",
       associations: {
         routes: [
           {
@@ -249,6 +258,10 @@ describe("handleGetOuting", () => {
               { lang: "en", title: "Normal route from Glacier du Geay", title_prefix: "Mont Pourri" },
               { lang: "it", title: "Voie normale du Glacier du Geay", title_prefix: "Mont Pourri" },
             ],
+            ski_rating: "4.1",
+            ski_exposition: "E2",
+            labande_ski_rating: "S4",
+            labande_global_rating: "AD",
           },
           {
             document_id: 1678194,
@@ -261,10 +274,17 @@ describe("handleGetOuting", () => {
     const result = await handleGetOuting({ id: 1880674 });
 
     const lines = result.split("\n");
+    const participants = lines.indexOf("**Participants**: 2");
+    expect(lines.slice(participants + 1, participants + 4)).toEqual([
+      "**Ski rating (Toponeige)**: 4.1",
+      "**Labande**: AD",
+      "**Conditions**: good",
+    ]);
     expect(lines.slice(lines.indexOf("## Associated routes") + 1)).toEqual([
-      "- [54085] Mont Pourri : Versant W par le Glacier du Geay",
+      "- [54085] Mont Pourri : Versant W par le Glacier du Geay | Ski rating (Toponeige): 4.1 | Ski exposure: E2 | Labande: S4 / AD",
       "- [1678194] Tour du Mont Pourri en 5 jours",
     ]);
+    expect(result).not.toMatch(BARE_RATING);
   });
 
   it("propagates API errors", async () => {
@@ -641,9 +661,9 @@ describe("handleSearchOutings", () => {
       const result = await search({ activity: "skitouring" });
 
       expect(result).toContain("Conditions: good");
-      expect(result).toContain("Ski rating: 2.3");
-      expect(result).toContain("Labande: PD+");
+      expect(result).toContain("Ski rating (Toponeige): 2.3 | Labande: PD+");
       expect(result).not.toContain("Global rating");
+      expect(result).not.toMatch(BARE_RATING);
     });
 
     it("prints every part in order when every field is set", async () => {
@@ -686,7 +706,7 @@ describe("handleSearchOutings", () => {
       const result = await search({});
 
       expect(result.split("\n")[2]).toBe(
-        "- [7] Tour complet (mountain_climbing, rock_climbing) | 2026-01-06 → 2026-03-01 | Conditions: excellent | Max elevation: 4808m | Elevation gain: 0m | Global rating: D | Ski rating: 4.1 | Labande: AD | Rock free rating: 5c | Ice rating: 3 | Hiking rating: T5 | Snowshoe rating: R3 | Areas: Mont-Blanc [14410], Aiguilles Rouges [14328] | Author: o.laurendeau",
+        "- [7] Tour complet (mountain_climbing, rock_climbing) | 2026-01-06 → 2026-03-01 | Conditions: excellent | Max elevation: 4808m | Elevation gain: 0m | Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: D | Rock free rating: 5c | Ice rating: 3 | Hiking rating: T5 | Snowshoe rating: R3 | Areas: Mont-Blanc [14410], Aiguilles Rouges [14328] | Author: o.laurendeau",
       );
     });
 
