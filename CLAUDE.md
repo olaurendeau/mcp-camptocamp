@@ -20,7 +20,8 @@ src/
 └── tools/
     ├── format.ts         # Shared formatting: pickLocale, joinList, formatHeader, document lines, areas section, dates, isPresent (0 and false are printed)
     ├── inputs.ts         # Shared zod inputs: bounded document IDs, 200-char queries
-    ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY), shared by every route/outing line
+    ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
+    ├── enums.ts          # Camptocamp's closed filter value lists (activities, route types, configurations)
     ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
     ├── text.ts           # formatUserText: rewrites image tags and internal links, delimits, demotes and caps user-written text
     ├── routes.ts         # Tools: search_routes, get_route
@@ -46,8 +47,9 @@ tests/
 │   └── guard.test.sh       # Tests for the agent guard hook (.claude/hooks/guard.sh), run on the host
 └── tools/
     ├── through-schema.ts   # Test helper: parses mocked API fixtures through the zod schemas
+    ├── bare-rating.ts      # Test helper: BARE_RATING, a bare "Rating:" label that must never be printed
     ├── format.test.ts      # Shared formatting helper unit tests
-    ├── ratings.test.ts     # Rating label order and Labande joining
+    ├── ratings.test.ts     # Rating label order, Labande joining and rating scales
     ├── paging.test.ts      # Shared search paging unit tests
     ├── text.test.ts        # formatUserText unit tests
     ├── routes.test.ts      # Tool handler unit tests
@@ -117,7 +119,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 | Tool                  | Description                                                                                          |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Search by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, gain, ratings |
+| `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`  |
 | `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas) |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
 | `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
@@ -130,6 +132,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)    |
 | `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type          |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)           |
+
+`search_routes` needs at least one filter (D5 on #58); any one is enough. Rating bounds are checked against the scale of `rating_system` (`ROUTE_RATING_SYSTEMS` in `src/tools/ratings.ts`) and list values against `src/tools/enums.ts` before any request, since Camptocamp silently ignores an unknown value (R7).
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 
