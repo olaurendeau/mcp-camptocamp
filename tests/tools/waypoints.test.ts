@@ -395,8 +395,8 @@ describe("get_waypoint user-written text", () => {
       "",
       "## Access",
       "[begin user-written text: access]",
-      "Suivre le tracé rouge depuis le [[waypoints/108218|parking du saut du loup]].",
-      "Accès possible depuis le [[waypoints/108217|parking du collet de Saint Pierre]]",
+      "Suivre le tracé rouge depuis le parking du saut du loup (waypoints/108218).",
+      "Accès possible depuis le parking du collet de Saint Pierre (waypoints/108217)",
       "[end user-written text: access]",
     ]);
   });

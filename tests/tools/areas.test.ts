@@ -204,14 +204,14 @@ describe("handleGetArea", () => {
       "",
       "## Description",
       "[begin user-written text: description]",
-      "[img=254125 big no_legend no_border center]Le massif des Écrins depuis la Maurienne[/img]",
+      "[image: Le massif des Écrins depuis la Maurienne]",
       "",
       "[toc]",
       "",
       "#### Situation",
       "L'Oisans (bassin de la Romanche) au NW, le Champsaur (haut-bassin du Drac) au SW, et le Briançonnais (bassin de la Guisane) au NE recouvrent une partie du massif.",
       "",
-      "Il est également entouré par les massifs des [[areas/14407|Grandes Rousses]] et du [[areas/14432|Queyras]] à l'E.",
+      "Il est également entouré par les massifs des Grandes Rousses (areas/14407) et du Queyras (areas/14432) à l'E.",
       "[end user-written text: description]",
     ]);
   });
@@ -307,6 +307,7 @@ describe("areaToolDefinitions", () => {
     const description = areaToolDefinitions.find((t) => t.name === "get_area")?.description ?? "";
 
     expect(description).toContain(USER_TEXT_NOTE);
+    expect(description).not.toContain("markup included");
   });
 
   it("describes area types and the area_id hand-off to every search tool", () => {
