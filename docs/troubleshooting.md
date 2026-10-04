@@ -62,13 +62,19 @@ docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest
 
 In a JSON configuration, `args` is `["run", "--rm", "-i", "ghcr.io/olaurendeau/mcp-camptocamp:latest"]`.
 
-## Gemini CLI shows the server as Disconnected
+## Gemini CLI shows the server as Disabled or Disconnected
 
-**Symptom:** `gemini mcp list` shows `camptocamp` as "Disconnected".
+**Symptom:** `gemini mcp list` shows `camptocamp` as "Disconnected", as the Gemini CLI documentation describes it, or as `Disabled`, as Gemini CLI 0.62.0 does (tried on 2026-10-05). 0.62.0 also prints "MCP servers are configured but disabled because this folder is untrusted".
 
-**Cause:** for security, Gemini CLI tests a stdio server (one with a `command`) and shows it as "Connected" only when the current folder is trusted.
+**Cause:** for security, Gemini CLI starts a stdio server (one with a `command`) only when the current folder is trusted. In an untrusted folder, MCP servers do not connect, the ones in your user settings included.
 
-**Fix:** run `gemini trust` in the folder you start Gemini CLI from.
+**Fix:** trust the folder you start Gemini CLI from:
+
+- start Gemini CLI there and choose **Trust folder** in the trust dialog;
+- or run `/permissions` inside Gemini CLI to change the folder's trust;
+- or, for one session only, start it with `--skip-trust` or with `GEMINI_CLI_TRUST_WORKSPACE=true`.
+
+The Gemini CLI MCP documentation says to run `gemini trust`, but Gemini CLI 0.62.0 has no such command: `gemini trust` sends "trust" as the first prompt of a new session. See [Trust the folder](clients/gemini-cli.md#trust-the-folder) on the Gemini CLI page.
 
 ## Claude Desktop does not show the server
 
@@ -134,7 +140,7 @@ Then start Claude Desktop again. If npx still fails, check that npm is installed
 - Claude Code: https://code.claude.com/docs/en/mcp
 - Codex and the ChatGPT desktop app: https://learn.chatgpt.com/docs/extend/mcp
 - Mistral Vibe Code: https://docs.mistral.ai/vibe/code/cli/mcp-servers and https://github.com/mistralai/mistral-vibe
-- Gemini CLI: https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md
+- Gemini CLI: https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md and, for folder trust, https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/trusted-folders.md
 - docker run: https://docs.docker.com/reference/cli/docker/container/run/
 
-Last verified: 2026-10-04 against official docs
+Last verified: 2026-10-05 against official docs

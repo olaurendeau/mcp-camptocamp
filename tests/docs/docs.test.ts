@@ -376,7 +376,7 @@ describe("pages", () => {
       "startup_timeout_sec", // first-run npx timeout
       "node --version", // Node older than 22
       "docker run --rm -i", // Docker without -i
-      "gemini trust", // Gemini CLI untrusted folder
+      "--skip-trust", // Gemini CLI untrusted folder
       "~/Library/Logs/Claude", // Claude Desktop logs and restart
       "ENOENT", // Windows %APPDATA%
       "MAX_MCP_OUTPUT_TOKENS", // Claude Code output warning
