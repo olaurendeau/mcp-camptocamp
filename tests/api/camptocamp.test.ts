@@ -81,6 +81,62 @@ describe("searchRoutes", () => {
 
     await expect(searchRoutes({ query: "test" })).rejects.toThrow("Camptocamp API error: 500");
   });
+
+  it("keeps the elevation gain and every rating through the response schema", async () => {
+    // Route 55195 of the live GET /routes?q=voie normale&limit=10&pl=fr response (2026-10-04): summary, areas
+    // and geometry left out.
+    const rocciaNera = {
+      document_id: 55195,
+      version: 6,
+      locales: [{ version: 10, lang: "fr", title: "Versant SW", title_prefix: "Roccia Nera" }],
+      quality: "medium",
+      activities: ["skitouring", "snow_ice_mixed"],
+      elevation_min: 3425,
+      elevation_max: 4075,
+      height_diff_up: 650,
+      height_diff_down: null,
+      durations: ["1"],
+      calculated_duration: 0.108333333333333,
+      height_diff_difficulties: 650,
+      orientations: ["SW"],
+      ski_rating: "4.1",
+      ski_exposition: "E4",
+      labande_ski_rating: null,
+      labande_global_rating: null,
+      global_rating: "F",
+      engagement_rating: "II",
+      risk_rating: null,
+      equipment_rating: null,
+      ice_rating: null,
+      mixed_rating: null,
+      public_transportation_rating: "good service",
+      available_langs: ["it", "eu", "fr"],
+      protected: false,
+      type: "r",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [rocciaNera], total: 1213 }));
+
+    const result = await searchRoutes({ query: "voie normale" });
+
+    expect(result.documents[0]).toEqual({
+      document_id: 55195,
+      locales: [{ lang: "fr", title: "Versant SW", title_prefix: "Roccia Nera" }],
+      activities: ["skitouring", "snow_ice_mixed"],
+      elevation_max: 4075,
+      height_diff_up: 650,
+      height_diff_difficulties: 650,
+      ski_rating: "4.1",
+      ski_exposition: "E4",
+      labande_ski_rating: null,
+      labande_global_rating: null,
+      global_rating: "F",
+      engagement_rating: "II",
+      risk_rating: null,
+      equipment_rating: null,
+      ice_rating: null,
+      mixed_rating: null,
+    });
+  });
 });
 
 describe("getRoute", () => {
@@ -139,6 +195,35 @@ describe("getRoute", () => {
 
     expect(result.locales[0].title_prefix).toBe("Mont Pourri");
     expect(result.locales[0].title).toBe("Versant W par le Glacier du Geay");
+  });
+
+  it("keeps the route's ratings through the response schema", async () => {
+    // Trimmed from the live GET /routes/54085 response (2026-10-04): the ratings, the untyped
+    // public_transportation_rating and the required fields only, the fr locale without texts.
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        document_id: 54085,
+        locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+        activities: ["skitouring"],
+        ski_rating: "4.1",
+        ski_exposition: "E2",
+        labande_ski_rating: "S4",
+        labande_global_rating: "AD",
+        public_transportation_rating: "good service",
+      }),
+    );
+
+    const result = await getRoute(54085);
+
+    expect(result).toEqual({
+      document_id: 54085,
+      locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+      activities: ["skitouring"],
+      ski_rating: "4.1",
+      ski_exposition: "E2",
+      labande_ski_rating: "S4",
+      labande_global_rating: "AD",
+    });
   });
 
   it("throws on non-OK response", async () => {
@@ -360,6 +445,46 @@ describe("getOuting", () => {
     expect(route?.document_id).toBe(54085);
     expect(route?.locales[0].title_prefix).toBe("Mont Pourri");
     expect(route?.locales[1].title_prefix).toBe("Mont Pourri");
+  });
+
+  it("keeps the outing's and its associated route's ratings through the response schema", async () => {
+    // Trimmed from the live GET /outings/1880674 response (2026-10-04): every field but the ratings and the
+    // untyped public_transportation_rating left out, the route association keeping its fr locale.
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        document_id: 1880674,
+        locales: [{ lang: "fr", title: "Mont Pourri : Versant W par le Glacier du Geay" }],
+        activities: ["skitouring"],
+        ski_rating: "4.1",
+        labande_global_rating: "AD",
+        associations: {
+          routes: [
+            {
+              document_id: 54085,
+              locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+              ski_rating: "4.1",
+              ski_exposition: "E2",
+              labande_ski_rating: "S4",
+              labande_global_rating: "AD",
+              public_transportation_rating: "good service",
+            },
+          ],
+        },
+      }),
+    );
+
+    const result = await getOuting(1880674);
+
+    expect(result).toMatchObject({ ski_rating: "4.1", labande_global_rating: "AD" });
+    const route = result.associations?.routes?.[0];
+    expect(route).toEqual({
+      document_id: 54085,
+      locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+      ski_rating: "4.1",
+      ski_exposition: "E2",
+      labande_ski_rating: "S4",
+      labande_global_rating: "AD",
+    });
   });
 
   it("throws on non-OK response", async () => {
@@ -834,6 +959,20 @@ describe("searchOutings", () => {
   function calledUrl(): URL {
     return new URL(mockFetch.mock.calls[0][0] as string);
   }
+
+  it("keeps every rating of a list item through the outing list schemas", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [OUTING_COSMIQUES, OUTING_SKITOURING], total: 2 }));
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [OUTING_COSMIQUES, OUTING_SKITOURING], total: 2 }));
+
+    // search_outings and search_user_outings read the same GET /outings list items.
+    const list = await searchOutings({});
+    const userList = await searchUserOutings({ user_id: 1910408 });
+
+    for (const { documents } of [list, userList]) {
+      expect(documents[0]).toMatchObject({ global_rating: "AD", engagement_rating: "II" });
+      expect(documents[1]).toMatchObject({ ski_rating: "3.1", labande_global_rating: "PD+" });
+    }
+  });
 
   it("sends only sort, limit, offset and pl when no filter is given", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [OUTING_COSMIQUES, OUTING_SKITOURING], total: 14 }));
