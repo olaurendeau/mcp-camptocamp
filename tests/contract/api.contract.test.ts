@@ -396,6 +396,48 @@ describe("search filters narrow live results", () => {
       );
     });
   });
+
+  // AC3.7 of #210: an unknown value is ignored (`acat=bogus` returns every article), so each filter must
+  // return fewer articles than the same search with an unknown value.
+  describe("articles, against the same filter with an unknown value", () => {
+    it("acat: category gear", async () => {
+      const [result, unfiltered] = await Promise.all([
+        searchArticles({ category: "gear" }),
+        searchArticles({ category: "bogus" }),
+      ]);
+
+      expectNarrows(result, unfiltered);
+      expectMostMatch(
+        wellFormed(result.documents),
+        (article) => article.categories?.includes("gear") ?? false,
+        "acat=gear",
+      );
+    });
+
+    it("atyp: article type personal", async () => {
+      const [result, unfiltered] = await Promise.all([
+        searchArticles({ article_type: "personal" }),
+        searchArticles({ article_type: "bogus" }),
+      ]);
+
+      expectNarrows(result, unfiltered);
+      expectMostMatch(wellFormed(result.documents), (article) => article.article_type === "personal", "atyp=personal");
+    });
+
+    it("act: activity skitouring", async () => {
+      const [result, unfiltered] = await Promise.all([
+        searchArticles({ activity: "skitouring" }),
+        searchArticles({ activity: "bogus" }),
+      ]);
+
+      expectNarrows(result, unfiltered);
+      expectMostMatch(
+        wellFormed(result.documents),
+        (article) => article.activities?.includes("skitouring") ?? false,
+        "act=skitouring",
+      );
+    });
+  });
 });
 
 // Documents that carry an author keep it after parsing (AUTHOR above); the outing searches check it in "searches".
