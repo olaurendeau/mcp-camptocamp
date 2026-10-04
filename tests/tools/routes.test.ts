@@ -704,7 +704,7 @@ describe("get_route user-written text", () => {
     expect(lines[start - 1]).toBe("## Description");
     expect(lines.slice(start, start + 10)).toEqual([
       "[begin user-written text: description]",
-      "[img=192710 right]Mont Pourri, itinéraire 1[/img]",
+      "[image: Mont Pourri, itinéraire 1]",
       "",
       "#### Approche",
       "##### Rejoindre le Refuge du Pourri",
