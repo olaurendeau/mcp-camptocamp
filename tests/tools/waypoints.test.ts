@@ -6,11 +6,13 @@ import {
   waypointToolDefinitions,
 } from "../../src/tools/waypoints.js";
 import * as api from "../../src/api/camptocamp.js";
+import { waypointDetailSchema, waypointSearchResponseSchema } from "../../src/api/schemas.js";
+import { throughSchema } from "./through-schema.js";
 
 vi.mock("../../src/api/camptocamp.js");
 
-const mockSearchWaypoints = vi.mocked(api.searchWaypoints);
-const mockGetWaypoint = vi.mocked(api.getWaypoint);
+const mockSearchWaypoints = throughSchema(vi.mocked(api.searchWaypoints), waypointSearchResponseSchema);
+const mockGetWaypoint = throughSchema(vi.mocked(api.getWaypoint), waypointDetailSchema);
 
 beforeEach(() => {
   vi.clearAllMocks();

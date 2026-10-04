@@ -6,11 +6,13 @@ import {
   routeToolDefinitions,
 } from "../../src/tools/routes.js";
 import * as api from "../../src/api/camptocamp.js";
+import { routeDetailSchema, routeSearchResponseSchema } from "../../src/api/schemas.js";
+import { throughSchema } from "./through-schema.js";
 
 vi.mock("../../src/api/camptocamp.js");
 
-const mockSearchRoutes = vi.mocked(api.searchRoutes);
-const mockGetRoute = vi.mocked(api.getRoute);
+const mockSearchRoutes = throughSchema(vi.mocked(api.searchRoutes), routeSearchResponseSchema);
+const mockGetRoute = throughSchema(vi.mocked(api.getRoute), routeDetailSchema);
 
 beforeEach(() => {
   vi.clearAllMocks();

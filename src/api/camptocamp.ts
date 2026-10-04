@@ -14,6 +14,21 @@ import type {
   ArticleSearchResponse,
   ArticleDetail,
 } from "./schemas.js";
+import {
+  routeSearchResponseSchema,
+  routeDetailSchema,
+  waypointSearchResponseSchema,
+  waypointDetailSchema,
+  outingSearchResponseSchema,
+  outingDetailSchema,
+  outingListResponseSchema,
+  areaSearchResponseSchema,
+  areaDetailSchema,
+  bookSearchResponseSchema,
+  bookDetailSchema,
+  articleSearchResponseSchema,
+  articleDetailSchema,
+} from "./schemas.js";
 
 // Response types are inferred from the zod schemas in schemas.ts; re-exported under their usual names.
 export type {
@@ -131,19 +146,19 @@ export async function searchRoutes(options: RouteSearchOptions): Promise<RouteSe
   if (options.route_types?.length) params.set("rtyp", options.route_types.join(","));
   if (options.configuration?.length) params.set("conf", options.configuration.join(","));
   if (options.offset !== undefined) params.set("offset", String(options.offset));
-  return getJson<RouteSearchResponse>({ path: "/routes", params });
+  return getJson({ path: "/routes", params, schema: routeSearchResponseSchema });
 }
 
 export async function getRoute(id: number): Promise<RouteDetail> {
-  return getJson<RouteDetail>({ path: `/routes/${id}`, document: { type: "route", id } });
+  return getJson({ path: `/routes/${id}`, document: { type: "route", id }, schema: routeDetailSchema });
 }
 
 export async function searchWaypoints(options: WaypointSearchOptions): Promise<WaypointSearchResponse> {
-  return getJson<WaypointSearchResponse>({ path: "/waypoints", params: keywordOrAreaParams(options) });
+  return getJson({ path: "/waypoints", params: keywordOrAreaParams(options), schema: waypointSearchResponseSchema });
 }
 
 export async function getWaypoint(id: number): Promise<WaypointDetail> {
-  return getJson<WaypointDetail>({ path: `/waypoints/${id}`, document: { type: "waypoint", id } });
+  return getJson({ path: `/waypoints/${id}`, document: { type: "waypoint", id }, schema: waypointDetailSchema });
 }
 
 export interface UserOutingSearchOptions {
@@ -157,11 +172,11 @@ export async function searchUserOutings(options: UserOutingSearchOptions): Promi
     limit: String(options.limit ?? DEFAULT_LIMIT),
     pl: PREFERRED_LANG,
   });
-  return getJson<OutingSearchResponse>({ path: "/outings", params });
+  return getJson({ path: "/outings", params, schema: outingSearchResponseSchema });
 }
 
 export async function getOuting(id: number): Promise<OutingDetail> {
-  return getJson<OutingDetail>({ path: `/outings/${id}`, document: { type: "outing", id } });
+  return getJson({ path: `/outings/${id}`, document: { type: "outing", id }, schema: outingDetailSchema });
 }
 
 export type AreaType = "range" | "admin_limits" | "country";
@@ -173,11 +188,11 @@ export interface AreaSearchOptions extends KeywordSearchOptions {
 export async function searchAreas(options: AreaSearchOptions): Promise<AreaSearchResponse> {
   const params = keywordParams(options);
   if (options.area_type !== undefined) params.set("atyp", options.area_type);
-  return getJson<AreaSearchResponse>({ path: "/areas", params });
+  return getJson({ path: "/areas", params, schema: areaSearchResponseSchema });
 }
 
 export async function getArea(id: number): Promise<AreaDetail> {
-  return getJson<AreaDetail>({ path: `/areas/${id}`, document: { type: "area", id } });
+  return getJson({ path: `/areas/${id}`, document: { type: "area", id }, schema: areaDetailSchema });
 }
 
 // The API treats `date=X,` as the single day X, so open-ended ranges use these bounds.
@@ -211,21 +226,21 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
   search.set("limit", String(params.limit ?? DEFAULT_LIMIT));
   search.set("offset", String(params.offset ?? 0));
   search.set("pl", PREFERRED_LANG);
-  return getJson<OutingListResponse>({ path: "/outings", params: search });
+  return getJson({ path: "/outings", params: search, schema: outingListResponseSchema });
 }
 
 export async function searchBooks(options: BookSearchOptions): Promise<BookSearchResponse> {
-  return getJson<BookSearchResponse>({ path: "/books", params: keywordParams(options) });
+  return getJson({ path: "/books", params: keywordParams(options), schema: bookSearchResponseSchema });
 }
 
 export async function getBook(id: number): Promise<BookDetail> {
-  return getJson<BookDetail>({ path: `/books/${id}`, document: { type: "book", id } });
+  return getJson({ path: `/books/${id}`, document: { type: "book", id }, schema: bookDetailSchema });
 }
 
 export async function searchArticles(options: ArticleSearchOptions): Promise<ArticleSearchResponse> {
-  return getJson<ArticleSearchResponse>({ path: "/articles", params: keywordParams(options) });
+  return getJson({ path: "/articles", params: keywordParams(options), schema: articleSearchResponseSchema });
 }
 
 export async function getArticle(id: number): Promise<ArticleDetail> {
-  return getJson<ArticleDetail>({ path: `/articles/${id}`, document: { type: "article", id } });
+  return getJson({ path: `/articles/${id}`, document: { type: "article", id }, schema: articleDetailSchema });
 }
