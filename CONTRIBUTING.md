@@ -51,7 +51,7 @@ Chaque agent termine par un rapport `Status` / `Deliverables`, complété par `D
 - **Process / sécurité** : CI, ruleset, seuils de qualité, hooks, définitions des agents ;
 - **Release** : la décision de publier et le numéro de version (l'exécution suit la section [Release](#release)).
 
-Chaque décision est tracée en commentaire de l'issue, sauf le rejet d'un point bloquant, tracé sur la PR (voir [Rejeter un point bloquant](#rejeter-un-point-bloquant)). Une revue est _clean_ quand elle n'a aucun point bloquant ; le coordinateur trie les suggestions (correction, issue de suivi ou rejet motivé) avant de merger.
+Chaque décision est tracée en commentaire de l'issue, avec trois exceptions : une décision prise avant que l'epic existe va dans le corps de l'epic, sous **Decisions** ; le tri des suggestions d'une revue est posté en un seul commentaire de la PR ; le rejet d'un point bloquant est tracé sur la PR (voir [Rejeter un point bloquant](#rejeter-un-point-bloquant)). Une revue est _clean_ quand elle n'a aucun point bloquant ; le coordinateur trie les suggestions (correction, issue de suivi ou rejet motivé) avant de merger.
 
 Pour lancer une session avec un autre rôle : `claude --agent <nom>`.
 
@@ -76,13 +76,13 @@ Le hook contrôle chaque commande d'une chaîne (`&&`, `||`, `;`, `|`) séparém
 
 ### Rejeter un point bloquant
 
-Un point bloquant ne disparaît que de deux façons : le développeur le corrige, ou l'humain le rejette. Le rejet par l'humain est le seul moyen de passer une revue bloquante sans correction ; ni le coordinateur ni le développeur ne peuvent l'écarter seuls.
+Un point bloquant ne doit disparaître que de deux façons : le développeur le corrige, ou l'humain le rejette. Le rejet par l'humain est le seul moyen de passer une revue bloquante sans correction ; ni le coordinateur ni le développeur ne peuvent l'écarter seuls.
 
 1. Le développeur conteste le point avec une raison, ou le même point survit à deux cycles de correction.
 2. Le coordinateur tranche : si le point est fondé, il le renvoie au développeur comme correction obligatoire ; s'il le juge faux positif, il pose la question à l'humain (label `needs-human` sur l'issue de la tâche pendant l'attente, retiré après la réponse).
 3. Si l'humain confirme le rejet, le coordinateur poste sur la PR `Decision: finding "<point>" rejected by the human — Reason: …`, puis relance la revue. Le reviewer traite ce point comme réglé : au plus une mention en suggestion, jamais en bloquant.
 
-Ce commentaire va sur la PR, et non sur l'issue comme les autres décisions, parce que le reviewer ne lit que la PR.
+Ce commentaire va sur la PR, et non sur l'issue, parce que le reviewer ne lit que la PR.
 
 C'est une convention, pas un contrôle technique : les agents écrivent sur GitHub avec le même compte que l'humain et le hook ne filtre pas les commentaires, donc n'importe quel agent pourrait techniquement poster ce commentaire. Seul le coordinateur le poste, et uniquement après la réponse de l'humain ; l'historique de la PR et de l'issue permet de le vérifier.
 
