@@ -689,12 +689,14 @@ describe("handleGetBook", () => {
     );
   });
 
-  it("prints the fr description as user-written text, markup kept and its ## Info heading demoted", async () => {
+  it("prints the fr description as user-written text, its image tag rewritten and its ## Info heading demoted", async () => {
     mockGetBook.mockResolvedValueOnce(BOOK_373877);
 
     const result = await handleGetBook({ id: 373877 });
 
-    const description = BOOK_373877.locales[1].description.replace("\r\n## Info \r\n", "\r\n#### Info \r\n");
+    const description = BOOK_373877.locales[1].description
+      .replace("[img=373947 right]Mont Blanc classique & plaisir[/img]", "[image: Mont Blanc classique & plaisir]")
+      .replace("\r\n## Info \r\n", "\r\n#### Info \r\n");
     expect(description).not.toBe(BOOK_373877.locales[1].description);
     expect(result).toContain(
       `\n## Description\n[begin user-written text: description]\n${description}\n[end user-written text: description]`,
