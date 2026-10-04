@@ -12,17 +12,34 @@ export function assertResultWindow(offset: number, limit: number): void {
 
 const ESCAPES: Record<string, string> = { '"': '\\"', "\\": "\\\\", "\n": "\\n", "\r": "\\r", "\t": "\\t" };
 
+/** True for a character `quote()` escapes as `\uxxxx`; all of them are in the BMP. */
+function isEscapedAsCode(code: number): boolean {
+  return (
+    code <= 0x1f || // C0 controls
+    (code >= 0x7f && code <= 0x9f) || // DEL and C1 controls
+    code === 0x061c || // Arabic letter mark
+    (code >= 0x200b && code <= 0x200f) || // zero-width space, non-joiner, joiner; LRM, RLM
+    code === 0x2028 || // line separator
+    code === 0x2029 || // paragraph separator
+    (code >= 0x202a && code <= 0x202e) || // bidi embeddings and overrides
+    (code >= 0x2066 && code <= 0x2069) || // bidi isolates
+    code === 0xfeff // zero-width no-break space (BOM)
+  );
+}
+
 /**
  * Wraps user input echoed in an output line in double quotes, on one line, so it cannot fake a
- * line of its own (e.g. a `Next page:` footer): `"`, `\`, LF, CR and tab escape as in JSON; other
- * C0 and C1 controls, DEL, U+2028 and U+2029 as `\uxxxx`; every other character is unchanged.
+ * line of its own (e.g. a `Next page:` footer) nor hide or reorder part of itself for a human
+ * reader: `"`, `\`, LF, CR and tab escape as in JSON; other C0 and C1 controls, DEL, U+2028,
+ * U+2029, and the bidi and zero-width characters U+061C, U+200B–U+200F, U+202A–U+202E,
+ * U+2066–U+2069 and U+FEFF as lowercase `\uxxxx` (a ZWJ inside an emoji sequence too); every other
+ * character is unchanged.
  */
 export function quote(value: string): string {
   let escaped = "";
   for (const char of value) {
     const code = char.charCodeAt(0);
-    const control = code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
-    escaped += ESCAPES[char] ?? (control ? `\\u${code.toString(16).padStart(4, "0")}` : char);
+    escaped += ESCAPES[char] ?? (isEscapedAsCode(code) ? `\\u${code.toString(16).padStart(4, "0")}` : char);
   }
   return `"${escaped}"`;
 }
