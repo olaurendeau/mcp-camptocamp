@@ -537,3 +537,204 @@ describe("zero elevation", () => {
     expect(result).not.toContain("null");
   });
 });
+
+describe("get_waypoint hut details", () => {
+  // Trimmed from the live GET /waypoints/104151?lang=fr response (2026-10-04): geometry, areas, associations,
+  // the description and the access dropped.
+  const hut104151 = {
+    document_id: 104151,
+    locales: [{ lang: "fr", title: "Refuge du Mont Pourri", summary: null, access_period: null }],
+    waypoint_type: "hut",
+    elevation: 2373,
+    capacity: 50,
+    capacity_staffed: 55,
+    custodianship: "always_accessible",
+    phone: "04.79.07.90.43 / 06.14.48.77.26",
+    phone_custodian: null,
+    url: "http://www.refuge-mont-pourri.fr",
+  };
+
+  it("prints the capacities, custodianship, phone and website of hut 104151 after the elevation", async () => {
+    mockGetWaypoint.mockResolvedValueOnce(hut104151);
+
+    const result = await handleGetWaypoint({ id: 104151 });
+
+    expect(result.split("\n").slice(2)).toEqual([
+      "",
+      "**Type**: hut",
+      "**Elevation**: 2373m",
+      "**Capacity (unstaffed)**: 50",
+      "**Capacity (staffed)**: 55",
+      "**Custodianship**: always_accessible",
+      "**Phone**: 04.79.07.90.43 / 06.14.48.77.26",
+      "**Website**: http://www.refuge-mont-pourri.fr",
+    ]);
+  });
+
+  it("prints an unstaffed capacity of 0 and the custodian's phone of hut 273946", async () => {
+    // Trimmed from the live GET /waypoints/273946?lang=fr response (2026-10-04): geometry, areas, associations
+    // and the locale's text fields dropped.
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 273946,
+      locales: [{ lang: "fr", title: "Refuge du Lac Blanc" }],
+      waypoint_type: "hut",
+      elevation: 2300,
+      capacity: 0,
+      capacity_staffed: 18,
+      custodianship: "accessible_when_wardened",
+      phone: "+33 (0)6 82 38 11 98",
+      phone_custodian: "+33 (0)6 45 98 77 26",
+      url: "https://www.refugedulacblanc-vanoise.com",
+    });
+
+    const result = await handleGetWaypoint({ id: 273946 });
+
+    expect(result.split("\n").slice(5)).toEqual([
+      "**Capacity (unstaffed)**: 0",
+      "**Capacity (staffed)**: 18",
+      "**Custodianship**: accessible_when_wardened",
+      "**Phone**: +33 (0)6 82 38 11 98",
+      "**Custodian's phone**: +33 (0)6 45 98 77 26",
+      "**Website**: https://www.refugedulacblanc-vanoise.com",
+    ]);
+  });
+
+  it("labels a bivouac's capacity Capacity", async () => {
+    // Trimmed from the live GET /waypoints/1925122?lang=fr response (2026-10-04): the it summary dropped.
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 1925122,
+      locales: [{ lang: "it", title: "Bivacco Ambrogio Fogar all'Alpe Fornalino" }],
+      waypoint_type: "bivouac",
+      elevation: 2084,
+      capacity: 12,
+      capacity_staffed: null,
+      custodianship: null,
+      phone: null,
+      phone_custodian: null,
+      url: null,
+    });
+
+    const result = await handleGetWaypoint({ id: 1925122 });
+
+    expect(result.split("\n").slice(2)).toEqual(["", "**Type**: bivouac", "**Elevation**: 2084m", "**Capacity**: 12"]);
+  });
+
+  it("labels a gîte's capacity Capacity (unstaffed) next to its staffed capacity", async () => {
+    // Trimmed from the live GET /waypoints/1931523?lang=fr response (2026-10-04): geometry, areas,
+    // associations and the sl locale's text fields dropped.
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 1931523,
+      locales: [{ lang: "sl", title: "Koča Antona Bavčerja na Čavnu" }],
+      waypoint_type: "gite",
+      elevation: 1242,
+      capacity: 10,
+      capacity_staffed: 40,
+      custodianship: "always_accessible",
+      phone: null,
+      phone_custodian: null,
+      url: "https://mapzs.pzs.si/poi/1062",
+    });
+
+    const result = await handleGetWaypoint({ id: 1931523 });
+
+    expect(result.split("\n").slice(5)).toEqual([
+      "**Capacity (unstaffed)**: 10",
+      "**Capacity (staffed)**: 40",
+      "**Custodianship**: always_accessible",
+      "**Website**: https://mapzs.pzs.si/poi/1062",
+    ]);
+  });
+
+  it("prints an unknown custodianship verbatim", async () => {
+    mockGetWaypoint.mockResolvedValueOnce({ ...hut104151, custodianship: "seasonal_key_box" });
+
+    const result = await handleGetWaypoint({ id: 104151 });
+
+    expect(result).toContain("**Custodianship**: seasonal_key_box");
+  });
+
+  it("prints the access period of hut 135691 delimited and verbatim, after the access", async () => {
+    // Trimmed from the live GET /waypoints/135691?lang=fr response (2026-10-04): geometry, areas,
+    // associations and the null external_resources dropped.
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 135691,
+      locales: [
+        {
+          lang: "fr",
+          title: "Refuge des Barmettes",
+          description: null,
+          summary: null,
+          access: "Depuis Pralognan / Les Fontanettes en 1h15 de marche.",
+          access_period: "14/06 au 14/09",
+        },
+      ],
+      waypoint_type: "hut",
+      elevation: 2010,
+      capacity: null,
+      capacity_staffed: 27,
+      custodianship: "always_accessible",
+      phone: "+33479087564",
+      phone_custodian: "+330682843168",
+      url: "https://www.lesbarmettes-refuge.com",
+    });
+
+    const result = await handleGetWaypoint({ id: 135691 });
+
+    const lines = result.split("\n");
+    expect(lines).not.toContain("**Capacity (unstaffed)**: null");
+    expect(lines).toContain("**Capacity (staffed)**: 27");
+    expect(lines.slice(lines.indexOf("## Access"))).toEqual([
+      "## Access",
+      "[begin user-written text: access]",
+      "Depuis Pralognan / Les Fontanettes en 1h15 de marche.",
+      "[end user-written text: access]",
+      "",
+      "## Access period",
+      "[begin user-written text: access_period]",
+      "14/06 au 14/09",
+      "[end user-written text: access_period]",
+    ]);
+  });
+
+  it("prints the summary delimited before the description", async () => {
+    // Summary from the live GET /waypoints/1925122?lang=fr response (2026-10-04), cut after its first
+    // sentence; description made up.
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 1925122,
+      locales: [
+        {
+          lang: "it",
+          title: "Bivacco Ambrogio Fogar all'Alpe Fornalino",
+          summary: "Il bivacco, di proprietà del comune di Bognanco, si trova su un dosso all'Alpe Fornalino.",
+          description: "## Accesso\nDa Bognanco.",
+        },
+      ],
+      waypoint_type: "bivouac",
+      elevation: 2084,
+    });
+
+    const result = await handleGetWaypoint({ id: 1925122 });
+
+    const lines = result.split("\n");
+    expect(lines.slice(lines.indexOf("## Summary"))).toEqual([
+      "## Summary",
+      "[begin user-written text: summary]",
+      "Il bivacco, di proprietà del comune di Bognanco, si trova su un dosso all'Alpe Fornalino.",
+      "[end user-written text: summary]",
+      "",
+      "## Description",
+      "[begin user-written text: description]",
+      "#### Accesso",
+      "Da Bognanco.",
+      "[end user-written text: description]",
+    ]);
+  });
+
+  it("describes the four known custodianship values", () => {
+    const tool = waypointToolDefinitions.find((t) => t.name === "get_waypoint");
+
+    for (const value of ["accessible_when_wardened", "always_accessible", "key_needed", "no_warden"]) {
+      expect(tool?.description).toContain(value);
+    }
+  });
+});
