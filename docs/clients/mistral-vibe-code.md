@@ -97,7 +97,9 @@ Mistral documents `vibe mcp add` only with the flags of remote servers (`--url`)
 
 ## Allow the tools without a prompt
 
-With the `default` agent, Vibe asks before it runs any tool, MCP tools included. A `[tools.<tool name>]` table with `permission = "always"` lets one tool run without asking; `permission = "ask"` keeps the prompt. An MCP tool's name is `{server_name}_{tool_name}`.
+Vibe asks before it runs an MCP tool, with its default agent, `accept-edits`, which auto-approves only file edits, and with the `ask` agent, which asks before every tool. A `[tools.<tool name>]` table with `permission = "always"` lets one tool run without asking; `permission = "ask"` keeps the prompt. An MCP tool's name is `{server_name}_{tool_name}`.
+
+The agent names come from the Vibe README and source code. Mistral's documentation site still lists a `default` agent that "asks before running any tool": the Vibe changelog renamed it to `ask` in version 2.24.1 (2026-08-11) and made `accept-edits` the default agent, and the latest release on 2026-10-05, v2.25.8, has no `default` agent.
 
 Mistral documents no wildcard for permissions (the glob patterns of `enabled_tools` and `disabled_tools` only choose which tools are available), so the block above lists the 13 tools one by one. When this server adds a tool, add its table too.
 
@@ -128,7 +130,8 @@ If the server is missing, see [Troubleshooting](../troubleshooting.md), starting
 - Safety, approvals, and permissions (agents, trusted folders, per-tool permissions): https://docs.mistral.ai/vibe/code/safety-approvals-permissions
 - Agents: https://docs.mistral.ai/vibe/code/cli/agents
 - VS Code extension settings: https://docs.mistral.ai/vibe/code/vs-code-extension/settings
-- Mistral Vibe README (timeout defaults, `vibe mcp add`): https://github.com/mistralai/mistral-vibe
+- Mistral Vibe README (built-in agents, timeout defaults, `vibe mcp add`): https://github.com/mistralai/mistral-vibe
+- Mistral Vibe changelog (version 2.24.1, the `ask` agent): https://github.com/mistralai/mistral-vibe/blob/main/CHANGELOG.md
 - Vibe modes: https://docs.mistral.ai/vibe/choose-chat-work-code
 - Vibe Work MCP connectors: https://docs.mistral.ai/vibe/work/connectors/mcp-connectors
 

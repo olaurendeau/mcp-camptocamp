@@ -141,4 +141,4 @@ Then start Claude Desktop again. If npx still fails, check that npm is installed
 - Gemini CLI: https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md and, for folder trust, https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/trusted-folders.md
 - docker run: https://docs.docker.com/reference/cli/docker/container/run/
 
-Last verified: 2026-10-04 against official docs
+Last verified: 2026-10-05 against official docs
