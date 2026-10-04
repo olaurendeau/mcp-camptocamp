@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
 import * as api from "../../src/api/camptocamp.js";
 import { areaDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
-import { throughSchema } from "./through-schema.js";
+import { FIXTURE_SETTERS, NOT_REDIRECTED, RESETTERS, throughSchema } from "./through-schema.js";
 
 vi.mock("../../src/api/camptocamp.js");
 
@@ -43,6 +43,39 @@ describe("throughSchema", () => {
         await expect(mock(37355)).resolves.toEqual(parsed);
       },
     );
+  });
+
+  it("resolves an async withImplementation to the mock, as vitest does", async () => {
+    const mock = getSummit();
+
+    const result = mock.withImplementation(
+      async () => fixture,
+      async () => {
+        await expect(mock(37355)).resolves.toEqual(parsed);
+      },
+    );
+
+    await expect(result).resolves.toBe(mock);
+  });
+
+  it("returns the mock from a sync withImplementation, as vitest does", () => {
+    const mock = getSummit();
+
+    expect(
+      mock.withImplementation(
+        async () => fixture,
+        () => undefined,
+      ),
+    ).toBe(mock);
+  });
+
+  it.each(["mockThrow", "mockThrowOnce"] as const)("rejects with the error set by %s", async (setter) => {
+    const mock = getSummit();
+    mock[setter](new Error("Camptocamp API error: 500"));
+
+    await expect(mock(37355)).rejects.toThrow("Camptocamp API error: 500");
+    mock.mockResolvedValueOnce(fixture);
+    await expect(mock(37355)).resolves.toEqual(parsed);
   });
 
   it("parses a mockReturnThis fixture through the schema", async () => {
@@ -95,6 +128,56 @@ describe("throughSchema", () => {
     await expect(mock(37355)).rejects.toThrow(z.ZodError);
     mock.mockResolvedValueOnce(fixture);
     await expect(mock(37355)).resolves.toEqual(parsed);
+  });
+
+  it("keeps parsing after vi.resetAllMocks, which drops the fixture", async () => {
+    const mock = getSummit();
+    mock.mockResolvedValue(fixture);
+
+    vi.resetAllMocks();
+
+    await expect(mock(37355)).rejects.toThrow(z.ZodError);
+    mock.mockResolvedValueOnce(fixture);
+    await expect(mock(37355)).resolves.toEqual(parsed);
+  });
+
+  // Since vitest 3, vi.restoreAllMocks only puts back vi.spyOn spies: a vi.fn() mock keeps its fixture.
+  it("keeps the fixture and the parsing after vi.restoreAllMocks", async () => {
+    const mock = getSummit();
+    mock.mockResolvedValue(fixture);
+
+    vi.restoreAllMocks();
+
+    await expect(mock(37355)).resolves.toEqual(parsed);
+  });
+
+  it("keeps parsing after a `using` block disposes of the mock", async () => {
+    const mock = getSummit();
+    mock.mockResolvedValue(fixture);
+
+    mock[Symbol.dispose]();
+
+    await expect(mock(37355)).rejects.toThrow(z.ZodError);
+    mock.mockResolvedValueOnce(fixture);
+    await expect(mock(37355)).resolves.toEqual(parsed);
+  });
+
+  // A vitest upgrade that adds a way of setting what a mock returns must not open a way around the schema.
+  it("handles every mock*/with* and Symbol-keyed method of vi.fn(), redirected or explicitly not", () => {
+    const methods = (mock: object) => mock as Record<PropertyKey, unknown>;
+    const fresh = vi.fn<GetSummit>();
+    const keys = Reflect.ownKeys(fresh).filter((key) =>
+      typeof key === "symbol" ? typeof methods(fresh)[key] === "function" : /^(mock|with)[A-Z]/.test(key),
+    );
+    const originals = new Map(keys.map((key) => [key, methods(fresh)[key]]));
+
+    throughSchema(fresh, summitSchema);
+
+    const replaced: readonly (string | symbol)[] = [...FIXTURE_SETTERS, ...RESETTERS];
+    expect(keys).toContain(Symbol.dispose);
+    expect(new Set([...replaced, ...NOT_REDIRECTED])).toEqual(new Set(keys));
+    for (const key of replaced) expect(methods(fresh)[key], String(key)).not.toBe(originals.get(key));
+    for (const key of NOT_REDIRECTED) expect(methods(fresh)[key], String(key)).toBe(originals.get(key));
   });
 
   it("wires a function of the mocked API module", async () => {
