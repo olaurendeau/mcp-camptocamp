@@ -23,6 +23,7 @@ export const searchBooksSchema = z.object({
   query: searchQuery("Search query matched against book titles (e.g. 'Vallot', 'Mont Blanc')", { allowBlank: false }),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   offset: searchOffset(),
+  lang: langInput(),
   book_type: enumValue(BOOK_TYPES)
     .optional()
     .describe(`Book type, one of: ${BOOK_TYPES.join(", ")} (topo = guidebook)`),
@@ -98,7 +99,7 @@ export async function handleSearchBooks(input: SearchBooksInput): Promise<string
     total: response.total,
     offset,
     limit,
-    lines: formatListItems(response.documents, formatBookLine),
+    lines: formatListItems(response.documents, (book) => formatBookLine(book, input.lang)),
     filters,
   });
 }
@@ -114,7 +115,7 @@ export const bookToolDefinitions = [
     title: "Search books",
     description:
       "Search books (guidebooks/topos, history, novels, photo books, technique) on Camptocamp.org by title keyword. The query matches book TITLES only: searching by author name or ISBN is unreliable and can return unrelated books or nothing, so an empty result does not mean the book does not exist. book_type and activity narrow the search (e.g. book_type topo with activity skitouring for ski touring guidebooks). Returns ID, title, author, book types and activities, after a header giving the total, the offset and the filters; use get_book for editor, date, ISBN and covered routes/waypoints. " +
-      PAGING_NOTE,
+      `${PAGING_NOTE} ${LANG_NOTE}`,
     inputSchema: searchBooksSchema,
     handler: handleSearchBooks,
   },

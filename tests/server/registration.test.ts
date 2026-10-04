@@ -7,6 +7,8 @@ import { areaToolDefinitions } from "../../src/tools/areas.js";
 import { bookToolDefinitions } from "../../src/tools/books.js";
 import { articleToolDefinitions } from "../../src/tools/articles.js";
 import { PAGING_NOTE } from "../../src/tools/paging.js";
+import { LANG_NOTE } from "../../src/tools/inputs.js";
+import { LANG_ORDER } from "../../src/tools/format.js";
 
 const definitions = [
   ...routeToolDefinitions,
@@ -81,6 +83,18 @@ describe("tool registration", () => {
     },
   );
 
+  // AC5.1, AC5.10 on #153: all 13 tools take lang and state its default and the fallback order.
+  it("gives every tool a lang input and states it in its description", async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+
+    for (const tool of tools) {
+      expect(tool.description, tool.name).toContain(LANG_NOTE);
+      expect(tool.inputSchema.properties, tool.name).toHaveProperty("lang");
+      expect(tool.inputSchema.required ?? [], tool.name).not.toContain("lang");
+    }
+  });
+
   it("gives each tool its title and read-only, idempotent, open-world annotations", async () => {
     const client = await connect();
     const { tools } = await client.listTools();
@@ -134,7 +148,8 @@ describe("tool registration", () => {
 });
 
 describe("server instructions", () => {
-  it("explain the area_id workflow and the French-first text in under 600 characters", async () => {
+  // AC5.10 on #153: lang, its default and the fallback order, in under 600 characters.
+  it("explain the area_id workflow and lang in under 600 characters", async () => {
     const client = await connect();
     const instructions = client.getInstructions() ?? "";
 
@@ -142,7 +157,10 @@ describe("server instructions", () => {
     expect(instructions.length).toBeLessThan(600);
     expect(instructions).toContain("search_areas");
     expect(instructions).toContain("area_id");
-    expect(instructions).toContain("French");
+    expect(instructions).toContain("Every tool takes lang (default fr; or en, de, it, es, ca, eu, sl, zh)");
+    expect(instructions).toContain("default fr");
+    expect(instructions).toContain(`falls back to ${LANG_ORDER.join(", ")}`);
+    expect(instructions).not.toContain("French");
   });
 
   it("describe the handling of user-written text: markers, demoted headings, cap, images and links", async () => {

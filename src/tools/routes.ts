@@ -60,6 +60,7 @@ export const searchRoutesSchema = z.object({
     `Terrain configurations, matching any of: ${ROUTE_CONFIGURATIONS.join(", ")} (edge = arête/ridge)`,
   ),
   offset: searchOffset(),
+  lang: langInput(),
 });
 
 export const getRouteSchema = z.object({
@@ -97,7 +98,12 @@ function routeSearchOptions(input: SearchRoutesInput): RouteSearchOptions {
     );
   }
   assertResultWindow(input.offset, input.limit);
-  return { ...filters, limit: input.limit, offset: input.offset };
+  return {
+    ...filters,
+    limit: input.limit,
+    offset: input.offset,
+    ...(input.lang !== undefined && { lang: input.lang }),
+  };
 }
 
 // The Filters line, in the order of the inputs: `area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1`.
@@ -218,7 +224,7 @@ export async function handleSearchRoutes(input: SearchRoutesInput): Promise<stri
     total: response.total,
     offset: input.offset,
     limit: input.limit,
-    lines: formatListItems(response.documents, formatRouteLine),
+    lines: formatListItems(response.documents, (route) => formatRouteLine(route, input.lang)),
     filters: describeFilters(options),
   });
 }
@@ -233,7 +239,8 @@ export const routeToolDefinitions = [
     name: "search_routes",
     title: "Search routes",
     description:
-      "Search for mountain routes on Camptocamp.org. Filters combine with AND and at least one filter is required (any single one is enough): query (keyword), area_id (from search_areas), waypoint_id (routes of a summit, hut or crag, from search_waypoints), activity, rating_system with rating_min and/or rating_max (one grading system per call, inclusive bounds checked against its scale; routes without that rating are excluded), height_diff_up_min / height_diff_up_max (elevation gain in metres, inclusive), route_types and configuration (each matches any of the listed values). Returns matching routes with basic info (ID, name as '<summit> : <route title>', activities, max elevation, elevation gain, and every rating labelled by its grading system, e.g. 'Ski rating (Toponeige): 4.1 | Labande: S4 / AD | Global rating: F'); the header repeats the applied filters. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more routes follow, or says when they lie beyond Camptocamp's 10,000-result window. An unknown area or waypoint ID yields no results, not an error. Call get_route with an ID for the full description.",
+      "Search for mountain routes on Camptocamp.org. Filters combine with AND and at least one filter is required (any single one is enough): query (keyword), area_id (from search_areas), waypoint_id (routes of a summit, hut or crag, from search_waypoints), activity, rating_system with rating_min and/or rating_max (one grading system per call, inclusive bounds checked against its scale; routes without that rating are excluded), height_diff_up_min / height_diff_up_max (elevation gain in metres, inclusive), route_types and configuration (each matches any of the listed values). Returns matching routes with basic info (ID, name as '<summit> : <route title>', activities, max elevation, elevation gain, and every rating labelled by its grading system, e.g. 'Ski rating (Toponeige): 4.1 | Labande: S4 / AD | Global rating: F'); the header repeats the applied filters. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more routes follow, or says when they lie beyond Camptocamp's 10,000-result window. An unknown area or waypoint ID yields no results, not an error. Call get_route with an ID for the full description. " +
+      LANG_NOTE,
     inputSchema: searchRoutesSchema,
     handler: handleSearchRoutes,
   },

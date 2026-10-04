@@ -712,3 +712,50 @@ describe("get_* lang input", () => {
     },
   );
 });
+
+// AC5.1, AC5.2 on #153: the seven searches take an optional lang, checked before any request and sent as pl
+// (default fr); the Language line stays on the get_* tools.
+describe("search lang input", () => {
+  const SEARCH_CASES: Array<[string, Record<string, unknown>]> = [
+    ["search_routes", { query: "Glacier du Geay" }],
+    ["search_waypoints", { query: "Mont Pourri" }],
+    ["search_user_outings", { user_id: ACCEPTED_ID }],
+    ["search_outings", {}],
+    ["search_areas", { query: "Vanoise" }],
+    ["search_books", { query: "Vallot" }],
+    ["search_articles", { query: "crampons" }],
+  ];
+
+  it.each(SEARCH_CASES)("%s refuses lang ru without calling Camptocamp", async (tool, args) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: tool, arguments: { ...args, lang: "ru" } });
+
+    expect(validationIssues(result, tool)).toEqual(["must be one of: fr, en, de, it, es, ca, eu, sl, zh at lang"]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(SEARCH_CASES)("%s sends lang de as pl=de, and pl=fr without lang", async (tool, args) => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH), jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const withLang = await client.callTool({ name: tool, arguments: { ...args, lang: "de" } });
+    const withoutLang = await client.callTool({ name: tool, arguments: args });
+
+    expect(withLang.isError, JSON.stringify(withLang.content)).toBeFalsy();
+    expect(resultText(withLang)).toBe(resultText(withoutLang));
+    expect(new URL(fetchMock.mock.calls[0][0] as string).searchParams.get("pl")).toBe("de");
+    expect(new URL(fetchMock.mock.calls[1][0] as string).searchParams.get("pl")).toBe("fr");
+  });
+
+  it.each(SEARCH_CASES)("%s states lang, its default and the fallback order (AC5.10)", async (tool) => {
+    const client = await connect();
+
+    const { tools } = await client.listTools();
+
+    const description = tools.find((t) => t.name === tool)?.description;
+    expect(description).toContain(LANG_NOTE);
+    expect(description).not.toContain(DETAIL_LANG_NOTE);
+  });
+});
