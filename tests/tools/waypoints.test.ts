@@ -586,13 +586,12 @@ describe("get_waypoint tool definition", () => {
     expect(tool?.description).toContain(USER_TEXT_NOTE);
   });
 
-  it("tells the LLM about the areas section and area_id reuse", () => {
+  // #201: area_id reuse is left to the server instructions, to keep the description under 2048 characters.
+  it("tells the LLM about the areas section", () => {
     const tool = waypointToolDefinitions.find((t) => t.name === "get_waypoint");
 
-    expect(tool?.description).toContain("the areas it belongs to");
-    expect(tool?.description).toContain(
-      "Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings.",
-    );
+    expect(tool?.description).toContain("the areas it belongs to (range, admin_limits, country)");
+    expect(tool?.description).not.toContain("Area IDs can be passed as area_id");
   });
 });
 
@@ -672,9 +671,10 @@ describe("virtual waypoints", () => {
 
     const result = await handleGetWaypoint({ id: 1947492 });
 
-    expect(result.split("\n").slice(0, 4)).toEqual([
+    expect(result.split("\n").slice(0, 5)).toEqual([
       "# Ouvertures 2013 (ID: 1947492)",
       "**URL**: https://www.camptocamp.org/waypoints/1947492",
+      "**Text in other languages**: description (en)",
       "",
       "**Type**: virtual",
     ]);
@@ -718,14 +718,15 @@ describe("virtual waypoints", () => {
     expect(tool?.description).toContain(`altitude and GPS coordinates. ${VIRTUAL_SENTENCE}`);
   });
 
-  it("prints the en locale of 1947492 for lang en, with no Language line", async () => {
+  it("prints the en locale of 1947492 for lang en, with no Language line and the fr-only summary named", async () => {
     mockGetWaypoint.mockResolvedValueOnce(ouvertures2013);
 
     const result = await handleGetWaypoint({ id: 1947492, lang: "en" });
 
-    expect(result.split("\n").slice(0, 4)).toEqual([
+    expect(result.split("\n").slice(0, 5)).toEqual([
       "# First Ascents in 2013 (ID: 1947492)",
       "**URL**: https://www.camptocamp.org/waypoints/1947492",
+      "**Text in other languages**: summary (fr)",
       "",
       "**Type**: virtual",
     ]);
@@ -789,6 +790,77 @@ describe("get_waypoint lang", () => {
     ]);
     expect(result).toContain("\n## Areas\n- [14274] Frankreich (country)\n- [14361] Hautes-Alpes (admin_limits)\n");
     expect(result).toContain("\n## Routes (1 of 1)\n- [46624] Mont Pourri : Traverse über den Grand Col (skitouring)");
+  });
+});
+
+// AC1.7 on #210: get_waypoint names the sections written only in other languages.
+describe("get_waypoint Text in other languages", () => {
+  // Hut 104022 of GET /waypoints/104022 (2026-10-05): its four locales with every free-text field, each cut to its
+  // first line; nulls kept as sent. fr has no access; en and it have one.
+  const durier = {
+    document_id: 104022,
+    locales: [
+      {
+        lang: "fr",
+        title: "Refuge Durier",
+        summary: "Le refuge Durier est un petit refuge de haute montagne dont le bâtiment actuel date de 1987.",
+        description: "[img=137864 right]Refuge Durier[/img]",
+        access: null,
+        access_period: "Mi-juin à mi-septembre",
+      },
+      {
+        lang: "sl",
+        title: "Refuge Durier",
+        summary: null,
+        description: null,
+        access: null,
+        access_period: "Od sredine junija do sredine septembra. ",
+      },
+      {
+        lang: "en",
+        title: "Refuge Durier",
+        summary: null,
+        description: "The hut is at col, (Col de Miage 3358m) between  the SW ridge of the Bionnassay",
+        access: "**To the Plan Glacier hut** (2680m) : 2 options\r",
+        access_period: "Mid June to mid September",
+      },
+      {
+        lang: "it",
+        title: "Refuge Durier",
+        summary: null,
+        description: "Al Col de Miage.\r",
+        access: "## Dall'Italia\r",
+        access_period: "Luglio - settembre",
+      },
+    ],
+    waypoint_type: "hut",
+    elevation: 3358,
+  };
+
+  it("names the access hut 104022 has only in en and it, right after the URL line", async () => {
+    mockGetWaypoint.mockResolvedValueOnce(durier);
+
+    const result = await handleGetWaypoint({ id: 104022 });
+
+    expect(result.split("\n").slice(0, 5)).toEqual([
+      "# Refuge Durier (ID: 104022)",
+      "**URL**: https://www.camptocamp.org/waypoints/104022",
+      "**Text in other languages**: access (en, it)",
+      "",
+      "**Type**: hut",
+    ]);
+    expect(result).not.toContain("## Access\n");
+    expect(result).not.toContain("Plan Glacier");
+  });
+
+  it("names the summary and description hut 104022 lacks in sl", async () => {
+    mockGetWaypoint.mockResolvedValueOnce(durier);
+
+    const result = await handleGetWaypoint({ id: 104022, lang: "sl" });
+
+    expect(result.split("\n")[2]).toBe(
+      "**Text in other languages**: summary (fr), description (fr, en, it), access (en, it)",
+    );
   });
 });
 

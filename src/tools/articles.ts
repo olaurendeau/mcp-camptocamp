@@ -13,6 +13,7 @@ import {
   formatTitledLine,
   formatListItems,
   formatLanguageLine,
+  formatOtherLanguagesLine,
 } from "./format.js";
 import { ACTIVITIES, ARTICLE_CATEGORIES, ARTICLE_TYPES, enumValue } from "./enums.js";
 import type { Lang } from "./enums.js";
@@ -61,6 +62,7 @@ function formatArticleDetail(article: ArticleDetail, lang?: Lang): string {
   const lines: string[] = [
     ...formatHeader(pickTitle(article.locales, lang), article.document_id, "articles"),
     ...formatLanguageLine(article.locales, lang),
+    ...formatOtherLanguagesLine(article.locales, locale, SUMMARY_AND_DESCRIPTION),
   ];
 
   // A collab article has many editors, so its creator is not labelled as the author (#11, D3).

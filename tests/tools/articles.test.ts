@@ -1336,6 +1336,56 @@ describe("get_article lang", () => {
   });
 });
 
+// AC1.7 on #210: get_article names the sections written only in other languages.
+describe("get_article Text in other languages", () => {
+  // Article 1307778 of GET /articles/1307778 (2026-10-05): its fr, sl and es locales, the fr description cut to
+  // its first sentence; nulls kept as sent. es has no description.
+  const sac: ArticleDetail = {
+    document_id: 1307778,
+    locales: [
+      {
+        lang: "fr",
+        title: "Le contenu du sac : Escalade en couenne",
+        summary: null,
+        description:
+          "Dans le topoguide Camptocamp, le champ matériel spécifique ne désigne pas le matériel nécessaire.",
+      },
+      { lang: "sl", title: "V nahrbtniku: Plezališče", summary: null, description: "V pripravi" },
+      { lang: "es", title: "material para deportivas", summary: null, description: null },
+    ],
+    article_type: "collab",
+    categories: ["gear"],
+    activities: ["rock_climbing"],
+    quality: "draft",
+    author: { name: "cdb", user_id: 286726 },
+  };
+
+  it("names the description article 1307778 has only in fr and sl, right after the URL line", async () => {
+    mockGetArticle.mockResolvedValueOnce(sac);
+
+    const result = await handleGetArticle({ id: 1307778, lang: "es" });
+
+    expect(result.split("\n").slice(0, 5)).toEqual([
+      "# material para deportivas (ID: 1307778)",
+      "**URL**: https://www.camptocamp.org/articles/1307778",
+      "**Text in other languages**: description (fr, sl)",
+      "",
+      "**Type**: collab",
+    ]);
+    expect(result).not.toContain("## Description");
+    expect(result).not.toContain("V pripravi");
+  });
+
+  it("prints no Text line in sl, which has the description", async () => {
+    mockGetArticle.mockResolvedValueOnce(sac);
+
+    const result = await handleGetArticle({ id: 1307778, lang: "sl" });
+
+    expect(result).not.toContain("Text in other languages");
+    expect(result).toContain("## Description\n[begin user-written text: description]\nV pripravi");
+  });
+});
+
 // #200 (from the #202 review): search_articles parses lang with the real list and names each article in it.
 describe("search_articles lang", () => {
   // Derived from GET /articles?q=avalanche&pl=en and &pl=de (2026-10-04; pl=de falls back to fr), one locale

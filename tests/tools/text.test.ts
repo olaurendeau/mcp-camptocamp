@@ -334,6 +334,15 @@ describe("formatUserTexts", () => {
     expect(formatUserTexts(locale, sections)).toEqual(formatUserText("gear", "Gear", "Piolet"));
   });
 
+  it("skips a section whose key is absent from the locale", () => {
+    // Route 675555's locales have no slope key at all (GET /routes/675555, 2026-10-05).
+    const locale: { summary?: string | null; description?: string | null; gear?: string | null } = {
+      description: "Dal parcheggio",
+    };
+    expect("summary" in locale || "gear" in locale).toBe(false);
+    expect(formatUserTexts(locale, sections)).toEqual(formatUserText("description", "Description", "Dal parcheggio"));
+  });
+
   it("prints nothing when there is no locale", () => {
     expect(formatUserTexts(undefined, sections)).toEqual([]);
   });
