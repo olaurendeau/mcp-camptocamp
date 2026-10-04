@@ -19,7 +19,7 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | `get_area`            | Détail d'une zone par ID (type, résumé, description)                                                      |
 | `search_books`        | Livres par titre uniquement (auteur/ISBN peu fiables), filtrables par type et activité ; paginée          |
 | `get_book`            | Détail d'un livre par ID (auteur, éditeur, date, ISBN, pages, langues, itinéraires, points, articles)     |
-| `search_articles`     | Recherche d'articles par mot-clé (matériel, technique, environnement, récits…) ; collab/perso ; paginée   |
+| `search_articles`     | Articles par mot-clé, catégorie, type collab/perso, activité ; mot-clé facultatif si filtre ; paginée     |
 | `get_article`         | Détail d'un article par ID (texte, auteur, type, itinéraires, points, sorties, livres liés)               |
 
 Chaque outil `get_*` commence par le titre et l'ID du document, suivis de son lien camptocamp.org (`**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>`) à citer comme source.

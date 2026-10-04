@@ -2,7 +2,7 @@ import { z } from "zod";
 import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchArticles, getArticle } from "../api/camptocamp.js";
-import type { ArticleSearchResult, ArticleDetail } from "../api/camptocamp.js";
+import type { ArticleSearchOptions, ArticleSearchResult, ArticleDetail } from "../api/camptocamp.js";
 import {
   pickLocale,
   pickTitle,
@@ -14,14 +14,26 @@ import {
   formatListItems,
   formatLanguageLine,
 } from "./format.js";
+import { ACTIVITIES, ARTICLE_CATEGORIES, ARTICLE_TYPES, enumValue } from "./enums.js";
 import type { Lang } from "./enums.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchArticlesSchema = z.object({
-  query: searchQuery("Search query (e.g. 'crampons', 'avalanche', 'rappel')", { allowBlank: false }),
+  query: searchQuery("Search query (e.g. 'crampons', 'avalanche', 'rappel'); optional when a filter is given", {
+    allowBlank: true,
+  }).optional(),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   offset: searchOffset(),
   lang: langInput(),
+  category: enumValue(ARTICLE_CATEGORIES)
+    .optional()
+    .describe(`Article category, one of: ${ARTICLE_CATEGORIES.join(", ")}`),
+  article_type: enumValue(ARTICLE_TYPES)
+    .optional()
+    .describe(`Article type, one of: ${ARTICLE_TYPES.join(", ")}`),
+  activity: enumValue(ACTIVITIES)
+    .optional()
+    .describe(`Activity covered by the article, one of: ${ACTIVITIES.join(", ")}`),
 });
 
 export const getArticleSchema = z.object({
@@ -100,17 +112,35 @@ function formatArticleDetail(article: ArticleDetail, lang?: Lang): string {
 }
 
 export async function handleSearchArticles(input: SearchArticlesInput): Promise<string> {
-  const { query, limit, offset } = input;
+  // A blank query counts as missing: the API treats `q=` like no `q` and lists every article.
+  const query = input.query?.trim() ? input.query : undefined;
+  const { limit, offset, lang, category, article_type, activity } = input;
+  if (query === undefined && category === undefined && article_type === undefined && activity === undefined) {
+    throw new Error("search_articles needs a query or at least one filter: category, article_type, activity.");
+  }
   assertResultWindow(offset, limit);
 
-  const response = await searchArticles(input);
+  // Only the keys that are set, so the client gets no `query: undefined` or `lang: undefined`.
+  const options: ArticleSearchOptions = { limit, offset };
+  if (query !== undefined) options.query = query;
+  if (lang !== undefined) options.lang = lang;
+  if (category !== undefined) options.category = category;
+  if (article_type !== undefined) options.article_type = article_type;
+  if (activity !== undefined) options.activity = activity;
+  const response = await searchArticles(options);
+
+  const filters: string[] = [];
+  if (query !== undefined) filters.push(`query ${quote(query)}`);
+  if (category !== undefined) filters.push(`category ${category}`);
+  if (article_type !== undefined) filters.push(`article type ${article_type}`);
+  if (activity !== undefined) filters.push(`activity ${activity}`);
   return formatSearchPage({
     kind: "article",
     total: response.total,
     offset,
     limit,
-    lines: formatListItems(response.documents, (article) => formatArticleSearchLine(article, input.lang)),
-    filters: [`query ${quote(query)}`],
+    lines: formatListItems(response.documents, (article) => formatArticleSearchLine(article, lang)),
+    filters,
   });
 }
 
@@ -124,7 +154,7 @@ export const articleToolDefinitions = [
     name: "search_articles",
     title: "Search articles",
     description:
-      "Search Camptocamp.org articles by keyword. Articles cover gear, climbing and mountaineering techniques, mountain environment (avalanches, snow, weather), stories, and topoguide supplements (route lists, useful links). Each result shows article_type: `collab` (community-edited reference) or `personal` (one author's view, not community consensus), plus categories and activities. A header gives the total, the offset and the filters. Use get_article for the full text and linked routes, waypoints, articles, outings and books. " +
+      "Search Camptocamp.org articles by keyword, category, article_type and activity. Articles cover gear, climbing and mountaineering techniques, mountain environment (avalanches, snow, weather), stories, and topoguide supplements (route lists, useful links). Filters combine with AND; the query is optional when at least one filter is given, and a call with neither is refused. Keyword search often misses ('noeud' and 'nœud' both find nothing), so browsing by category is the surer way to find a topic. An article is listed when any of its categories or activities matches the value given. Categories, as Camptocamp names them: mountain_environment, gear, technical, topoguide_supplements, soft_mobility (car-free and bike travel), expeditions, stories, c2c_meetings (community meetups), tags, site_info (help pages about Camptocamp.org), association (Camptocamp association news). Each result shows article_type: `collab` (community-edited reference) or `personal` (one author's view, not community consensus), plus categories and activities. A header gives the total, the offset and the filters. Use get_article for the full text and linked routes, waypoints, articles, outings and books. " +
       `${PAGING_NOTE} ${LANG_NOTE}`,
     inputSchema: searchArticlesSchema,
     handler: handleSearchArticles,

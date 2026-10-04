@@ -132,7 +132,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_area`            | Get area detail by ID (type, summary, description)                                                               |
 | `search_books`        | Search books by title only (author/ISBN unreliable), by `book_type` and `activity`; paged with `offset`          |
 | `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)                |
-| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type; paged with `offset` |
+| `search_articles`     | Search articles by keyword and/or `category`, `article_type`, `activity` (any one suffices); paged with `offset` |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)                       |
 
 Virtual waypoints (`waypoint_type` `virtual`) are groupings with no real location: no tool prints their elevation or coordinates.
@@ -181,5 +181,5 @@ Locale: every search function takes `lang?` and sends `pl={lang}` (default `fr`)
 - `GET /areas/{id}`
 - `GET /books?q={query}&limit=10&pl={lang}[&btyp={book_type}][&act={activity}][&offset={n}]`
 - `GET /books/{id}`
-- `GET /articles?q={query}&limit=10&pl={lang}[&offset={n}]`
+- `GET /articles?limit=10&pl={lang}[&q={query}][&acat={category}][&atyp={article_type}][&act={activity}][&offset={n}]` (at least one of `q`, `acat`, `atyp` and `act`)
 - `GET /articles/{id}`

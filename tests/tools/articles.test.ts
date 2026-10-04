@@ -271,6 +271,195 @@ describe("handleSearchArticles", () => {
   });
 });
 
+// The live GET /articles?q=avalanche&acat=mountain_environment&atyp=collab&act=skitouring&limit=10&pl=fr
+// response (2026-10-04).
+const AVALANCHE_FILTERED_SEARCH = {
+  documents: [
+    {
+      document_id: 584868,
+      locales: [{ lang: "fr", title: "Observations avalanches et signes d'alarme", summary: null }],
+      quality: "medium",
+      categories: ["mountain_environment"],
+      activities: ["skitouring"],
+      article_type: "collab",
+    },
+    {
+      document_id: 107439,
+      locales: [
+        {
+          lang: "fr",
+          title: "Neige et avalanches : les ressources du net",
+          summary:
+            "Cet article recense différentes ressources relatives aux avalanches sur camptocamp et sur la toile: théorie (nivologie et prévention), retour d'expérience, matériel, en France et ailleurs dans le monde.",
+        },
+      ],
+      quality: "medium",
+      categories: ["mountain_environment", "topoguide_supplements"],
+      activities: ["skitouring", "snow_ice_mixed"],
+      article_type: "collab",
+    },
+    {
+      document_id: 108698,
+      locales: [{ lang: "fr", title: "L’échelle européenne de risque d’avalanche", summary: null }],
+      quality: "medium",
+      categories: ["mountain_environment"],
+      activities: ["skitouring"],
+      article_type: "collab",
+    },
+    {
+      document_id: 583439,
+      locales: [{ lang: "fr", title: "Répartition régionale des accidents d’avalanche en Suisse", summary: null }],
+      quality: "medium",
+      categories: ["mountain_environment"],
+      activities: ["skitouring"],
+      article_type: "collab",
+    },
+    {
+      document_id: 153159,
+      locales: [
+        {
+          lang: "fr",
+          title: "S'entrainer à la recherche de victimes d'avalanche: Les ARVA/DVA parcs",
+          summary:
+            "Recensement à visée exhaustive des parcs d'entraînement à l'utilisation de Détecteurs de Victimes d'Avalanche (DVA).",
+        },
+      ],
+      quality: "fine",
+      categories: ["mountain_environment"],
+      activities: ["snowshoeing", "skitouring", "snow_ice_mixed", "ice_climbing"],
+      article_type: "collab",
+    },
+  ],
+  total: 5,
+};
+
+// The live GET /articles?acat=c2c_meetings&limit=2&offset=0&pl=fr response (2026-10-04).
+const C2C_MEETINGS_SEARCH = {
+  documents: [
+    {
+      document_id: 1407409,
+      locales: [{ lang: "fr", title: "C2C G2G et AG 2022 à Samoëns", summary: null }],
+      quality: "medium",
+      categories: ["c2c_meetings"],
+      activities: ["skitouring", "snowshoeing"],
+      article_type: "collab",
+    },
+    {
+      document_id: 1350692,
+      locales: [
+        {
+          lang: "fr",
+          title: 'C2C G2G 2021 "chez Bernard"',
+          summary:
+            'Après 2 annulations pour cause de pandémie Covid en mars 2020 et mars 2021, rassemblement c2c dans le Trièves, "chez Bernard".',
+        },
+      ],
+      quality: "fine",
+      categories: ["c2c_meetings"],
+      activities: ["hiking", "rock_climbing"],
+      article_type: "collab",
+    },
+  ],
+  total: 24,
+};
+
+const NO_FILTER_MESSAGE = "search_articles needs a query or at least one filter: category, article_type, activity.";
+
+// S3 of #210: category, article type and activity filters, with the query optional once one is given.
+describe("search_articles filters", () => {
+  it("sends the query and the three filters and lists them in the Filters line (AC3.2)", async () => {
+    mockSearchArticles.mockResolvedValueOnce(AVALANCHE_FILTERED_SEARCH);
+
+    const result = await search({
+      query: "avalanche",
+      category: "mountain_environment",
+      article_type: "collab",
+      activity: "skitouring",
+    });
+
+    expect(mockSearchArticles).toHaveBeenCalledWith({
+      query: "avalanche",
+      limit: 10,
+      offset: 0,
+      category: "mountain_environment",
+      article_type: "collab",
+      activity: "skitouring",
+    });
+    const lines = result.split("\n");
+    expect(lines.slice(0, 3)).toEqual([
+      "Found 5 article(s). Showing 5 from offset 0:",
+      'Filters: query "avalanche", category mountain_environment, article type collab, activity skitouring',
+      "",
+    ]);
+    expect(lines).toContain(
+      "- [584868] Observations avalanches et signes d'alarme | Type: collab | Categories: mountain_environment | Activities: skitouring",
+    );
+    expect(lines).toHaveLength(8);
+  });
+
+  it("lists a category without a query and points to the next page (AC3.3)", async () => {
+    mockSearchArticles.mockResolvedValueOnce(C2C_MEETINGS_SEARCH);
+
+    const result = await search({ category: "c2c_meetings", limit: 2 });
+
+    // Strict: no `query` key, not even undefined, and lang only when given.
+    expect(mockSearchArticles.mock.calls[0][0]).toStrictEqual({ limit: 2, offset: 0, category: "c2c_meetings" });
+    expect(result.split("\n")).toEqual([
+      "Found 24 article(s). Showing 2 from offset 0:",
+      "Filters: category c2c_meetings",
+      "",
+      "- [1407409] C2C G2G et AG 2022 à Samoëns | Type: collab | Categories: c2c_meetings | Activities: skitouring, snowshoeing",
+      '- [1350692] C2C G2G 2021 "chez Bernard" | Type: collab | Categories: c2c_meetings | Activities: hiking, rock_climbing',
+      "",
+      "Next page: offset=2",
+    ]);
+  });
+
+  it.each([
+    ["an article type", { article_type: "personal" as const }, "article type personal"],
+    ["an activity", { activity: "skitouring" as const }, "activity skitouring"],
+  ])("accepts %s alone as the only filter", async (_label, filter, text) => {
+    mockSearchArticles.mockResolvedValueOnce({ documents: [], total: 0 });
+
+    const result = await search(filter);
+
+    expect(mockSearchArticles.mock.calls[0][0]).toStrictEqual({ limit: 10, offset: 0, ...filter });
+    expect(result).toBe(`No articles found matching ${text}.`);
+  });
+
+  it.each([
+    ["no query and no filter", {}],
+    ["a blank query and no filter", { query: "   " }],
+  ])("refuses %s before any request (AC3.4)", async (_label, input) => {
+    await expect(search(input)).rejects.toThrow(NO_FILTER_MESSAGE);
+    expect(mockSearchArticles).not.toHaveBeenCalled();
+  });
+
+  it("treats a blank query with a filter as missing: no query sent or echoed (AC3.4)", async () => {
+    mockSearchArticles.mockResolvedValueOnce({ documents: [], total: 0 });
+
+    const result = await search({ query: "  ", category: "gear" });
+
+    expect(mockSearchArticles.mock.calls[0][0]).toStrictEqual({ limit: 10, offset: 0, category: "gear" });
+    expect(result).toBe("No articles found matching category gear.");
+  });
+
+  it("checks the result window after the filter rule, without calling the API", async () => {
+    await expect(search({ category: "stories", offset: 9995, limit: 10 })).rejects.toThrow(
+      "offset + limit must not exceed 10000",
+    );
+    expect(mockSearchArticles).not.toHaveBeenCalled();
+  });
+
+  it("passes lang only when given", async () => {
+    mockSearchArticles.mockResolvedValueOnce({ documents: [], total: 0 });
+
+    await search({ category: "gear", lang: "en" });
+
+    expect(mockSearchArticles.mock.calls[0][0]).toStrictEqual({ limit: 10, offset: 0, category: "gear", lang: "en" });
+  });
+});
+
 describe("article tool definitions", () => {
   it("registers search_articles and get_article with their schemas", () => {
     expect(articleToolDefinitions.map((t) => t.name)).toEqual(["search_articles", "get_article"]);
@@ -291,17 +480,34 @@ describe("article tool definitions", () => {
     expect(searchArticlesSchema.parse({ query: "crampons" })).toEqual({ query: "crampons", limit: 10, offset: 0 });
     expect(searchArticlesSchema.safeParse({ query: "crampons", limit: 0 }).success).toBe(false);
     expect(searchArticlesSchema.safeParse({ query: "crampons", limit: 51 }).success).toBe(false);
-    expect(searchArticlesSchema.safeParse({ limit: 10 }).success).toBe(false);
   });
 
-  it("rejects a blank query", () => {
-    for (const query of ["", "   "]) {
-      const parsed = searchArticlesSchema.safeParse({ query });
-      expect(parsed.success).toBe(false);
-      expect(parsed.error?.issues).toEqual([
-        expect.objectContaining({ path: ["query"], message: "must not be blank" }),
-      ]);
+  // D3 of #210: the query is optional; a blank one passes the schema and the handler treats it as missing.
+  it("accepts a missing or blank query", () => {
+    expect(searchArticlesSchema.parse({ category: "gear" })).toEqual({ category: "gear", limit: 10, offset: 0 });
+    for (const query of ["", "   "]) expect(searchArticlesSchema.safeParse({ query }).success).toBe(true);
+  });
+
+  // AC3.8 of #210.
+  it("says filters combine with AND, the query is optional and any value of an article matches", () => {
+    const description = articleToolDefinitions[0].description;
+    expect(description).toContain("Filters combine with AND");
+    expect(description).toContain("query is optional when at least one filter is given");
+    expect(description).toContain("listed when any of its categories or activities matches");
+  });
+
+  it("gives the meaning of site_info, association, c2c_meetings and soft_mobility, and none for tags", () => {
+    const description = articleToolDefinitions[0].description;
+    for (const meaning of [
+      "site_info (help pages about Camptocamp.org)",
+      "association (Camptocamp association news)",
+      "c2c_meetings (community meetups)",
+      "soft_mobility (car-free and bike travel)",
+    ]) {
+      expect(description).toContain(meaning);
     }
+    expect(description).toContain("tags,");
+    expect(description).not.toMatch(/tags \(/);
   });
 
   it("accepts only a positive integer id", () => {
