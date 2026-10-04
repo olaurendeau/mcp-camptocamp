@@ -15,7 +15,6 @@ import {
   searchBooks,
   searchOutings,
   searchRoutes,
-  searchUserOutings,
   searchWaypoints,
 } from "../../src/api/camptocamp.js";
 
@@ -28,6 +27,10 @@ interface Search {
   documents: Document[];
   total: number;
 }
+
+// authorSchema falls back to null on a malformed author, so a renamed field would silently drop the
+// Author line everywhere: documents that carry an author must keep it after parsing.
+const AUTHOR = { name: expect.any(String), user_id: expect.any(Number) };
 
 // Shape beyond what the schemas already enforce: a search found something and each document has a locale.
 function expectNonEmptySearch(result: Search): void {
@@ -76,12 +79,35 @@ describe("searches (AC8.2, AC8.3)", () => {
     expectNonEmptySearch(await searchWaypoints({ query: "Mont Blanc" }));
   });
 
-  it("outings in area 14403", async () => {
-    expectNonEmptySearch(await searchOutings({ area_id: 14403 }));
+  // The outing detail (/outings/{id}) has no `author` key at all, only associations.users;
+  // the outing searches are where the API sends it.
+  it("outings in area 14403, each with its author", async () => {
+    const result = await searchOutings({ area_id: 14403 });
+
+    expectNonEmptySearch(result);
+    for (const outing of result.documents) expect(outing.author).toEqual(AUTHOR);
   });
 
-  it("outings of user 430052", async () => {
-    expectNonEmptySearch(await searchUserOutings({ user_id: 430052 }));
+  // `u=`, behind search_outings {user_id} and its search_user_outings alias.
+  it("outings of user 430052, each by that user", async () => {
+    const result = await searchOutings({ user_id: 430052 });
+
+    expectNonEmptySearch(result);
+    for (const outing of result.documents) expect(outing.author).toEqual({ ...AUTHOR, user_id: 430052 });
+  });
+
+  // `period=2020-06-01,2020-06-30`: the same days in every year.
+  it("outings at waypoint 37916 in the period 06-01 → 06-30, all in June", async () => {
+    const result = await searchOutings({ waypoint_id: 37916, period: { start: "06-01", end: "06-30" } });
+
+    expectNonEmptySearch(result);
+    for (const outing of result.documents) {
+      const dates = [outing.date_start, outing.date_end];
+      expect(
+        dates.map((date) => date?.slice(5, 7)),
+        `outing ${outing.document_id} (${dates.join(" → ")})`,
+      ).toEqual(["06", "06"]);
+    }
   });
 
   it("areas by keyword", async () => {
@@ -101,37 +127,22 @@ describe("searches (AC8.2, AC8.3)", () => {
   it("route 675555 comes back from a search with its single en locale", async () => {
     const result = await searchRoutes({ query: "Dente del Resegone" });
     const route = result.documents.find((document) => document.document_id === 675555);
+    const found = result.documents.map((document) => document.document_id).join(", ");
 
-    expect(route).toBeDefined();
-    expect(route?.locales.map((locale) => locale.lang)).toEqual(["en"]);
+    expect(route, `route 675555 is not in the results anymore (found: ${found}); pick another route`).toBeDefined();
+    expect(
+      route?.locales.map((locale) => locale.lang),
+      "route 675555 is found but its locale changed: pl=fr no longer returns the API's single fallback locale",
+    ).toEqual(["en"]);
   });
 });
 
-// authorSchema falls back to null on a malformed author, so a renamed field would silently drop the
-// Author line everywhere: documents that carry an author must keep it after parsing.
+// Documents that carry an author keep it after parsing (AUTHOR above); the outing searches check it in "searches".
 describe("authors survive parsing", () => {
-  const AUTHOR = { name: expect.any(String), user_id: expect.any(Number) };
-
   it("article 716039", async () => {
     const article = await getArticle(716039);
 
     expect(article.author).toEqual(AUTHOR);
-  });
-
-  // The outing detail (/outings/{id}) has no `author` key at all, only associations.users;
-  // the outing searches are where the API sends it.
-  it("outings of user 430052", async () => {
-    const result = await searchUserOutings({ user_id: 430052 });
-
-    expect(result.documents.length).toBeGreaterThan(0);
-    for (const outing of result.documents) expect(outing.author).toEqual(AUTHOR);
-  });
-
-  it("outings in area 14403", async () => {
-    const result = await searchOutings({ area_id: 14403 });
-
-    expect(result.documents.length).toBeGreaterThan(0);
-    for (const outing of result.documents) expect(outing.author).toEqual(AUTHOR);
   });
 });
 

@@ -96,6 +96,16 @@ describe("tool registration", () => {
     }
   });
 
+  // AC5.7: no tool name, title, description or input schema uses a real user as an example.
+  it("exposes no real user's ID or username", async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+
+    const json = JSON.stringify(tools);
+    expect(json).not.toContain("430052");
+    expect(json).not.toContain("o.laurendeau");
+  });
+
   it("keeps the input JSON Schema of every tool", async () => {
     const client = await connect();
     const { tools } = await client.listTools();

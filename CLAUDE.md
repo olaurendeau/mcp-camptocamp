@@ -96,7 +96,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas) |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
 | `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
-| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings        |
+| `search_user_outings` | Alias of `search_outings` by `user_id`: a user's outings, newest first, labelled ratings, paged      |
 | `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings) |
 | `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`              |
@@ -121,9 +121,9 @@ Base URL: `https://api.camptocamp.org`
 - `GET /waypoints?q={query}&limit=10&lang=fr`
 - `GET /waypoints?a={area_id}&limit=10&lang=fr` (combinable with `q`)
 - `GET /waypoints/{id}?lang=fr`
-- `GET /outings?u={user_id}&limit=10&lang=fr`
 - `GET /outings/{id}?lang=fr`
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]`
+  - `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
 - `GET /areas?q={query}&limit=10&lang=fr[&atyp={type}]`
 - `GET /areas/{id}?lang=fr`
