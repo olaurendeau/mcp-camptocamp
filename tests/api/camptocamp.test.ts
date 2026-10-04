@@ -15,6 +15,8 @@ import {
   getArticle,
   ROUTE_RATING_FIELDS,
   ROUTE_RATING_PARAMS,
+  OUTING_RATING_FIELDS,
+  type OutingRatingField,
   type RouteRatingField,
 } from "../../src/api/camptocamp.js";
 import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
@@ -1569,6 +1571,108 @@ describe("searchOutings", () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
 
     await expect(searchOutings()).rejects.toThrow("Camptocamp API error: 500 Error");
+  });
+
+  // AC6.2 on #153: the outing filters on reported rating, conditions, max elevation and elevation gain.
+  it("sends rating, conditions, max elevation and elevation gain after the activity", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({
+      area_id: 14409,
+      activity: "skitouring",
+      rating: { system: "ski_rating", min: "3.1", max: "4.1" },
+      condition_at_least: "good",
+      elevation_max: { min: 3000, max: 4000 },
+      height_diff_up: { min: 1000, max: 1500 },
+    });
+
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      `${API}/outings?a=14409&act=skitouring&trat=3.1%2C4.1&ocond=excellent%2Cgood&oalt=3000%2C4000&odif=1000%2C1500` +
+        "&sort=-date_end&limit=10&offset=0&pl=fr",
+    );
+  });
+
+  // AC6.3: a min alone keeps every value from min up, a max alone every value up to max.
+  it("sends x=min for a min alone", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({
+      rating: { system: "global_rating", min: "AD" },
+      elevation_max: { min: 3000 },
+      height_diff_up: { min: 1000 },
+    });
+
+    const params = calledUrl().searchParams;
+    expect(params.get("grat")).toBe("AD");
+    expect(params.get("oalt")).toBe("3000");
+    expect(params.get("odif")).toBe("1000");
+  });
+
+  it("sends x=,max for a max alone", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({
+      rating: { system: "global_rating", max: "AD" },
+      elevation_max: { max: 4000 },
+      height_diff_up: { max: 1500 },
+    });
+
+    const params = calledUrl().searchParams;
+    expect(params.get("grat")).toBe(",AD");
+    expect(params.get("oalt")).toBe(",4000");
+    expect(params.get("odif")).toBe(",1500");
+  });
+
+  it("sends no range parameter when neither bound is given", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ rating: { system: "ski_rating" }, elevation_max: {}, height_diff_up: {} });
+
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?sort=-date_end&limit=10&offset=0&pl=fr`);
+  });
+
+  // `ocond=excellent` alone matches every outing with a condition: the range always starts at excellent,
+  // and `excellent,excellent` returns the excellent outings only (548 in area 14409 skitouring, 2026-10-04).
+  it.each([
+    ["excellent", "excellent,excellent"],
+    ["good", "excellent,good"],
+    ["average", "excellent,average"],
+    ["poor", "excellent,poor"],
+    ["awful", "excellent,awful"],
+  ])("sends condition_at_least %s as ocond=%s", async (condition, ocond) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ condition_at_least: condition });
+
+    expect(calledUrl().searchParams.get("ocond")).toBe(ocond);
+  });
+
+  const outingRatingParams: Array<[OutingRatingField, string]> = [
+    ["ski_rating", "trat"],
+    ["labande_global_rating", "lrat"],
+    ["global_rating", "grat"],
+    ["engagement_rating", "erat"],
+    ["equipment_rating", "prat"],
+    ["ice_rating", "irat"],
+    ["rock_free_rating", "frat"],
+    ["via_ferrata_rating", "krat"],
+    ["hiking_rating", "hrat"],
+    ["snowshoe_rating", "wrat"],
+    ["mtb_up_rating", "mbur"],
+    ["mtb_down_rating", "mbdr"],
+  ];
+
+  // The /outings search supports 12 of the 20 route rating systems; the API ignores the others.
+  it("covers the 12 outing rating systems", () => {
+    expect([...OUTING_RATING_FIELDS].sort()).toEqual(outingRatingParams.map(([field]) => field).sort());
+  });
+
+  it.each(outingRatingParams)("maps %s to %s", async (system, param) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ rating: { system, min: "X", max: "Y" } });
+
+    expect(calledUrl().searchParams.get(param)).toBe("X,Y");
   });
 });
 
