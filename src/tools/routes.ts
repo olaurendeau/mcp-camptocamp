@@ -19,7 +19,7 @@ import {
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 import { ACTIVITIES, ROUTE_CONFIGURATIONS, ROUTE_TYPES, enumValue } from "./enums.js";
-import { assertResultWindow, formatSearchPage } from "./paging.js";
+import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
 
 const RATING_SYSTEM_NAMES = Object.keys(ROUTE_RATING_SYSTEMS) as [RouteRatingField, ...RouteRatingField[]];
 
@@ -109,7 +109,7 @@ function ratingFilter(input: SearchRoutesInput): RouteSearchOptions["rating"] {
     ["rating_max", max],
   ] as const) {
     if (value !== undefined && !scale.includes(value)) {
-      throw new Error(`${name} "${value}" is not a valid ${system} value; valid values: ${scale.join(", ")}`);
+      throw new Error(`${name} ${quote(value)} is not a valid ${system} value; valid values: ${scale.join(", ")}`);
     }
   }
   if (min !== undefined && max !== undefined && scale.indexOf(min) > scale.indexOf(max)) {
@@ -157,7 +157,7 @@ function routeSearchOptions(input: SearchRoutesInput): RouteSearchOptions {
 // The Filters line, in the order of the inputs: `area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1`.
 function describeFilters(options: RouteSearchOptions): string[] {
   const filters: string[] = [];
-  if (options.query !== undefined) filters.push(`query "${options.query}"`);
+  if (options.query !== undefined) filters.push(`query ${quote(options.query)}`);
   if (options.area_id !== undefined) filters.push(`area ${options.area_id}`);
   if (options.waypoint_id !== undefined) filters.push(`waypoint ${options.waypoint_id}`);
   if (options.activity !== undefined) filters.push(`activity ${options.activity}`);

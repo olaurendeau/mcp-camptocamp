@@ -1,0 +1,9 @@
+{
+  // The tests keep every flag of the build except noUncheckedIndexedAccess: they index mock calls
+  // and fixtures they have just set up, where `[0]` is never undefined.
+  "extends": "../tsconfig.typecheck.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["./**/*"]
+}

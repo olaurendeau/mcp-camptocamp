@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
-import { assertResultWindow, formatSearchPage } from "./paging.js";
+import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
 import { ACTIVITIES, enumValue } from "./enums.js";
 import { getOuting, searchOutings } from "../api/camptocamp.js";
 import type { OutingDetail, OutingListResponse } from "../api/camptocamp.js";
@@ -128,7 +128,7 @@ function formatOutingDetail(outing: OutingDetail): string {
 function describeFilters(params: SearchOutingsInput): string[] {
   const filters: string[] = [];
   if (params.user_id !== undefined) filters.push(`user ${params.user_id}`);
-  if (params.query !== undefined) filters.push(`query "${params.query}"`);
+  if (params.query !== undefined) filters.push(`query ${quote(params.query)}`);
   if (params.area_id !== undefined) filters.push(`area ${params.area_id}`);
   if (params.activity !== undefined) filters.push(`activity ${params.activity}`);
   if (params.date_from !== undefined && params.date_to !== undefined) {

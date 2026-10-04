@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
-import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
+import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchAreas, getArea } from "../api/camptocamp.js";
 import type { AreaDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, formatHeader, formatAreaLine, formatListItems } from "./format.js";
@@ -41,7 +41,7 @@ export async function handleSearchAreas(input: SearchAreasInput): Promise<string
   assertResultWindow(offset, limit);
 
   const response = await searchAreas(input);
-  const filters = [`query "${query}"`];
+  const filters = [`query ${quote(query)}`];
   if (area_type !== undefined) filters.push(`area type ${area_type}`);
   return formatSearchPage({
     kind: "area",

@@ -153,8 +153,8 @@ describe("pickLocale", () => {
   });
 
   it("returns undefined for no locales", () => {
-    expect(pickLocale([])).toBeUndefined();
-    expect(pickLocale([], "de")).toBeUndefined();
+    expect(pickLocale<{ lang: string }>([])).toBeUndefined();
+    expect(pickLocale<{ lang: string }>([], "de")).toBeUndefined();
   });
 
   // AC5.6 on #153: the requested language, then fr, en, it, de, es, ca, eu, sl, zh, then the first locale.

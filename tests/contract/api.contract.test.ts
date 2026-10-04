@@ -39,7 +39,7 @@ interface Search {
 
 // authorSchema falls back to null on a malformed author, so a renamed field would silently drop the
 // Author line everywhere: documents that carry an author must keep it after parsing.
-const AUTHOR = { name: expect.any(String), user_id: expect.any(Number) };
+const AUTHOR: Record<string, unknown> = { name: expect.any(String), user_id: expect.any(Number) };
 
 // Whether the dates start → end (YYYY-MM-DD) cover at least one day of June in some year.
 function overlapsJune(start: string, end: string): boolean {
@@ -92,6 +92,7 @@ const routesInVanoise = once(() => searchRoutes({ area_id: VANOISE }));
 const mountBlancBooks = once(() => searchBooks({ query: "Mont Blanc" }));
 const allOutings = once(() => searchOutings());
 const outingsAtWaypoint37916 = once(() => searchOutings({ waypoint_id: 37916 }));
+const skitouringOutingsInVanoise = once(() => searchOutings({ area_id: VANOISE, activity: "skitouring" }));
 
 describe("document details (AC8.2, AC8.3)", () => {
   it.each([
@@ -205,9 +206,9 @@ describe("searches (AC8.2, AC8.3)", () => {
   });
 });
 
-// Each filter of search_routes, search_waypoints and search_books narrows the same search without it; the
-// outing filters `u` and `period` are checked the same way in "searches". Where the search results carry
-// the filtered field, most results must also carry the filtered value.
+// Each filter of search_routes, search_waypoints, search_outings and search_books narrows the same search
+// without it; the outing filters `u` and `period` are checked the same way in "searches". Where the search
+// results carry the filtered field, most results must also carry the filtered value.
 describe("search filters narrow live results", () => {
   describe(`routes in Vanoise (area ${VANOISE})`, () => {
     it("act: activity skitouring", async () => {
@@ -248,6 +249,90 @@ describe("search filters narrow live results", () => {
 
     it("conf: configuration edge", async () => {
       expectNarrows(await searchRoutes({ area_id: VANOISE, configuration: ["edge"] }), await routesInVanoise());
+    });
+  });
+
+  // AC6.7 on #153.
+  describe("outings, against all outings", () => {
+    it("act: activity skitouring", async () => {
+      const result = await searchOutings({ activity: "skitouring" });
+
+      expectNarrows(result, await allOutings());
+      expectMostMatch(
+        wellFormed(result.documents),
+        (outing) => outing.activities.includes("skitouring"),
+        "act=skitouring",
+      );
+    });
+
+    it(`a: area ${VANOISE}`, async () => {
+      const result = await searchOutings({ area_id: VANOISE });
+
+      expectNarrows(result, await allOutings());
+      expectMostMatch(
+        wellFormed(result.documents),
+        (outing) => outing.areas?.some((area) => area.document_id === VANOISE) ?? false,
+        `a=${VANOISE}`,
+      );
+    });
+
+    it("date: 2026-01-01 → 2026-03-31", async () => {
+      const result = await searchOutings({ date_from: "2026-01-01", date_to: "2026-03-31" });
+
+      expectNarrows(result, await allOutings());
+      expectMostMatch(
+        wellFormed(result.documents),
+        (outing) => (outing.date_start ?? "") <= "2026-03-31" && (outing.date_end ?? "") >= "2026-01-01",
+        "date=2026-01-01,2026-03-31",
+      );
+    });
+
+    // The outing's routes are not in the search results: only the totals tell.
+    it("r: route 53884", async () => {
+      expectNarrows(await searchOutings({ route_id: 53884 }), await allOutings());
+    });
+  });
+
+  describe(`skitouring outings in Vanoise (area ${VANOISE})`, () => {
+    const base = { area_id: VANOISE, activity: "skitouring" };
+
+    it("trat: ski rating 3.1 → 4.1", async () => {
+      const result = await searchOutings({ ...base, rating: { system: "ski_rating", min: "3.1", max: "4.1" } });
+
+      expectNarrows(result, await skitouringOutingsInVanoise());
+      const inRange = ["3.1", "3.2", "3.3", "4.1"];
+      expectMostMatch(
+        wellFormed(result.documents),
+        (outing) => inRange.includes(outing.ski_rating ?? ""),
+        "trat=3.1,4.1",
+      );
+    });
+
+    it("ocond: conditions good or better", async () => {
+      const result = await searchOutings({ ...base, condition_at_least: "good" });
+
+      expectNarrows(result, await skitouringOutingsInVanoise());
+      expectMostMatch(
+        wellFormed(result.documents),
+        (outing) => ["excellent", "good"].includes(outing.condition_rating ?? ""),
+        "ocond=excellent,good",
+      );
+    });
+
+    it("oalt: max elevation 3000 → 4000 m", async () => {
+      const result = await searchOutings({ ...base, elevation_max: { min: 3000, max: 4000 } });
+
+      expectNarrows(result, await skitouringOutingsInVanoise());
+      const inRange = (elevation?: number | null) => elevation != null && elevation >= 3000 && elevation <= 4000;
+      expectMostMatch(wellFormed(result.documents), (outing) => inRange(outing.elevation_max), "oalt=3000,4000");
+    });
+
+    it("odif: elevation gain 1000 → 1500 m", async () => {
+      const result = await searchOutings({ ...base, height_diff_up: { min: 1000, max: 1500 } });
+
+      expectNarrows(result, await skitouringOutingsInVanoise());
+      const inRange = (up?: number | null) => up != null && up >= 1000 && up <= 1500;
+      expectMostMatch(wellFormed(result.documents), (outing) => inRange(outing.height_diff_up), "odif=1000,1500");
     });
   });
 

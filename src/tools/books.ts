@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
-import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
+import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchBooks, getBook } from "../api/camptocamp.js";
 import type { BookDetail } from "../api/camptocamp.js";
 import {
@@ -84,7 +84,7 @@ export async function handleSearchBooks(input: SearchBooksInput): Promise<string
   assertResultWindow(offset, limit);
 
   const response = await searchBooks(input);
-  const filters = [`query "${query}"`];
+  const filters = [`query ${quote(query)}`];
   if (book_type !== undefined) filters.push(`book type ${book_type}`);
   if (activity !== undefined) filters.push(`activity ${activity}`);
   return formatSearchPage({
