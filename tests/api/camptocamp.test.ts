@@ -13,16 +13,18 @@ import {
   getBook,
   searchArticles,
   getArticle,
+} from "../../src/api/camptocamp.js";
+import {
   ROUTE_RATING_FIELDS,
   ROUTE_RATING_PARAMS,
   OUTING_RATING_FIELDS,
   type OutingRatingField,
   type ConditionRating,
   type RouteRatingField,
-} from "../../src/api/camptocamp.js";
+} from "../../src/api/values.js";
 import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
 import { wellFormed } from "./well-formed.js";
-import type { Lang } from "../../src/api/camptocamp.js";
+import type { Lang } from "../../src/api/values.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);

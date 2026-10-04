@@ -1676,3 +1676,48 @@ describe("malformed list items", () => {
     expect(lines).toContain(`- [104151] ${PLACEHOLDER}`);
   });
 });
+
+// #200 (from the #202 review): search_waypoints parses lang with the real list and names each waypoint in it.
+describe("search_waypoints lang", () => {
+  // Derived from GET /waypoints?q=Matterhorn&pl=fr and &pl=de (2026-10-04), one locale each: both locales merged
+  // into each document, summaries, geometry and areas left out, so the line shows which one lang picks.
+  const matterhorn = {
+    total: 2,
+    documents: [
+      {
+        document_id: 37558,
+        locales: [
+          { lang: "fr", title: "Cervin" },
+          { lang: "de", title: "Matterhorn" },
+        ],
+        waypoint_type: "summit",
+        elevation: 4478,
+      },
+      {
+        document_id: 446706,
+        locales: [
+          { lang: "fr", title: "Petit Cervin" },
+          { lang: "de", title: "Klein Matterhorn" },
+        ],
+        waypoint_type: "access",
+        elevation: 3800,
+      },
+    ],
+  };
+
+  it.each([
+    [
+      "de",
+      { lang: "de" as const },
+      ["- [37558] Matterhorn (summit) | 4478m", "- [446706] Klein Matterhorn (access) | 3800m"],
+    ],
+    ["no lang", {}, ["- [37558] Cervin (summit) | 4478m", "- [446706] Petit Cervin (access) | 3800m"]],
+  ])("names each waypoint in the requested language (%s)", async (_label, lang, lines) => {
+    mockSearchWaypoints.mockResolvedValueOnce(matterhorn);
+
+    const result = await search({ query: "Matterhorn", ...lang });
+
+    expect(mockSearchWaypoints).toHaveBeenCalledWith(expect.objectContaining({ query: "Matterhorn", ...lang }));
+    expect(result.split("\n").slice(-2)).toEqual(lines);
+  });
+});
