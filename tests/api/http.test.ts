@@ -189,12 +189,13 @@ describe("getJson network errors", () => {
       new DOMException("This operation was aborted", "AbortError"),
       "This operation was aborted",
     ],
-  ])("reports %s", async (_label, error, detail) => {
+  ])("reports %s, and keeps the fetch error as the cause", async (_label, error, detail) => {
     mockFetch.mockRejectedValueOnce(error);
+    const request = getJson({ path: "/routes/1", document: { type: "route", id: 1 }, schema: anySchema });
 
-    await expect(getJson({ path: "/routes/1", document: { type: "route", id: 1 }, schema: anySchema })).rejects.toThrow(
-      new Error(`Camptocamp API error: network error (${detail})`),
-    );
+    await expect(request).rejects.toThrow(new Error(`Camptocamp API error: network error (${detail})`));
+    const failure = await request.catch((reason: unknown) => reason);
+    expect((failure as Error).cause).toBe(error);
   });
 });
 
@@ -431,7 +432,7 @@ describe("getJson timeout", () => {
     vi.useRealTimers();
   });
 
-  it("aborts a fetch that never answers after 15 s and says it timed out", async () => {
+  it("aborts a fetch that never answers after 15 s and says it timed out, the abort as the cause", async () => {
     mockFetch.mockImplementationOnce(fetchSettlingOnAbort);
     let settled = false;
     const request = getJson({
@@ -449,7 +450,13 @@ describe("getJson timeout", () => {
 
     await vi.advanceTimersByTimeAsync(1);
     await outcome;
-    expect((mockFetch.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true);
+    const signal = (mockFetch.mock.calls[0][1] as RequestInit).signal;
+    expect(signal?.aborted).toBe(true);
+    // The aborted fetch first fails as a network error, which the timeout error then wraps.
+    const failure = await request.catch((reason: unknown) => reason);
+    const cause = (failure as Error).cause;
+    expect(cause).toEqual(new Error("Camptocamp API error: network error (This operation was aborted)"));
+    expect((cause as Error).cause).toBe(signal?.reason);
   });
 
   it("covers reading a successful body", async () => {

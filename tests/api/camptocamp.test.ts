@@ -897,9 +897,9 @@ describe("getOuting", () => {
     const result = outingDetailSchema.parse(await getOuting(1880674));
 
     const route = wellFormed(result.associations?.routes)[0];
-    expect(route?.document_id).toBe(54085);
-    expect(route?.locales[0].title_prefix).toBe("Mont Pourri");
-    expect(route?.locales[1].title_prefix).toBe("Mont Pourri");
+    expect(route.document_id).toBe(54085);
+    expect(route.locales[0].title_prefix).toBe("Mont Pourri");
+    expect(route.locales[1].title_prefix).toBe("Mont Pourri");
   });
 
   it("keeps the outing's and its associated route's ratings through the response schema", async () => {
