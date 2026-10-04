@@ -58,6 +58,124 @@ Search trip reports across Camptocamp.org, most recent first, by keyword, area, 
 
 <!-- generated:inputs end -->
 
+## Output format
+
+```text
+Found <total> outing(s), most recent first. Showing <n> from offset <offset>:
+Filters: <filter>, <filter>, …
+Note: Camptocamp's period filter can miss outings on the first or last day of the range.
+
+- [<id>] <title> (<activities>) | <date> | Conditions: <condition> | Max elevation: <metres>m | Elevation gain: <metres>m | <rating system>: <grade> | … | Areas: <range> [<area id>], … | Author: <name>
+
+Next page: offset=<N>
+```
+
+- **The header** gives the total number of matches and how many lines follow. Outings are sorted by end date, most recent first, keyword searches included.
+- **The `Filters:` line** repeats the filters applied, in this order, whatever the order of the call:
+
+  | Input                                       | In the `Filters:` line                                                                     |
+  | ------------------------------------------- | ------------------------------------------------------------------------------------------ |
+  | `user_id`                                   | `user 211581`                                                                              |
+  | `query`                                     | `query "cosmiques"`                                                                        |
+  | `area_id`                                   | `area 14409`                                                                               |
+  | `activity`                                  | `activity skitouring`                                                                      |
+  | `rating_system`, `rating_min`, `rating_max` | `ski rating (Toponeige) 3.1 → 4.1`, `global rating from AD` or `hiking rating up to T3`    |
+  | `condition_at_least`                        | `conditions good or better`                                                                |
+  | `max_elevation_min`, `max_elevation_max`    | `max elevation 3000 → 4000m`, `max elevation from 3000m` or `max elevation up to 4000m`    |
+  | `height_diff_up_min`, `height_diff_up_max`  | `elevation gain 1000 → 1500m`, `elevation gain from 1000m` or `elevation gain up to 1500m` |
+  | `date_from`, `date_to`                      | `dates 2026-01-01 → 2026-06-30`, `dates from 2026-01-01` or `dates until 2026-06-30`       |
+  | `period_start`, `period_end`                | `period 06-01 → 06-30 of every year`                                                       |
+  | `route_id`                                  | `route 46954`                                                                              |
+  | `waypoint_id`                               | `waypoint 38516`                                                                           |
+
+  With no filter at all, there is no `Filters:` line.
+
+- **The `Note:` line** is printed with every search that has `period_start` and `period_end`, even when nothing is found. See [Limits](#limits).
+- **Each result line** starts with the outing's ID in brackets, its title as its author wrote it, and its activities. The other parts follow in the order above, and each one is left out when the author gave no value:
+  - the date, or `<start> → <end>` for an outing over several days;
+  - `Conditions:`, a code from `excellent`, `good`, `average`, `poor`, `awful`, copied verbatim;
+  - `Max elevation:` and `Elevation gain:`, as the author reported them;
+  - the ratings the author reported for that day, each labelled with its grading system (`Ski rating (Toponeige): 3.2 | Labande: PD+`). They can differ from the route's own ratings;
+  - `Areas:`, the mountain ranges of the outing with their area IDs. Countries and administrative subdivisions are not listed;
+  - `Author:`, the Camptocamp user who wrote the report. [`get_outing`](get_outing.md) does not give it.
+- **The footer** is `Next page: offset=N` when more outings follow, `Next page: offset=N (limit at most M)` near the end of Camptocamp's 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` There is no footer on the last page. See [Paging](../using-with-llms.md#paging).
+- **No match** prints a single line, `No outings found matching <filters>.` (`No outings found.` without filters), followed by the `Note:` line for a period search.
+- An item Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`, or by `- (not shown: Camptocamp sent an item in an unexpected format)` when its ID is unreadable. See [Missing data](../using-with-llms.md#missing-data).
+- `lang` picks the language of titles and range names. A search prints no `**Language**` line, unlike the `get_*` tools.
+
+## Example
+
+June ski-touring reports in the Vanoise, in conditions rated good or better: the second step of the [June example](../using-with-llms.md#example-a-june-ski-tour-in-the-vanoise).
+
+`search_outings {area_id: 14409, activity: "skitouring", period_start: "06-01", period_end: "06-30", condition_at_least: "good", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+```text
+Found 101 outing(s), most recent first. Showing 3 from offset 0:
+Filters: area 14409, activity skitouring, conditions good or better, period 06-01 → 06-30 of every year
+Note: Camptocamp's period filter can miss outings on the first or last day of the range.
+
+- [1912989] Dôme de Polset : Par le Col de Gébroulaz et boucle sur le glacier de Gébroulaz  (skitouring) | 2026-06-07 | Conditions: good | Max elevation: 3500m | Elevation gain: 1640m | Ski rating (Toponeige): 3.2 | Labande: PD+ | Areas: Vanoise [14409] | Author: Loïc Perrin
+- [1913877] Aiguille de Péclet : Versant W (skitouring) | 2026-06-06 | Conditions: good | Max elevation: 3561m | Elevation gain: 1261m | Ski rating (Toponeige): 3.3 | Labande: AD+ | Areas: Vanoise [14409] | Author: NiFo73
+- [1780056] Mont de Gébroulaz : Par le Col de Thorens (skitouring) | 2025-06-11 | Conditions: good | Max elevation: 3511m | Elevation gain: 1050m | Ski rating (Toponeige): 3.2 | Labande: AD- | Areas: Vanoise [14409] | Author: Acharnay
+
+Next page: offset=3
+```
+
+The period matches June of every year: here 2026 and 2025. `get_outing {id: 1912989}` gives the full report of the first one: see [its example](get_outing.md#example).
+
+## Limits
+
+- **Edge days of a period can be missed.** Camptocamp's period filter can leave out outings dated on `period_start` or `period_end`, depending on the year; the `Note:` line says so on every period search. When those days matter, widen the period by one day on each side (`period_start: "05-31"`, `period_end: "07-01"` for June) and leave out the outings dated outside it. Measured on the live API on 2026-10-05, the June outings of one year (`date_from` and `date_to` alone, then with the June period, then with the widened period):
+
+  | Year | Dates only | `06-01` → `06-30` | `05-31` → `07-01` |
+  | ---- | ---------- | ----------------- | ----------------- |
+  | 2019 | 1363       | 1244              | 1363              |
+  | 2021 | 1358       | 1313              | 1357              |
+  | 2024 | 1519       | 1456              | 1518              |
+
+  A period ending on `12-31` cannot be widened past it, and widening a period to start on `01-01` runs into the next limit.
+
+- **A period starting on `01-01` returns almost nothing.** Measured on the live API on 2026-10-05, with no other filter:
+
+  | Period            | Outings found |
+  | ----------------- | ------------- |
+  | `01-01` → `01-31` | 0             |
+  | `01-02` → `01-31` | 29297         |
+  | `01-01` → `12-31` | 4             |
+  | `12-20` → `12-31` | 10098         |
+
+  A period ending on `12-31` works normally. For early January, start the period on `01-02` and accept that 1 January is left out, or use `date_from` and `date_to` instead, one year per call. An empty result for a period starting on `01-01` does not mean there are no reports.
+
+- **An outing spanning the new year matches no period.** Outing 1362640, from 2020-12-17 to 2021-10-28, was returned by no period tested. `date_from` and `date_to` do return it.
+- **A period cannot wrap around the new year.** `period_end` must be on or after `period_start`. `search_outings {area_id: 14409, activity: "skitouring", period_start: "12-20", period_end: "01-10", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  Error: period cannot wrap around the new year; make two calls (12-20 → 12-31 and 01-01 → 01-10)
+  ```
+
+  The second call this error suggests starts on `01-01`, so it hits the limit above. Make the second call start on `01-02`, or use `date_from` and `date_to` for those January days. For this Vanoise ski-touring search, measured on 2026-10-05:
+  - `12-20` → `12-31` found 79 outings;
+  - `01-01` → `01-10` found none;
+  - `01-02` → `01-10` found 45;
+  - `date_from: "2025-01-01"` with `date_to: "2025-01-10"` and no period found 3, for January 2025 only.
+
+- **A period needs both days.** `search_outings {period_start: "06-01", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  Error: period_start and period_end must be given together (MM-DD, e.g. 06-01 and 06-30).
+  ```
+
+  A period matches the same days in every year. Add `date_from` and `date_to` to keep only some years. `02-29` is accepted.
+
+- **`date_from` and `date_to` match overlapping outings.** An outing over several days matches when any of its days falls in the range. `date_from` after `date_to`, or a date that does not exist such as `2026-02-30`, is refused before any request.
+- **`condition_at_least` keeps that rating or better**, on the scale `excellent`, `good`, `average`, `poor`, `awful`: `condition_at_least: "good"` keeps `good` and `excellent`. Outings whose author gave no condition rating are left out.
+- **Ratings, conditions, max elevation and elevation gain are those the author reported for that day**, not the route's. An outing without a value for a filtered field is left out. One rating system per call: `rating_min` and `rating_max` must come from the scale of `rating_system`, and any other value is refused with the valid list.
+- **`query` matches outing titles only**, not the report text.
+- **`user_id` lists the outings a user is listed on as a participant**, including those another user wrote. No tool finds a user by name: the ID is the number in the user's camptocamp.org profile URL, or comes from the `**Participants with a Camptocamp account**` line of [`get_outing`](get_outing.md).
+- **An unknown ID used as a filter returns no results, not an error.** An empty result after an `area_id`, `route_id`, `waypoint_id` or `user_id` filter can mean a wrong ID. See [Unknown IDs](../using-with-llms.md#unknown-ids).
+- **Paging stops at 10,000 results.** A call where `offset + limit` exceeds 10,000 is refused before any request: narrow the filters instead.
+- **Outings are past reports, not a forecast.** Give each outing's date with what it says. The server has no weather forecast and no avalanche bulletin.
+
 ## Related tools
 
 - [`search_areas`](search_areas.md): find the `area_id` of a region.
