@@ -7,11 +7,13 @@ import {
   bookToolDefinitions,
 } from "../../src/tools/books.js";
 import * as api from "../../src/api/camptocamp.js";
+import { bookDetailSchema, bookSearchResponseSchema } from "../../src/api/schemas.js";
+import { throughSchema } from "./through-schema.js";
 
 vi.mock("../../src/api/camptocamp.js");
 
-const mockSearchBooks = vi.mocked(api.searchBooks);
-const mockGetBook = vi.mocked(api.getBook);
+const mockSearchBooks = throughSchema(vi.mocked(api.searchBooks), bookSearchResponseSchema);
+const mockGetBook = throughSchema(vi.mocked(api.getBook), bookDetailSchema);
 
 const FORBIDDEN = ["undefined", "null", "Unknown", "N/A"];
 

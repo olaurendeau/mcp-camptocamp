@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { z } from "zod";
 import { BASE_URL, getJson } from "../../src/api/http.js";
+
+// Any body passes: for the tests that are not about the response shape.
+const anySchema = z.unknown();
+const countSchema = z.object({ documents: z.array(z.object({ document_id: z.number() })), total: z.number() });
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -14,16 +19,12 @@ function jsonResponse(body: unknown, init: ResponseInit): Response {
 
 describe("getJson", () => {
   it("fetches BASE_URL + path + params and returns the parsed body", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      json: () => Promise.resolve({ documents: [], total: 0 }),
-    });
+    mockFetch.mockResolvedValueOnce(jsonResponse({ documents: [], total: 0 }, { status: 200 }));
 
-    const result = await getJson<{ total: number }>({
+    const result = await getJson({
       path: "/routes",
       params: new URLSearchParams({ q: "Mont Blanc", limit: "10" }),
+      schema: countSchema,
     });
 
     expect(BASE_URL).toBe("https://api.camptocamp.org");
@@ -33,9 +34,9 @@ describe("getJson", () => {
   });
 
   it("omits the query string when there are no params", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, statusText: "OK", json: () => Promise.resolve({}) });
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, { status: 200 }));
 
-    await getJson({ path: "/routes/123" });
+    await getJson({ path: "/routes/123", schema: anySchema });
 
     expect(mockFetch.mock.calls[0][0]).toBe("https://api.camptocamp.org/routes/123");
   });
@@ -45,7 +46,7 @@ describe("getJson", () => {
       jsonResponse({ status: "error", errors: [{ name: "Not Found" }] }, { status: 404, statusText: "Not Found" }),
     );
 
-    await expect(getJson({ path: "/routes/999999999" })).rejects.toThrow(
+    await expect(getJson({ path: "/routes/999999999", schema: anySchema })).rejects.toThrow(
       new Error("Camptocamp API error: 404 Not Found"),
     );
   });
@@ -60,9 +61,9 @@ describe("getJson HTTP error messages", () => {
       ),
     );
 
-    await expect(getJson({ path: "/routes/53914", document: { type: "route", id: 53914 } })).rejects.toThrow(
-      new Error("Camptocamp API error: 404 Not Found (route 53914): document not found"),
-    );
+    await expect(
+      getJson({ path: "/routes/53914", document: { type: "route", id: 53914 }, schema: anySchema }),
+    ).rejects.toThrow(new Error("Camptocamp API error: 404 Not Found (route 53914): document not found"));
   });
 
   it("joins several descriptions, collapses their whitespace and skips the unusable ones", async () => {
@@ -83,7 +84,7 @@ describe("getJson HTTP error messages", () => {
       ),
     );
 
-    await expect(getJson({ path: "/outings" })).rejects.toThrow(
+    await expect(getJson({ path: "/outings", schema: anySchema })).rejects.toThrow(
       new Error("Camptocamp API error: 400 Bad Request: invalid date; unknown language"),
     );
   });
@@ -97,7 +98,7 @@ describe("getJson HTTP error messages", () => {
   ])("gives only the status line for %s", async (_label, body) => {
     mockFetch.mockResolvedValueOnce(new Response(body, { status: 500, statusText: "Internal Server Error" }));
 
-    await expect(getJson({ path: "/routes" })).rejects.toThrow(
+    await expect(getJson({ path: "/routes", schema: anySchema })).rejects.toThrow(
       new Error("Camptocamp API error: 500 Internal Server Error"),
     );
   });
@@ -110,15 +111,17 @@ describe("getJson HTTP error messages", () => {
       text: () => Promise.reject(new TypeError("terminated")),
     });
 
-    await expect(getJson({ path: "/routes" })).rejects.toThrow(new Error("Camptocamp API error: 502 Bad Gateway"));
+    await expect(getJson({ path: "/routes", schema: anySchema })).rejects.toThrow(
+      new Error("Camptocamp API error: 502 Bad Gateway"),
+    );
   });
 
   it("leaves out an empty status text", async () => {
     mockFetch.mockResolvedValueOnce(new Response("", { status: 503 }));
 
-    await expect(getJson({ path: "/areas/14403", document: { type: "area", id: 14403 } })).rejects.toThrow(
-      new Error("Camptocamp API error: 503 (area 14403)"),
-    );
+    await expect(
+      getJson({ path: "/areas/14403", document: { type: "area", id: 14403 }, schema: anySchema }),
+    ).rejects.toThrow(new Error("Camptocamp API error: 503 (area 14403)"));
   });
 
   it("cuts a long description to 200 characters without splitting a character", async () => {
@@ -126,7 +129,7 @@ describe("getJson HTTP error messages", () => {
       jsonResponse({ errors: [{ description: "𝄞".repeat(300) }] }, { status: 400, statusText: "Bad Request" }),
     );
 
-    const error = await getJson({ path: "/routes" }).catch((e: unknown) => e);
+    const error = await getJson({ path: "/routes", schema: anySchema }).catch((e: unknown) => e);
 
     const reason = (error as Error).message.replace("Camptocamp API error: 400 Bad Request: ", "");
     expect(reason).toBe(`${"𝄞".repeat(199)}…`);
@@ -138,7 +141,7 @@ describe("getJson HTTP error messages", () => {
       jsonResponse({ errors: [{ description: "y".repeat(200) }] }, { status: 400, statusText: "Bad Request" }),
     );
 
-    await expect(getJson({ path: "/routes" })).rejects.toThrow(
+    await expect(getJson({ path: "/routes", schema: anySchema })).rejects.toThrow(
       new Error(`Camptocamp API error: 400 Bad Request: ${"y".repeat(200)}`),
     );
   });
@@ -165,8 +168,48 @@ describe("getJson network errors", () => {
   ])("reports %s", async (_label, error, detail) => {
     mockFetch.mockRejectedValueOnce(error);
 
-    await expect(getJson({ path: "/routes/1", document: { type: "route", id: 1 } })).rejects.toThrow(
+    await expect(getJson({ path: "/routes/1", document: { type: "route", id: 1 }, schema: anySchema })).rejects.toThrow(
       new Error(`Camptocamp API error: network error (${detail})`),
+    );
+  });
+});
+
+describe("getJson response validation", () => {
+  it("returns the body parsed by the schema, without the keys the schema does not declare", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ documents: [{ document_id: 1, version: 3 }], total: 1, extra: true }, { status: 200 }),
+    );
+
+    const result = await getJson({ path: "/routes", schema: countSchema });
+
+    expect(result).toEqual({ documents: [{ document_id: 1 }], total: 1 });
+  });
+
+  it.each([
+    ["an HTML page", "<html><body>Maintenance</body></html>"],
+    ["an empty body", ""],
+    ["truncated JSON", '{"documents": ['],
+  ])("reports %s as an unexpected response (not JSON)", async (_label, body) => {
+    mockFetch.mockResolvedValueOnce(new Response(body, { status: 200, statusText: "OK" }));
+
+    await expect(getJson({ path: "/routes", schema: countSchema })).rejects.toThrow(
+      new Error("Camptocamp API error: unexpected response (not JSON)"),
+    );
+  });
+
+  it.each([
+    ["a missing field", { total: 0 }, "documents: Required"],
+    [
+      "a wrong type in a document",
+      { documents: [{ document_id: "1" }], total: 1 },
+      "documents.0.document_id: Expected number, received string",
+    ],
+    ["a body that is not an object", null, "Expected object, received null"],
+  ])("reports %s with the path and message of the first issue", async (_label, body, detail) => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(body, { status: 200 }));
+
+    await expect(getJson({ path: "/routes", schema: countSchema })).rejects.toThrow(
+      new Error(`Camptocamp API error: unexpected response (${detail})`),
     );
   });
 });

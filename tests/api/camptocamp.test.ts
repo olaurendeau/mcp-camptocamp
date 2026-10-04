@@ -1229,7 +1229,9 @@ describe("locale parameters", () => {
   ];
 
   it.each(details)("%s sends no query string", async (_name, call, path) => {
-    mockFetch.mockResolvedValueOnce(makeResponse({ document_id: 675555, locales: [] }));
+    // The required fields of every detail schema; each schema drops the ones it does not declare.
+    const body = { document_id: 675555, locales: [], activities: [], waypoint_type: "summit", area_type: "range" };
+    mockFetch.mockResolvedValueOnce(makeResponse(body));
 
     await call(675555);
 

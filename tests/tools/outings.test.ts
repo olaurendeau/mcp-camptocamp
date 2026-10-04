@@ -8,12 +8,14 @@ import {
 import type { SearchOutingsInput } from "../../src/tools/outings.js";
 import * as api from "../../src/api/camptocamp.js";
 import type { OutingListItem, OutingListResponse } from "../../src/api/camptocamp.js";
+import { outingDetailSchema, outingListResponseSchema, outingSearchResponseSchema } from "../../src/api/schemas.js";
+import { throughSchema } from "./through-schema.js";
 
 vi.mock("../../src/api/camptocamp.js");
 
-const mockSearchUserOutings = vi.mocked(api.searchUserOutings);
-const mockGetOuting = vi.mocked(api.getOuting);
-const mockSearchOutings = vi.mocked(api.searchOutings);
+const mockSearchUserOutings = throughSchema(vi.mocked(api.searchUserOutings), outingSearchResponseSchema);
+const mockGetOuting = throughSchema(vi.mocked(api.getOuting), outingDetailSchema);
+const mockSearchOutings = throughSchema(vi.mocked(api.searchOutings), outingListResponseSchema);
 
 beforeEach(() => {
   vi.clearAllMocks();

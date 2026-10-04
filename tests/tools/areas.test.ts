@@ -8,11 +8,13 @@ import {
 } from "../../src/tools/areas.js";
 import * as api from "../../src/api/camptocamp.js";
 import type { AreaDetail, AreaSearchResult } from "../../src/api/camptocamp.js";
+import { areaDetailSchema, areaSearchResponseSchema } from "../../src/api/schemas.js";
+import { throughSchema } from "./through-schema.js";
 
 vi.mock("../../src/api/camptocamp.js");
 
-const mockSearchAreas = vi.mocked(api.searchAreas);
-const mockGetArea = vi.mocked(api.getArea);
+const mockSearchAreas = throughSchema(vi.mocked(api.searchAreas), areaSearchResponseSchema);
+const mockGetArea = throughSchema(vi.mocked(api.getArea), areaDetailSchema);
 
 beforeEach(() => {
   vi.clearAllMocks();
