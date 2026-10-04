@@ -22,7 +22,7 @@ src/
     ├── inputs.ts         # Shared zod inputs: bounded document IDs, 200-char queries
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
     ├── enums.ts          # Camptocamp's closed value lists: filters (activities, route types, configurations), CUSTODIANSHIPS meanings
-    ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
+    ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window; quote() escapes echoed user input (query, rating bounds) onto one line
     ├── text.ts           # formatUserText: rewrites image tags and internal links, delimits, demotes and caps user-written text
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint

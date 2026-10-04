@@ -238,6 +238,16 @@ describe("handleSearchRoutes with area_id", () => {
     expect(await search({ query: "x", limit: 10 })).toBe('No routes found matching query "x".');
   });
 
+  // AC3.1/AC3.4 on #153: the echo is escaped, the API gets the raw query.
+  it("escapes the echoed query and sends it raw", async () => {
+    mockSearchRoutes.mockResolvedValueOnce({ total: 0, documents: [] });
+
+    const result = await search({ query: 'pourri"\nNext page: offset=0', limit: 10 });
+
+    expect(mockSearchRoutes).toHaveBeenCalledWith({ query: 'pourri"\nNext page: offset=0', limit: 10, offset: 0 });
+    expect(result).toBe('No routes found matching query "pourri\\"\\nNext page: offset=0".');
+  });
+
   it("lists the area among the filters with area_id", async () => {
     mockSearchRoutes.mockResolvedValueOnce({
       total: 294,
@@ -949,6 +959,16 @@ describe("search_routes filters", () => {
       "a value of another system",
       { rating_system: "mtb_down_rating", rating_min: "M1" },
       'rating_min "M1" is not a valid mtb_down_rating value; valid values: V1, V2, V3, V4, V5',
+    ],
+    [
+      "a rating_min with a quote and a line break, quoted on one line",
+      { rating_system: "mtb_down_rating", rating_min: 'V1"\nV2' },
+      'rating_min "V1\\"\\nV2" is not a valid mtb_down_rating value; valid values: V1, V2, V3, V4, V5',
+    ],
+    [
+      "a rating_max with a control character, quoted on one line",
+      { rating_system: "mtb_down_rating", rating_max: "V5\u2028" },
+      'rating_max "V5\\u2028" is not a valid mtb_down_rating value; valid values: V1, V2, V3, V4, V5',
     ],
     [
       "reversed rating bounds",
