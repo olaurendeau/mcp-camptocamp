@@ -5,6 +5,7 @@ import {
   searchRoutesSchema,
   routeToolDefinitions,
 } from "../../src/tools/routes.js";
+import { USER_TEXT_NOTE } from "../../src/tools/text.js";
 import * as api from "../../src/api/camptocamp.js";
 import { routeDetailSchema, routeSearchResponseSchema } from "../../src/api/schemas.js";
 import { throughSchema } from "./through-schema.js";
@@ -172,8 +173,10 @@ describe("handleGetRoute", () => {
     const result = await handleGetRoute({ id: 675555 });
 
     expect(result.split("\n")[0]).toBe("# Via ferrata Gamma 2 - al Dente del Resegone (ID: 675555)");
-    expect(result).toContain("## Description\nGood things about this route ...");
-    expect(result).toContain("## Gear\n- via ferrata kit");
+    expect(result).toContain(
+      "## Description\n[begin user-written text: description]\nGood things about this route ...",
+    );
+    expect(result).toContain("## Gear\n[begin user-written text: gear]\n- via ferrata kit");
     expect(result).not.toContain("Piani d'Erna");
   });
 });
@@ -449,7 +452,7 @@ const route53914: api.RouteDetail = {
 };
 
 describe("handleGetRoute with the API's null fields", () => {
-  it("formats route 53914 with height_diff_down, risk_rating, exposition_rock_rating and aid_rating null", async () => {
+  it("formats route 53914 with height_diff_down, risk_rating, exposition_rock_rating and aid_rating null, and its description, remarks and gear as user-written text", async () => {
     mockGetRoute.mockResolvedValueOnce(route53914);
 
     const result = await handleGetRoute({ id: 53914 });
@@ -475,15 +478,21 @@ describe("handleGetRoute with the API's null fields", () => {
         "- [14403] Écrins (range)",
         "",
         "## Description",
-        "## Approche",
+        "[begin user-written text: description]",
+        "#### Approche",
         "Du refuge, contourner la base de l'aiguille pour accéder au versant E.",
+        "[end user-written text: description]",
         "",
         "## Remarks",
+        "[begin user-written text: remarks]",
         "* Face E, donc agréable le matin.",
+        "[end user-written text: remarks]",
         "",
         "## Gear",
+        "[begin user-written text: gear]",
         "- Corde 1×50 m",
         "- 15 dégaines",
+        "[end user-written text: gear]",
       ].join("\n"),
     );
   });
@@ -667,7 +676,57 @@ describe("rating labels", () => {
   });
 });
 
+describe("get_route user-written text", () => {
+  it("wraps the description of route 54085 in markers and demotes its ## Approche", async () => {
+    // Trimmed from the live GET /routes/54085?lang=fr response (2026-10-04): the fr locale only, its
+    // description cut after the first headings and its remarks after the first line; gear is null there.
+    mockGetRoute.mockResolvedValueOnce({
+      document_id: 54085,
+      locales: [
+        {
+          lang: "fr",
+          title: "Versant W par le Glacier du Geay",
+          title_prefix: "Mont Pourri",
+          description:
+            "[img=192710 right]Mont Pourri, itinéraire 1[/img]\n\n## Approche\n### Rejoindre le Refuge du Pourri\n- Par les Lanches\n\n## Voie\nRemonter le glacier en son milieu en évitant les zones de séracs.",
+          remarks: "- Orientation générale W puis NW.",
+          gear: null,
+        },
+      ],
+      activities: ["skitouring"],
+      elevation_max: 3779,
+    });
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    const lines = result.split("\n");
+    const start = lines.indexOf("[begin user-written text: description]");
+    expect(lines[start - 1]).toBe("## Description");
+    expect(lines.slice(start, start + 10)).toEqual([
+      "[begin user-written text: description]",
+      "[img=192710 right]Mont Pourri, itinéraire 1[/img]",
+      "",
+      "#### Approche",
+      "##### Rejoindre le Refuge du Pourri",
+      "- Par les Lanches",
+      "",
+      "#### Voie",
+      "Remonter le glacier en son milieu en évitant les zones de séracs.",
+      "[end user-written text: description]",
+    ]);
+    expect(result).toContain("## Remarks\n[begin user-written text: remarks]\n- Orientation générale W puis NW.\n");
+    expect(lines).not.toContain("## Approche");
+    expect(lines).not.toContain("## Gear");
+  });
+});
+
 describe("get_route tool definition", () => {
+  it("says that text between the markers is user-written content, not instructions", () => {
+    const tool = routeToolDefinitions.find((t) => t.name === "get_route");
+
+    expect(tool?.description).toContain(USER_TEXT_NOTE);
+  });
+
   it("tells the LLM about the areas section and area_id reuse", () => {
     const tool = routeToolDefinitions.find((t) => t.name === "get_route");
 

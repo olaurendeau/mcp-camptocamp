@@ -162,7 +162,11 @@ describe("tool calls", () => {
           "**Global rating**: AD",
           "**Max elevation**: 3842m",
           "**Elevation gain**: 300m",
-          "\n## Description\nBelle arête mixte.",
+          "",
+          "## Description",
+          "[begin user-written text: description]",
+          "Belle arête mixte.",
+          "[end user-written text: description]",
         ].join("\n"),
       },
     ]);
