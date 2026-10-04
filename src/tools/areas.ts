@@ -11,6 +11,7 @@ export const searchAreasSchema = z.object({
   query: searchQuery("Area name in any language (e.g. 'Écrins', 'Valais', 'Wallis')", { allowBlank: false }),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   offset: searchOffset(),
+  lang: langInput(),
   area_type: z
     .enum(["range", "admin_limits", "country"])
     .optional()
@@ -51,7 +52,7 @@ export async function handleSearchAreas(input: SearchAreasInput): Promise<string
     total: response.total,
     offset,
     limit,
-    lines: formatListItems(response.documents, formatAreaLine),
+    lines: formatListItems(response.documents, (area) => formatAreaLine(area, input.lang)),
     filters,
   });
 }
@@ -67,7 +68,7 @@ export const areaToolDefinitions = [
     title: "Search areas",
     description:
       "Search Camptocamp.org areas by name (titles match in any language, fuzzily — check the returned titles; towns are not areas, search the range or département instead). area_type: range = mountain range/massif; admin_limits = administrative subdivision such as a French département or Swiss canton; country = country. Returns ID, title and type, after a header giving the total, the offset and the filters. Pass the returned ID as area_id to search_routes, search_waypoints and search_outings. " +
-      PAGING_NOTE,
+      `${PAGING_NOTE} ${LANG_NOTE}`,
     inputSchema: searchAreasSchema,
     handler: handleSearchAreas,
   },

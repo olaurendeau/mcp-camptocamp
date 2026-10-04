@@ -8,6 +8,7 @@ import {
 import { USER_TEXT_NOTE } from "../../src/tools/text.js";
 import type { z } from "zod";
 import * as api from "../../src/api/camptocamp.js";
+import type { Lang } from "../../src/api/camptocamp.js";
 import { routeDetailSchema, routeSearchResponseSchema } from "../../src/api/schemas.js";
 import { ROUTE_RATING_SYSTEMS } from "../../src/tools/ratings.js";
 import { throughSchema } from "./through-schema.js";
@@ -1991,5 +1992,56 @@ describe("get_route lang", () => {
     );
     expect(result).toContain("\n## Associated waypoints\n- [37916] Mont Pourri (summit) | 3779m | main waypoint\n");
     expect(result).toContain("\n## Associated routes\n- [46624] Mont Pourri : Traverse über den Grand Col");
+  });
+});
+
+// AC5.2 on #153: search_routes sends the requested language to searchRoutes (pl=<lang>) and names each route
+// in the locale Camptocamp returns for it.
+describe("search_routes lang", () => {
+  // Trimmed from GET /routes?q=Glacier du Geay&pl=de (2026-10-04): route 54085 with its single de locale.
+  const geayDe = {
+    document_id: 54085,
+    locales: [{ lang: "de", title: "Voie normale du Glacier du Geay", title_prefix: "Mont Pourri" }],
+    activities: ["skitouring"],
+    elevation_max: 3779,
+  };
+  // The same search with the default pl=fr: the fr locale.
+  const geayFr = {
+    ...geayDe,
+    locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+  };
+
+  // The automock empties LANGS, so lang is added after parsing (tests/server/input-validation.test.ts checks
+  // the real schema).
+  function searchIn(lang: Lang, input: z.input<typeof searchRoutesSchema> = {}): Promise<string> {
+    return handleSearchRoutes({ ...searchRoutesSchema.parse(input), lang });
+  }
+
+  it("sends lang de and prints the de title (AC5.2)", async () => {
+    mockSearchRoutes.mockResolvedValueOnce({ total: 1, documents: [geayDe] });
+
+    const result = await searchIn("de", { query: "Glacier du Geay" });
+
+    expect(mockSearchRoutes).toHaveBeenCalledWith({ query: "Glacier du Geay", limit: 10, offset: 0, lang: "de" });
+    expect(result.split("\n")).toEqual([
+      "Found 1 route(s). Showing 1 from offset 0:",
+      'Filters: query "Glacier du Geay"',
+      "",
+      "- [54085] Mont Pourri : Voie normale du Glacier du Geay (skitouring) | Max elevation: 3779m",
+    ]);
+  });
+
+  it("sends no lang without one, so the output is unchanged (AC5.2)", async () => {
+    mockSearchRoutes.mockResolvedValueOnce({ total: 1, documents: [geayFr] });
+
+    const result = await search({ query: "Glacier du Geay" });
+
+    expect(mockSearchRoutes.mock.calls[0][0]).not.toHaveProperty("lang");
+    expect(result).toContain("- [54085] Mont Pourri : Versant W par le Glacier du Geay (skitouring)");
+  });
+
+  it("does not count lang as a filter", async () => {
+    await expect(searchIn("de")).rejects.toThrow("search_routes needs at least one filter");
+    expect(mockSearchRoutes).not.toHaveBeenCalled();
   });
 });

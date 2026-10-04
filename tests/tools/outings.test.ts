@@ -1409,6 +1409,21 @@ describe("handleSearchUserOutings", () => {
     expect(alias).not.toContain("undefined");
   });
 
+  // AC5.9 on #153: the alias takes lang too, and still returns exactly what search_outings returns.
+  it("returns exactly what search_outings returns for the same user and lang", async () => {
+    // Outing 712152 has only a fr locale: pl=de falls back to it.
+    mockSearchOutings.mockResolvedValue(listResponse([ponteil], 494));
+
+    const alias = await searchUser({ user_id: 430052, lang: "de" });
+    const outings = await search({ user_id: 430052, lang: "de" });
+
+    expect(alias).toBe(outings);
+    expect(mockSearchOutings).toHaveBeenNthCalledWith(1, { user_id: 430052, limit: 10, offset: 0, lang: "de" });
+    expect(mockSearchOutings).toHaveBeenNthCalledWith(2, { user_id: 430052, limit: 10, offset: 0, lang: "de" });
+    expect(alias).toContain("- [712152] Le Ponteil : La diagonale de gauche (rock_climbing) | 2014-05-05 |");
+    expect(alias).toContain("| Areas: Écrins [14403] | Author: o.laurendeau");
+  });
+
   it("passes offset through to searchOutings, reaching outing 712152 at offset 480", async () => {
     mockSearchOutings.mockResolvedValueOnce(listResponse([ponteil, ponteilEarlier], 494));
 
@@ -1432,8 +1447,8 @@ describe("handleSearchUserOutings", () => {
     expect(mockSearchOutings).not.toHaveBeenCalled();
   });
 
-  it("accepts only user_id, limit and offset, with search_outings' defaults", () => {
-    expect(Object.keys(searchUserOutingsSchema.shape).sort()).toEqual(["limit", "offset", "user_id"]);
+  it("accepts only user_id, limit, offset and lang, with search_outings' defaults", () => {
+    expect(Object.keys(searchUserOutingsSchema.shape).sort()).toEqual(["lang", "limit", "offset", "user_id"]);
     expect(searchUserOutingsSchema.parse({ user_id: 430052 })).toEqual({ user_id: 430052, limit: 10, offset: 0 });
     expect(searchUserOutingsSchema.safeParse({ user_id: 430052, offset: -1 }).success).toBe(false);
     expect(searchUserOutingsSchema.safeParse({ limit: 10 }).success).toBe(false);
@@ -1503,7 +1518,14 @@ describe("outingToolDefinitions", () => {
   it("describes search_user_outings as an alias of search_outings with offset paging", () => {
     const description = outingToolDefinitions.find((t) => t.name === "search_user_outings")?.description ?? "";
 
-    for (const phrase of ["search_outings", "user_id", "offset", "Next page: offset=N", "labelled by grading system"]) {
+    for (const phrase of [
+      "search_outings",
+      "user_id",
+      "offset",
+      "lang",
+      "Next page: offset=N",
+      "labelled by grading system",
+    ]) {
       expect(description).toContain(phrase);
     }
   });

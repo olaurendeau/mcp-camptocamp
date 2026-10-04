@@ -761,8 +761,17 @@ describe("get_waypoint lang", () => {
               document_id: 46624,
               locales: [
                 { lang: "en", title: "Traverse via Grand Col", title_prefix: "Mont Pourri" },
+                {
+                  lang: "it",
+                  title: "Versant W: Col des Roches >> Glacier du Geay - da les Arcs",
+                  title_prefix: "Mont Pourri",
+                },
                 { lang: "de", title: "Traverse über den Grand Col", title_prefix: "Mont Pourri" },
-                { lang: "fr", title: "Versant W - Grand Col", title_prefix: "Mont Pourri" },
+                {
+                  lang: "fr",
+                  title: "Versant W - Grand Col → Col des Roches → Glacier du Geay",
+                  title_prefix: "Mont Pourri",
+                },
               ],
               activities: ["skitouring"],
             },
