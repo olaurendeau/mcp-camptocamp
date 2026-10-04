@@ -16,22 +16,33 @@ import type {
 } from "../api/schemas.js";
 import { formatRatingParts } from "./ratings.js";
 
-// Locale fallback order after fr. Only [it, en] → en was observed live (route 675555 has [it, en] and a
-// `pl=fr` search returns en); the rest of the order is decision D1 on #57.
+// Locale fallback order after the requested language: the API's own `pl` fallback (#141 on #153). Only
+// [it, en] → en was observed live (route 675555 has [it, en] and a `pl=fr` search returns en).
 const LANG_ORDER = ["fr", "en", "it", "de", "es", "ca", "eu", "sl", "zh"];
 
 // Detail endpoints return every locale in no useful order (book 373877: it, fr, en; article 716039:
-// en before fr), so pick the one a `pl=fr` search would return: fr, then LANG_ORDER, then the first.
-export function pickLocale<T extends { lang: string }>(locales: T[]): T | undefined {
-  for (const lang of LANG_ORDER) {
-    const locale = locales.find((l) => l.lang === lang);
+// en before fr), so pick the one a `pl=<lang>` search would return: the requested language, then
+// LANG_ORDER, then the first (AC5.6 on #153).
+export function pickLocale<T extends { lang: string }>(locales: T[], lang = "fr"): T | undefined {
+  for (const candidate of [lang, ...LANG_ORDER]) {
+    const locale = locales.find((l) => l.lang === candidate);
     if (locale) return locale;
   }
   return locales[0];
 }
 
-export function pickTitle(locales: Locale[]): string {
-  return pickLocale(locales)?.title ?? "Untitled";
+export function pickTitle(locales: Locale[], lang?: string): string {
+  return pickLocale(locales, lang)?.title ?? "Untitled";
+}
+
+// The Language line of a detail when it has no text in the requested language (decision D3 on #153):
+// `**Language**: en (no de version; available: it, en)`, the available languages in API order. No line
+// when the requested language is present or there is no locale at all.
+export function formatLanguageLine(locales: { lang: string }[], lang = "fr"): string[] {
+  const picked = pickLocale(locales, lang);
+  if (!picked || picked.lang === lang) return [];
+  const available = locales.map((locale) => locale.lang).join(", ");
+  return [`**Language**: ${picked.lang} (no ${lang} version; available: ${available})`];
 }
 
 // A list as tolerantArray parses it: each item is well-formed or a MalformedItem.
@@ -94,17 +105,17 @@ export function formatRouteName(locale?: RouteAssociation["locales"][number]): s
 }
 
 // A route in a search result: "- [id] <name> (<activities>) | Max elevation: Xm | Elevation gain: Ym | <ratings>".
-export function formatRouteLine(route: RouteSearchResult): string {
+export function formatRouteLine(route: RouteSearchResult, lang?: string): string {
   const activities = route.activities.length > 0 ? ` (${route.activities.join(", ")})` : "";
-  const parts = [`- [${route.document_id}] ${formatRouteName(pickLocale(route.locales))}${activities}`];
+  const parts = [`- [${route.document_id}] ${formatRouteName(pickLocale(route.locales, lang))}${activities}`];
   if (isPresent(route.elevation_max)) parts.push(`Max elevation: ${route.elevation_max}m`);
   if (isPresent(route.height_diff_up)) parts.push(`Elevation gain: ${route.height_diff_up}m`);
   return [...parts, ...formatRatingParts(route)].join(" | ");
 }
 
 // A route associated with another document (outing, book, article): "- [id] <name> | <ratings>".
-export function formatAssociatedRouteLine(route: RouteAssociation): string {
-  const name = `- [${route.document_id}] ${formatRouteName(pickLocale(route.locales))}`;
+export function formatAssociatedRouteLine(route: RouteAssociation, lang?: string): string {
+  const name = `- [${route.document_id}] ${formatRouteName(pickLocale(route.locales, lang))}`;
   return [name, ...formatRatingParts(route)].join(" | ");
 }
 
@@ -116,18 +127,27 @@ export function isVirtualWaypoint(waypoint: Pick<WaypointAssociation, "waypoint_
 }
 
 // "- [id] <title> (<type>) | <elevation>m", ending "| main waypoint" for a route's main_waypoint_id. A
-// virtual waypoint has no elevation part.
-export function formatWaypointLine(waypoint: WaypointAssociation, options: { main?: boolean } = {}): string {
-  const parts = [`- [${waypoint.document_id}] ${pickTitle(waypoint.locales)} (${waypoint.waypoint_type})`];
-  if (isPresent(waypoint.elevation) && !isVirtualWaypoint(waypoint)) parts.push(`${waypoint.elevation}m`);
+// virtual waypoint has no elevation part. A malformed waypoint prints its placeholder, still followed by the
+// main marker (review of #188).
+export function formatWaypointLine(
+  waypoint: WaypointAssociation | MalformedItem,
+  options: { main?: boolean; lang?: string } = {},
+): string {
+  const parts: string[] = [];
+  if (isMalformed(waypoint)) {
+    parts.push(`- ${formatMalformed(waypoint)}`);
+  } else {
+    parts.push(`- [${waypoint.document_id}] ${pickTitle(waypoint.locales, options.lang)} (${waypoint.waypoint_type})`);
+    if (isPresent(waypoint.elevation) && !isVirtualWaypoint(waypoint)) parts.push(`${waypoint.elevation}m`);
+  }
   if (options.main) parts.push("main waypoint");
   return parts.join(" | ");
 }
 
 // A book in a search result or a route's associations: "- [id] <title> | Author: … | Types: … | Activities: …".
 // The title is printed verbatim: book 14643 has a double space in "Vanoise -  Tarentaise".
-export function formatBookLine(book: BookSearchResult): string {
-  const parts = [`- [${book.document_id}] ${pickTitle(book.locales)}`];
+export function formatBookLine(book: BookSearchResult, lang?: string): string {
+  const parts = [`- [${book.document_id}] ${pickTitle(book.locales, lang)}`];
   const types = joinList(book.book_types);
   const activities = joinList(book.activities);
   if (book.author) parts.push(`Author: ${book.author}`);
@@ -138,7 +158,7 @@ export function formatBookLine(book: BookSearchResult): string {
 
 // An outing in search_outings and in a document's recent outings: "- [id] <title> (<activities>) | <dates> |
 // Conditions: … | Max elevation: Xm | Elevation gain: Ym | <ratings> | Areas: <ranges> | Author: …".
-export function formatOutingLine(outing: OutingListItem): string {
+export function formatOutingLine(outing: OutingListItem, lang?: string): string {
   const parts: string[] = [];
   const push = (label: string, value: string | number | null | undefined, unit = ""): void => {
     if (isPresent(value)) parts.push(`${label}${value}${unit}`);
@@ -152,36 +172,40 @@ export function formatOutingLine(outing: OutingListItem): string {
 
   const ranges = (outing.areas ?? []).filter((area) => area.area_type === "range");
   if (ranges.length > 0) {
-    parts.push(`Areas: ${ranges.map((area) => `${pickTitle(area.locales)} [${area.document_id}]`).join(", ")}`);
+    parts.push(`Areas: ${ranges.map((area) => `${pickTitle(area.locales, lang)} [${area.document_id}]`).join(", ")}`);
   }
   push("Author: ", outing.author?.name);
 
-  const head = `- [${outing.document_id}] ${pickTitle(outing.locales)} (${outing.activities.join(", ")})`;
+  const head = `- [${outing.document_id}] ${pickTitle(outing.locales, lang)} (${outing.activities.join(", ")})`;
   return [head, ...parts].join(" | ");
 }
 
 // The recent outings of a route or waypoint: the API sends the latest few and the total count, so the
 // heading gives both and, when some are not shown, "More: <more>" says how to list them all.
-export function formatRecentOutings(recent: OutingListResponse | null | undefined, more: string): string[] {
+export function formatRecentOutings(
+  recent: OutingListResponse | null | undefined,
+  more: string,
+  lang?: string,
+): string[] {
   if (!recent || recent.documents.length === 0) return [];
   const shown = recent.documents.length;
   const lines = [
     `\n## Recent outings (${shown} of ${recent.total})`,
-    ...formatListItems(recent.documents, formatOutingLine),
+    ...formatListItems(recent.documents, (outing) => formatOutingLine(outing, lang)),
   ];
   if (recent.total > shown) lines.push(`More: ${more}`);
   return lines;
 }
 
-export function formatTitledLine(document: TitledAssociation): string {
-  return `- [${document.document_id}] ${pickTitle(document.locales)}`;
+export function formatTitledLine(document: TitledAssociation, lang?: string): string {
+  return `- [${document.document_id}] ${pickTitle(document.locales, lang)}`;
 }
 
-export function formatAreaLine(area: AreaSummary): string {
-  return `- [${area.document_id}] ${pickTitle(area.locales)} (${area.area_type})`;
+export function formatAreaLine(area: AreaSummary, lang?: string): string {
+  return `- [${area.document_id}] ${pickTitle(area.locales, lang)} (${area.area_type})`;
 }
 
-export function formatAreasSection(areas?: ListOf<AreaSummary> | null): string[] {
+export function formatAreasSection(areas?: ListOf<AreaSummary> | null, lang?: string): string[] {
   if (!areas || areas.length === 0) return [];
-  return ["\n## Areas", ...formatListItems(areas, formatAreaLine)];
+  return ["\n## Areas", ...formatListItems(areas, (area) => formatAreaLine(area, lang))];
 }
