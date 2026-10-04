@@ -1,4 +1,43 @@
 import { getJson } from "./http.js";
+import type {
+  RouteSearchResponse,
+  RouteDetail,
+  WaypointSearchResponse,
+  WaypointDetail,
+  OutingSearchResponse,
+  OutingDetail,
+  OutingListResponse,
+  AreaSearchResponse,
+  AreaDetail,
+  BookSearchResponse,
+  BookDetail,
+  ArticleSearchResponse,
+  ArticleDetail,
+} from "./schemas.js";
+
+// Response types are inferred from the zod schemas in schemas.ts; re-exported under their usual names.
+export type {
+  RouteSearchResult,
+  RouteSearchResponse,
+  RouteDetail,
+  WaypointSearchResult,
+  WaypointSearchResponse,
+  WaypointDetail,
+  OutingSearchResult,
+  OutingSearchResponse,
+  OutingDetail,
+  OutingListItem,
+  OutingListResponse,
+  AreaSearchResult,
+  AreaSearchResponse,
+  AreaDetail,
+  BookSearchResult,
+  BookSearchResponse,
+  BookDetail,
+  ArticleSearchResult,
+  ArticleSearchResponse,
+  ArticleDetail,
+} from "./schemas.js";
 
 const DEFAULT_LANG = "fr";
 const DEFAULT_LIMIT = 10;
@@ -37,77 +76,6 @@ function keywordParams(options: KeywordSearchOptions): URLSearchParams {
   return new URLSearchParams({ q: options.query, limit: String(options.limit ?? DEFAULT_LIMIT), lang: DEFAULT_LANG });
 }
 
-export interface RouteSearchResult {
-  document_id: number;
-  locales: Array<{ lang: string; title: string; title_prefix?: string }>;
-  activities: string[];
-  elevation_max?: number;
-  height_diff_difficulties?: number;
-  rock_free_rating?: string;
-  global_rating?: string;
-}
-
-export interface RouteSearchResponse {
-  documents: RouteSearchResult[];
-  total: number;
-}
-
-export interface RouteDetail {
-  document_id: number;
-  locales: Array<{
-    lang: string;
-    title: string;
-    description?: string;
-    remarks?: string;
-    gear?: string;
-    route_history?: string;
-  }>;
-  activities: string[];
-  elevation_max?: number;
-  elevation_min?: number;
-  height_diff_up?: number;
-  height_diff_down?: number;
-  rock_free_rating?: string;
-  rock_required_rating?: string;
-  global_rating?: string;
-  engagement_rating?: string;
-  equipment_rating?: string;
-  durations?: string[];
-  main_waypoint_id?: number;
-  geometry?: {
-    geom_detail?: string;
-  };
-  areas?: AreaSearchResult[] | null;
-}
-
-export interface WaypointSearchResult {
-  document_id: number;
-  locales: Array<{ lang: string; title: string }>;
-  waypoint_type: string;
-  elevation?: number;
-}
-
-export interface WaypointSearchResponse {
-  documents: WaypointSearchResult[];
-  total: number;
-}
-
-export interface WaypointDetail {
-  document_id: number;
-  locales: Array<{
-    lang: string;
-    title: string;
-    description?: string;
-    access?: string;
-  }>;
-  waypoint_type: string;
-  elevation?: number;
-  geometry?: {
-    geom?: string;
-  };
-  areas?: AreaSearchResult[] | null;
-}
-
 export async function searchRoutes(options: RouteSearchOptions): Promise<RouteSearchResponse> {
   return getJson<RouteSearchResponse>({ path: "/routes", params: keywordOrAreaParams(options) });
 }
@@ -122,60 +90,6 @@ export async function searchWaypoints(options: WaypointSearchOptions): Promise<W
 
 export async function getWaypoint(id: number): Promise<WaypointDetail> {
   return getJson<WaypointDetail>({ path: `/waypoints/${id}`, params: detailParams() });
-}
-
-export interface OutingSearchResult {
-  document_id: number;
-  locales: Array<{ lang: string; title: string }>;
-  activities: string[];
-  date_start?: string;
-  date_end?: string;
-  elevation_max?: number;
-  height_diff_up?: number;
-  global_rating?: string;
-  hiking_rating?: string;
-  rock_free_rating?: string;
-  author?: { name: string; user_id: number };
-}
-
-export interface OutingSearchResponse {
-  documents: OutingSearchResult[];
-  total: number;
-}
-
-export interface OutingDetail {
-  document_id: number;
-  locales: Array<{
-    lang: string;
-    title: string;
-    description?: string;
-    conditions?: string;
-    participants?: string;
-    route_description?: string;
-    timing?: string;
-    weather?: string;
-  }>;
-  activities: string[];
-  date_start?: string;
-  date_end?: string;
-  elevation_max?: number;
-  elevation_min?: number;
-  height_diff_up?: number;
-  height_diff_down?: number;
-  global_rating?: string;
-  engagement_rating?: string;
-  equipment_rating?: string;
-  hiking_rating?: string;
-  rock_free_rating?: string;
-  condition_rating?: string;
-  participant_count?: number;
-  author?: { name: string; user_id: number };
-  associations?: {
-    routes?: Array<{
-      document_id: number;
-      locales: Array<{ lang: string; title: string }>;
-    }>;
-  };
 }
 
 export interface UserOutingSearchOptions {
@@ -197,30 +111,6 @@ export async function getOuting(id: number): Promise<OutingDetail> {
 }
 
 export type AreaType = "range" | "admin_limits" | "country";
-
-export interface AreaSearchResult {
-  document_id: number;
-  locales: Array<{ lang: string; title: string }>;
-  area_type: string; // printed verbatim, never narrowed or translated
-  available_langs?: string[] | null;
-}
-
-export interface AreaSearchResponse {
-  documents: AreaSearchResult[];
-  total: number;
-}
-
-export interface AreaDetail {
-  document_id: number;
-  area_type: string;
-  locales: Array<{
-    lang: string;
-    title: string;
-    summary?: string | null;
-    description?: string | null;
-  }>;
-  geometry?: { geom?: string | null; geom_detail?: string | null } | null; // typed for fixtures only; never displayed
-}
 
 export interface AreaSearchOptions extends KeywordSearchOptions {
   area_type?: AreaType;
@@ -252,35 +142,6 @@ export interface OutingSearchParams {
   offset?: number; // default 0
 }
 
-export interface OutingListItem {
-  document_id: number;
-  locales: Array<{ lang: string; title: string }>;
-  activities: string[];
-  date_start?: string | null;
-  date_end?: string | null;
-  condition_rating?: string | null;
-  elevation_max?: number | null;
-  height_diff_up?: number | null;
-  global_rating?: string | null;
-  ski_rating?: string | null;
-  labande_global_rating?: string | null;
-  rock_free_rating?: string | null;
-  ice_rating?: string | null;
-  hiking_rating?: string | null;
-  snowshoe_rating?: string | null;
-  areas?: Array<{
-    document_id: number;
-    area_type?: string | null;
-    locales: Array<{ lang: string; title: string }>;
-  }> | null;
-  author?: { name: string; user_id: number } | null;
-}
-
-export interface OutingListResponse {
-  documents: OutingListItem[];
-  total: number;
-}
-
 export async function searchOutings(params: OutingSearchParams = {}): Promise<OutingListResponse> {
   const search = new URLSearchParams();
   // `q=` (empty) returns every outing, so only send a non-empty keyword.
@@ -299,105 +160,12 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
   return getJson<OutingListResponse>({ path: "/outings", params: search });
 }
 
-export interface BookSearchResult {
-  document_id: number;
-  locales: Array<{ lang: string; title: string; summary?: string | null }>;
-  author?: string | null;
-  activities?: string[] | null;
-  book_types?: string[] | null;
-  available_langs?: string[] | null;
-  quality?: string;
-}
-
-export interface BookSearchResponse {
-  documents: BookSearchResult[];
-  total: number;
-}
-
-export interface BookDetail {
-  document_id: number;
-  locales: Array<{
-    lang: string;
-    title: string;
-    summary?: string | null;
-    description?: string | null;
-  }>;
-  author?: string | null;
-  editor?: string | null;
-  isbn?: string | null;
-  url?: string | null;
-  nb_pages?: number | null;
-  publication_date?: string | null;
-  langs?: string[] | null; // languages the book is published in
-  available_langs?: string[] | null; // languages of the Camptocamp page; never displayed
-  activities?: string[] | null;
-  book_types?: string[] | null;
-  associations?: {
-    routes?: Array<{
-      document_id: number;
-      locales: Array<{ lang: string; title: string; title_prefix?: string | null }>;
-    }>;
-    waypoints?: Array<{
-      document_id: number;
-      locales: Array<{ lang: string; title: string }>;
-      waypoint_type: string;
-      elevation?: number | null;
-    }>;
-    articles?: Array<{ document_id: number; locales: Array<{ lang: string; title: string }> }>;
-  };
-}
-
 export async function searchBooks(options: BookSearchOptions): Promise<BookSearchResponse> {
   return getJson<BookSearchResponse>({ path: "/books", params: keywordParams(options) });
 }
 
 export async function getBook(id: number): Promise<BookDetail> {
   return getJson<BookDetail>({ path: `/books/${id}`, params: detailParams() });
-}
-
-export interface ArticleSearchResult {
-  document_id: number;
-  locales: Array<{ lang: string; title: string; summary?: string | null }>;
-  article_type?: string | null; // "collab" | "personal", printed verbatim
-  categories?: string[] | null;
-  activities?: string[] | null;
-  quality?: string | null;
-}
-
-export interface ArticleSearchResponse {
-  documents: ArticleSearchResult[];
-  total: number;
-}
-
-// images, users and xreports associations are left out on purpose: no tool can follow them.
-export interface ArticleDetail {
-  document_id: number;
-  locales: Array<{
-    lang: string;
-    title: string;
-    summary?: string | null;
-    description?: string | null;
-  }>;
-  article_type?: string | null;
-  categories?: string[] | null;
-  activities?: string[] | null;
-  quality?: string | null;
-  author?: { name: string; user_id: number } | null;
-  associations?: {
-    routes?: Array<{
-      document_id: number;
-      locales: Array<{ lang: string; title: string; title_prefix?: string | null }>;
-    }>;
-    waypoints?: Array<{
-      document_id: number;
-      locales: Array<{ lang: string; title: string }>;
-      waypoint_type: string;
-      elevation?: number | null;
-    }>;
-    articles?: Array<{ document_id: number; locales: Array<{ lang: string; title: string }> }>;
-    outings?: Array<{ document_id: number; locales: Array<{ lang: string; title: string }> }>;
-    books?: Array<{ document_id: number; locales: Array<{ lang: string; title: string }> }>;
-  };
 }
 
 export async function searchArticles(options: ArticleSearchOptions): Promise<ArticleSearchResponse> {

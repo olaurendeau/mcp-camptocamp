@@ -36,7 +36,7 @@ function formatWaypointSearchResult(response: WaypointSearchResponse, areaId?: n
 }
 
 // geometry.geom is a GeoJSON Point serialized as a string, in Web Mercator (EPSG:3857)
-function parseCoordinates(geom?: string): { lat: number; lng: number } | undefined {
+function parseCoordinates(geom?: string | null): { lat: number; lng: number } | undefined {
   if (!geom) return undefined;
   try {
     const parsed = JSON.parse(geom) as { coordinates?: [number, number] };
