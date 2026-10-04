@@ -227,11 +227,13 @@ describe("searches (AC8.2, AC8.3)", () => {
 
 // #203: the server instructions and LANG_NOTE state that a document without the requested language comes in
 // the first available of LANG_ORDER; on searches the API picks it through `pl`. Each route below lacks the
-// requested language (its languages as of 2026-10-04, in the order of the search's available_langs) and the API
-// lists the expected language after another one, so a pick of the first locale would fail. Pairs covered: fr before es, en before ca,
-// it before de, sl and es, es before ca, eu and sl; en before it is the AC3.4 case above.
+// requested language (its languages as of 2026-10-04, in the detail's order). All but 480854 and 327059 list the
+// expected language after another one, so a pick of the first locale would fail on them; those two list es
+// first and only show that the API does not prefer ca or eu. Pairs covered: fr before en, sl and es, en before
+// ca, it before de, sl and es, es before ca, eu and sl; en before it is the AC3.4 case above.
 describe("searches fall back to the first available of LANG_ORDER (#203)", () => {
   it.each([
+    [668432, "Tominskova", "de", ["en", "fr", "sl"], "fr"],
     [925530, "Via dei Camini", "de", ["es", "fr"], "fr"],
     [326458, "Volta al massis de Montserrat", "fr", ["ca", "en"], "en"],
     [47328, "Za Cmirom", "fr", ["sl", "de", "it"], "it"],
