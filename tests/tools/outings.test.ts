@@ -15,12 +15,7 @@ import { outingDetailSchema, outingListResponseSchema } from "../../src/api/sche
 import { throughSchema } from "./through-schema.js";
 import { BARE_RATING } from "./bare-rating.js";
 
-// Not an automock: it would empty the value lists the search_outings schema is built from. Only those lists are
-// real; the API calls are mocks, and any other export is missing, so no test can reach Camptocamp.
-vi.mock("../../src/api/camptocamp.js", async (importOriginal) => {
-  const { OUTING_RATING_FIELDS, CONDITION_RATINGS, LANGS } = await importOriginal<typeof api>();
-  return { OUTING_RATING_FIELDS, CONDITION_RATINGS, LANGS, getOuting: vi.fn(), searchOutings: vi.fn() };
-});
+vi.mock("../../src/api/camptocamp.js");
 
 const mockGetOuting = throughSchema(vi.mocked(api.getOuting), outingDetailSchema);
 const mockSearchOutings = throughSchema(vi.mocked(api.searchOutings), outingListResponseSchema);
@@ -1548,5 +1543,53 @@ describe("outingToolDefinitions", () => {
     ]) {
       expect(description).toContain(phrase);
     }
+  });
+});
+
+// #200 (from the #202 review): search_outings parses lang with the real list and names each outing in it.
+describe("search_outings lang", () => {
+  // Derived from GET /outings?q=Benedetti&pl=fr and &pl=en (2026-10-04), one locale per document and area:
+  // both locales merged (summary, geometry and the country and admin_limits areas left out), so the line shows
+  // which one lang picks. The range is titled Mont-Blanc in both.
+  const benedetti: OutingListItem = {
+    document_id: 170463,
+    locales: [
+      { lang: "fr", title: "Mont Blanc : Face W, couloir Benedetti" },
+      { lang: "en", title: "Mont Blanc : West face, Benedetti couloir" },
+    ],
+    activities: ["skitouring"],
+    condition_rating: "good",
+    date_start: "2009-05-25",
+    date_end: "2009-05-25",
+    elevation_max: 4810,
+    height_diff_up: 1400,
+    ski_rating: "5.2",
+    labande_global_rating: "TD+",
+    areas: [
+      {
+        document_id: 14410,
+        locales: [
+          { lang: "fr", title: "Mont-Blanc" },
+          { lang: "en", title: "Mont-Blanc" },
+        ],
+        area_type: "range",
+      },
+    ],
+    author: { name: "tobias granath", user_id: 126607 },
+  };
+  const details =
+    "2009-05-25 | Conditions: good | Max elevation: 4810m | Elevation gain: 1400m | " +
+    "Ski rating (Toponeige): 5.2 | Labande: TD+ | Areas: Mont-Blanc [14410] | Author: tobias granath";
+
+  it.each([
+    ["en", { lang: "en" as const }, "- [170463] Mont Blanc : West face, Benedetti couloir (skitouring)"],
+    ["no lang", {}, "- [170463] Mont Blanc : Face W, couloir Benedetti (skitouring)"],
+  ])("names each outing in the requested language (%s)", async (_label, lang, head) => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([benedetti]));
+
+    const result = await search({ query: "Benedetti", ...lang });
+
+    expect(mockSearchOutings).toHaveBeenCalledWith(expect.objectContaining({ query: "Benedetti", ...lang }));
+    expect(result.split("\n").at(-1)).toBe(`${head} | ${details}`);
   });
 });

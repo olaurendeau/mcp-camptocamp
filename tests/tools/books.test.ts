@@ -1245,3 +1245,33 @@ describe("get_book lang", () => {
     expect(result).toContain("\n## Associated routes\n- [53781] Mont Blanc : Bossesgrat");
   });
 });
+
+// #200 (from the #202 review): search_books parses lang with the real list and names each book in it.
+describe("search_books lang", () => {
+  // Derived from GET /books?q=Mont Blanc&pl=fr and &pl=en (2026-10-04), one locale each: both locales merged
+  // (summaries left out), so the line shows which one lang picks.
+  const romelli = {
+    document_id: 373877,
+    locales: [
+      { lang: "fr", title: "Mont Blanc Classique & Plaisir" },
+      { lang: "en", title: "Mont Blanc Classic & Plaisir" },
+    ],
+    author: "Marco Romelli",
+    activities: ["mountain_climbing", "snow_ice_mixed"],
+    book_types: ["topo"],
+    available_langs: ["it", "fr", "en"],
+  };
+  const details = "| Author: Marco Romelli | Types: topo | Activities: mountain_climbing, snow_ice_mixed";
+
+  it.each([
+    ["en", { lang: "en" as const }, `- [373877] Mont Blanc Classic & Plaisir ${details}`],
+    ["no lang", {}, `- [373877] Mont Blanc Classique & Plaisir ${details}`],
+  ])("names each book in the requested language (%s)", async (_label, lang, line) => {
+    mockSearchBooks.mockResolvedValueOnce({ total: 1, documents: [romelli] });
+
+    const result = await search({ query: "Mont Blanc", ...lang });
+
+    expect(mockSearchBooks).toHaveBeenCalledWith(expect.objectContaining({ query: "Mont Blanc", ...lang }));
+    expect(result.split("\n").at(-1)).toBe(line);
+  });
+});

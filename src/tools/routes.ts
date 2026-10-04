@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searchQuery } from "./inputs.js";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
-import type { RouteDetail, RouteRatingField, RouteSearchOptions } from "../api/camptocamp.js";
+import type { RouteDetail, RouteSearchOptions } from "../api/camptocamp.js";
+import type { RouteRatingField } from "../api/values.js";
 import {
   pickLocale,
   isPresent,
