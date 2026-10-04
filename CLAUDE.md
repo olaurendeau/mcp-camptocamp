@@ -21,7 +21,7 @@ src/
     ├── format.ts         # Shared formatting: pickLocale, joinList, formatHeader, document lines, areas section, dates, isPresent (0 and false are printed)
     ├── inputs.ts         # Shared zod inputs: bounded document IDs, 200-char queries
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
-    ├── enums.ts          # Camptocamp's closed filter value lists (activities, route types, configurations)
+    ├── enums.ts          # Camptocamp's closed value lists: filters (activities, route types, configurations), CUSTODIANSHIPS meanings
     ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
     ├── text.ts           # formatUserText: rewrites image tags and internal links, delimits, demotes and caps user-written text
     ├── routes.ts         # Tools: search_routes, get_route
@@ -122,7 +122,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`              |
 | `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas)             |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`, narrowed by `waypoint_type`; paged          |
-| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                                        |
+| `get_waypoint`        | Waypoint by ID (altitude, GPS, areas; huts: capacity, custodianship, phones, website, access period)             |
 | `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings                    |
 | `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings)             |
 | `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged             |

@@ -368,6 +368,81 @@ describe("getWaypoint", () => {
     expect(result.geometry?.geom).toContain("Point");
   });
 
+  it("keeps the hut fields, the summary and the access period", async () => {
+    // Trimmed from the live GET /waypoints/273946?lang=fr response (2026-10-04): description and access cut
+    // to 80 characters, areas, associations, maps and maps_info dropped; the summary set to show it survives.
+    const mockData = {
+      document_id: 273946,
+      version: 4,
+      locales: [
+        {
+          version: 7,
+          lang: "fr",
+          title: "Refuge du Lac Blanc",
+          description: "Le Refuge du Lac Blanc est niché sur le plateau de Praz Bouchet, entouré de plus",
+          summary: "Refuge gardé en été.",
+          access: "Depuis Termignon la Vanoise, prendre la route de Bellecombe (D126) ou la navette",
+          access_period: "De début juin à fin septembre",
+          external_resources: null,
+          topic_id: 212047,
+        },
+      ],
+      geometry: { version: 3, geom: '{"type": "Point", "coordinates": [758908.605978137, 5671856.762174786]}' },
+      quality: "fine",
+      waypoint_type: "hut",
+      elevation: 2300,
+      capacity: 0,
+      capacity_staffed: 18,
+      url: "https://www.refugedulacblanc-vanoise.com",
+      phone: "+33 (0)6 82 38 11 98",
+      phone_custodian: "+33 (0)6 45 98 77 26",
+      custodianship: "accessible_when_wardened",
+      matress_unstaffed: false,
+      blanket_unstaffed: false,
+      gas_unstaffed: false,
+      heating_unstaffed: false,
+      available_langs: ["fr"],
+      protected: false,
+      type: "w",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getWaypoint(273946);
+
+    expect(result.capacity).toBe(0);
+    expect(result.capacity_staffed).toBe(18);
+    expect(result.custodianship).toBe("accessible_when_wardened");
+    expect(result.phone).toBe("+33 (0)6 82 38 11 98");
+    expect(result.phone_custodian).toBe("+33 (0)6 45 98 77 26");
+    expect(result.url).toBe("https://www.refugedulacblanc-vanoise.com");
+    expect(result.locales[0].summary).toBe("Refuge gardé en été.");
+    expect(result.locales[0].access_period).toBe("De début juin à fin septembre");
+  });
+
+  it("accepts null hut fields, as a summit or a bivouac sends them", async () => {
+    // Trimmed from the live GET /waypoints/1810808?lang=fr response (2026-10-04): a bivouac with every hut
+    // field null.
+    const mockData = {
+      document_id: 1810808,
+      locales: [{ lang: "fr", title: "Bivouac du col de la Temple", summary: null, access_period: null }],
+      waypoint_type: "bivouac",
+      elevation: 3321,
+      capacity: null,
+      capacity_staffed: null,
+      custodianship: null,
+      phone: null,
+      phone_custodian: null,
+      url: null,
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getWaypoint(1810808);
+
+    expect(result.capacity).toBeNull();
+    expect(result.custodianship).toBeNull();
+    expect(result.locales[0].access_period).toBeNull();
+  });
+
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 404));
 

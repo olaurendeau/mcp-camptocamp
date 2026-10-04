@@ -135,12 +135,23 @@ export const waypointDetailSchema = z.object({
   document_id: z.number(),
   locales: z.array(
     localeSchema.extend({
+      summary: z.string().nullish(),
       description: z.string().nullish(),
       access: z.string().nullish(),
+      access_period: z.string().nullish(), // free text ("14/06 au 14/09"), never parsed into dates
     }),
   ),
   waypoint_type: z.string(),
   elevation: z.number().nullish(),
+  // Hut fields, also set on gîtes and camp sites, null elsewhere. capacity is the number of places outside
+  // the wardened period (0 when a hut has no winter room, waypoint 273946), or a bivouac's number of places;
+  // custodianship is printed verbatim (src/tools/enums.ts).
+  capacity: z.number().nullish(),
+  capacity_staffed: z.number().nullish(),
+  custodianship: z.string().nullish(),
+  phone: z.string().nullish(),
+  phone_custodian: z.string().nullish(),
+  url: z.string().nullish(),
   geometry: z.object({ geom: z.string().nullish() }).nullish(), // GeoJSON Point as a string
   areas: z.array(areaSummarySchema).nullish(),
 });
