@@ -113,7 +113,6 @@ describe("handleSearchAreas", () => {
 
     expect(mockSearchAreas).toHaveBeenCalledTimes(1);
     expect(mockSearchAreas.mock.calls[0]).toEqual([{ query: "ecrins", limit: 10 }]);
-    expect(mockSearchAreas.mock.calls[0]?.[0].area_type).toBeUndefined();
   });
 
   it("formats the header and one line per area", async () => {

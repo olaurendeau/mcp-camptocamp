@@ -449,6 +449,16 @@ describe("area filter on searchRoutes and searchWaypoints", () => {
         expect(url).toBe(`${API}/${path}?limit=10&lang=fr&a=14403`);
         expect(url).not.toContain("q=");
       });
+
+      it("omits q= when the query key is set to undefined, as the tool handlers send it", async () => {
+        mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+        await fn({ query: undefined, limit: 10, area_id: 14403 });
+
+        const url = mockFetch.mock.calls[0][0] as string;
+        expect(url).toBe(`${API}/${path}?limit=10&lang=fr&a=14403`);
+        expect(url).not.toContain("q=");
+      });
     });
   }
 });
