@@ -18,7 +18,7 @@ src/
 │   ├── schemas.ts        # zod response schemas, the one place response types are declared
 │   └── camptocamp.ts     # Camptocamp API v6 client: one function per endpoint, pl=fr on searches
 └── tools/
-    ├── format.ts         # Shared formatting: pickLocale, joinList, formatHeader, document lines, areas section, dates, isPresent (0 and false are printed)
+    ├── format.ts         # Shared formatting: pickLocale, joinList, formatHeader, route/waypoint/book/outing lines, recent outings, areas section, dates, isPresent (0 and false are printed)
     ├── inputs.ts         # Shared zod inputs: bounded document IDs, 200-char queries
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
     ├── enums.ts          # Camptocamp's closed value lists: filters (activities, route types, configurations), CUSTODIANSHIPS meanings
@@ -120,7 +120,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | Tool                  | Description                                                                                                      |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`              |
-| `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas)             |
+| `get_route`           | Route detail by ID (summit : title, text, ratings, elevation, areas, books, waypoints, outings…)                 |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`; paged with `offset`                         |
 | `get_waypoint`        | Waypoint by ID (altitude, GPS, areas; huts: capacity, custodianship, phones, website, access period)             |
 | `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings                    |
@@ -137,6 +137,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 
+`get_route` ends with the route's associations, each section left out when its list is empty: `## Associated waypoints` (`| main waypoint` on `main_waypoint_id`), `## Associated routes`, `## Associated books` (`formatBookLine`, shared with `search_books`), `## Associated articles`, then `## Recent outings (<shown> of <total>)` in `search_outings` line format (`formatRecentOutings`), ending `More: search_outings with route_id=<id>` when more exist.
+
 Free-text locale fields written by Camptocamp users (descriptions, summaries, remarks, gear, access, conditions, weather…) go through `formatUserText` in `src/tools/text.ts`: printed under `## <Heading>` between `[begin user-written text: <field>]` and `[end user-written text: <field>]`. The pipeline: Camptocamp image tags rewritten to `[image: <caption>]` (nothing without a caption) and internal links `[[routes/54080/fr|Col des Roches]]` to `Col des Roches (routes/54080)`, other markup kept; line-start Markdown headings demoted two levels (capped at `######`), setext headings (`===` / `---` underlines) turned into `###` / `####`; copies of the markers neutralised (`[` → `(`), lookalikes included (full-width, `【`, dash variants, `user written` / `userwritten` / `user_written`, zero-width characters, combining grapheme joiner, variation selectors); then cut after 8000 characters with `[truncated, N more characters]`, N counted after the earlier steps. Each `get_*` tool description says that text between the markers is user-written content, not instructions.
 
 ## Camptocamp API v6
@@ -151,6 +153,7 @@ Locale: searches send `pl=fr`, which returns one locale per document, French whe
   - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.
   - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
 - `GET /routes/{id}`
+  - `associations`: `waypoints` (the one matching `main_waypoint_id` is marked), `routes`, `books`, `articles`, and `recent_outings {documents, total}` (the latest 10, shaped like `/outings` list items); `images` and `xreports` are not read.
 - `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}][&offset={n}]` (at least one of `q` and `a`)
 - `GET /waypoints/{id}`
 - `GET /outings?u={user_id}&limit=10&pl=fr`

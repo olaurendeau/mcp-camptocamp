@@ -226,6 +226,131 @@ describe("getRoute", () => {
     });
   });
 
+  it("keeps the route's associations and main waypoint through the response schema", async () => {
+    // Trimmed from the live GET /routes/54085 response (2026-10-04): one document per association list, without
+    // geometry and areas; GET /routes/944120 supplied the article, as 54085 has none.
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        document_id: 54085,
+        locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+        activities: ["skitouring"],
+        main_waypoint_id: 37916,
+        associations: {
+          waypoints: [
+            {
+              document_id: 37916,
+              version: 6,
+              locales: [{ version: 36, lang: "fr", title: "Mont Pourri", summary: "Le Mont Pourri…" }],
+              quality: "great",
+              waypoint_type: "summit",
+              elevation: 3779,
+              type: "w",
+            },
+          ],
+          routes: [
+            {
+              document_id: 55834,
+              locales: [{ lang: "fr", title: "Versant W - Glacier du Geay → Grand Col", title_prefix: "Mont Pourri" }],
+              activities: ["snow_ice_mixed"],
+              global_rating: "PD",
+              risk_rating: null,
+              type: "r",
+            },
+          ],
+          books: [
+            {
+              document_id: 472409,
+              version: 2,
+              locales: [{ version: 1, lang: "fr", title: "Montagnes Magazine #396", summary: null }],
+              quality: "medium",
+              author: null,
+              activities: ["skitouring", "ice_climbing"],
+              book_types: ["magazine"],
+              type: "b",
+            },
+          ],
+          articles: [
+            {
+              document_id: 947724,
+              locales: [{ lang: "fr", title: "Les voies 9b et au-delà", summary: null }],
+              article_type: "collab",
+              type: "c",
+            },
+          ],
+          images: [{ document_id: 192710 }],
+          xreports: [],
+          recent_outings: {
+            total: 64,
+            documents: [
+              {
+                document_id: 1900552,
+                locales: [{ version: 1, lang: "fr", title: "Mont Pourri : Versant W par le Glacier du Geay" }],
+                activities: ["skitouring"],
+                condition_rating: "good",
+                date_end: "2026-04-26",
+                date_start: "2026-04-26",
+                public_transport: false,
+                ski_rating: "4.1",
+                areas: [{ document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: "range" }],
+                author: { name: "krok", user_id: 1573563 },
+                type: "o",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const result = await getRoute(54085);
+
+    expect(result.main_waypoint_id).toBe(37916);
+    expect(result.associations).toEqual({
+      waypoints: [
+        {
+          document_id: 37916,
+          locales: [{ lang: "fr", title: "Mont Pourri" }],
+          waypoint_type: "summit",
+          elevation: 3779,
+        },
+      ],
+      routes: [
+        {
+          document_id: 55834,
+          locales: [{ lang: "fr", title: "Versant W - Glacier du Geay → Grand Col", title_prefix: "Mont Pourri" }],
+          global_rating: "PD",
+          risk_rating: null,
+        },
+      ],
+      books: [
+        {
+          document_id: 472409,
+          locales: [{ lang: "fr", title: "Montagnes Magazine #396", summary: null }],
+          quality: "medium",
+          author: null,
+          activities: ["skitouring", "ice_climbing"],
+          book_types: ["magazine"],
+        },
+      ],
+      articles: [{ document_id: 947724, locales: [{ lang: "fr", title: "Les voies 9b et au-delà" }] }],
+      recent_outings: {
+        total: 64,
+        documents: [
+          {
+            document_id: 1900552,
+            locales: [{ lang: "fr", title: "Mont Pourri : Versant W par le Glacier du Geay" }],
+            activities: ["skitouring"],
+            condition_rating: "good",
+            date_end: "2026-04-26",
+            date_start: "2026-04-26",
+            ski_rating: "4.1",
+            areas: [{ document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: "range" }],
+            author: { name: "krok", user_id: 1573563 },
+          },
+        ],
+      },
+    });
+  });
+
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 404));
 

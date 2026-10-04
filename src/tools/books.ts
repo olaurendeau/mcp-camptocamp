@@ -2,7 +2,7 @@ import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
 import { searchBooks, getBook } from "../api/camptocamp.js";
-import type { BookSearchResult, BookDetail } from "../api/camptocamp.js";
+import type { BookDetail } from "../api/camptocamp.js";
 import {
   pickLocale,
   pickTitle,
@@ -11,6 +11,7 @@ import {
   formatAssociatedRouteLine,
   formatWaypointLine,
   formatTitledLine,
+  formatBookLine,
 } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
@@ -26,16 +27,6 @@ export const getBookSchema = z.object({
 
 export type SearchBooksInput = z.infer<typeof searchBooksSchema>;
 export type GetBookInput = z.infer<typeof getBookSchema>;
-
-function formatBookSearchLine(book: BookSearchResult): string {
-  const types = joinList(book.book_types);
-  const activities = joinList(book.activities);
-  const parts = [`- [${book.document_id}] ${pickTitle(book.locales)}`];
-  if (book.author) parts.push(`Author: ${book.author}`);
-  if (types) parts.push(`Types: ${types}`);
-  if (activities) parts.push(`Activities: ${activities}`);
-  return parts.join(" | ");
-}
 
 function formatBookDetail(book: BookDetail): string {
   const locale = pickLocale(book.locales);
@@ -69,7 +60,7 @@ function formatBookDetail(book: BookDetail): string {
 
   const waypoints = book.associations?.waypoints;
   if (waypoints && waypoints.length > 0) {
-    lines.push("\n## Associated waypoints", ...waypoints.map(formatWaypointLine));
+    lines.push("\n## Associated waypoints", ...waypoints.map((waypoint) => formatWaypointLine(waypoint)));
   }
 
   const articles = book.associations?.articles;
@@ -90,7 +81,7 @@ export async function handleSearchBooks(input: SearchBooksInput): Promise<string
     total: response.total,
     offset,
     limit,
-    lines: response.documents.map(formatBookSearchLine),
+    lines: response.documents.map(formatBookLine),
     filters: [`query "${query}"`],
   });
 }
