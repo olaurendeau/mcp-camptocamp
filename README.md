@@ -2,6 +2,8 @@
 
 Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www.camptocamp.org) aux LLMs. Permet d'interroger des données fiables et à jour sur les itinéraires alpins, les altitudes de sommets et les descriptions de courses — en évitant les hallucinations sur les données d'alpinisme.
 
+Documentation (en anglais) : [docs/README.md](docs/README.md).
+
 <!-- mcp-name: io.github.olaurendeau/mcp-camptocamp -->
 
 ## Outils disponibles

@@ -1,0 +1,339 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  ROOT,
+  checkJsonBlocks,
+  checkLinks,
+  checkMcpServers,
+  checkNames,
+  checkNodeVersion,
+  checkSources,
+  fencedBlocks,
+  headingSlugs,
+  inlineCodeSpans,
+  links,
+  listMarkdownFiles,
+  slugify,
+} from "./markdown.js";
+
+const DOCS = join(ROOT, "docs");
+const README = join(ROOT, "README.md");
+const docFiles = listMarkdownFiles(DOCS);
+const checkedFiles = [...docFiles, README];
+const engines = (JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { engines: { node: string } }).engines
+  .node;
+
+function read(file: string): string {
+  return readFileSync(file, "utf8");
+}
+
+/** Runs `check` on every file and prefixes each problem with the file's path from the repo root. */
+function problemsIn(files: string[], check: (file: string, text: string) => string[]): string[] {
+  return files.flatMap((file) => check(file, read(file)).map((problem) => `${relative(ROOT, file)}: ${problem}`));
+}
+
+const fence = "```";
+
+describe("markdown helpers", () => {
+  it("lists the Markdown files under a folder, recursively and sorted", () => {
+    const files = listMarkdownFiles(DOCS).map((file) => relative(DOCS, file));
+
+    expect(files).toContain("README.md");
+    expect(files).toContain("getting-started.md");
+    expect(files).toEqual([...files].sort());
+    expect(files.every((file) => file.endsWith(".md"))).toBe(true);
+  });
+
+  it("slugs headings like GitHub", () => {
+    expect(slugify("Quick start (npx)")).toBe("quick-start-npx");
+    expect(slugify("`search_routes` needs a filter")).toBe("search_routes-needs-a-filter");
+    expect(slugify("Protection de `main`")).toBe("protection-de-main");
+    expect(slugify("Écrins, Vanoise & co.")).toBe("écrins-vanoise--co");
+    expect(slugify("See [the guide](guide.md)")).toBe("see-the-guide");
+  });
+
+  it("gives a duplicate heading the suffix -1, then -2", () => {
+    const text = ["# Title", "## Setup", "text", "## Setup", "## Setup"].join("\n");
+
+    expect(headingSlugs(text)).toEqual(["title", "setup", "setup-1", "setup-2"]);
+  });
+
+  it("ignores headings inside fenced blocks", () => {
+    const text = ["## Real", fence + "sh", "# not a heading", fence].join("\n");
+
+    expect(headingSlugs(text)).toEqual(["real"]);
+  });
+
+  it("returns fenced blocks with their language and first content line", () => {
+    const text = [
+      "intro",
+      fence + "json",
+      "{}",
+      fence,
+      "",
+      "  ~~~toml",
+      "  a = 1",
+      "  ~~~",
+      fence,
+      "plain",
+      fence,
+    ].join("\n");
+
+    expect(fencedBlocks(text)).toEqual([
+      { lang: "json", content: "{}", line: 3 },
+      { lang: "toml", content: "  a = 1", line: 7 },
+      { lang: "", content: "plain", line: 10 },
+    ]);
+    expect(fencedBlocks(text, "json")).toEqual([{ lang: "json", content: "{}", line: 3 }]);
+  });
+
+  it("returns inline code spans, outside fenced blocks", () => {
+    const text = ["Run `npx -y x` or ``a ` b``.", fence, "`not inline`", fence].join("\n");
+
+    expect(inlineCodeSpans(text)).toEqual(["npx -y x", "a ` b"]);
+  });
+
+  it("returns link and image targets, and reference definitions", () => {
+    const text = [
+      "See [the guide](guide.md#setup), ![logo](img/logo.png) and [home](https://example.com 'Home').",
+      "A [spaced](<my file.md>) link.",
+      "",
+      "[ref]: ../CONTRIBUTING.md",
+    ].join("\n");
+
+    expect(links(text)).toEqual([
+      "guide.md#setup",
+      "img/logo.png",
+      "https://example.com",
+      "my file.md",
+      "../CONTRIBUTING.md",
+    ]);
+  });
+
+  it("ignores links inside fenced blocks, inline code and HTML comments", () => {
+    const text = [
+      "`[inline](missing-inline.md)`",
+      fence + "md",
+      "[fenced](missing-fenced.md)",
+      fence,
+      "<!-- [comment](missing-comment.md) -->",
+      "[kept](kept.md)",
+    ].join("\n");
+
+    expect(links(text)).toEqual(["kept.md"]);
+  });
+});
+
+describe("docs checks fail on bad fixtures", () => {
+  const page = join(DOCS, "fixture.md");
+
+  it("a relative link to a missing file", () => {
+    expect(checkLinks(page, "[gone](no-such-page.md)")).toEqual(["no-such-page.md: no such file"]);
+  });
+
+  it("an absolute link path", () => {
+    expect(checkLinks(page, "[root](/docs/README.md)")).toEqual([
+      "/docs/README.md: use a relative link, not a path from the site root",
+    ]);
+  });
+
+  it("a link that leaves the repository", () => {
+    expect(checkLinks(page, "[out](../../outside.md)")).toEqual(["../../outside.md: points outside the repository"]);
+  });
+
+  it("an anchor that is not a heading of the target page", () => {
+    expect(checkLinks(page, "[bad](getting-started.md#no-such-heading)")).toEqual([
+      "getting-started.md#no-such-heading: no heading with this anchor",
+    ]);
+  });
+
+  it("an anchor that is not a heading of the same page", () => {
+    expect(checkLinks(page, "## Here\n\n[up](#here) [bad](#there)")).toEqual(["#there: no heading with this anchor"]);
+  });
+
+  it("accepts existing files, folders, anchors and external URLs", () => {
+    const text = [
+      "## Here",
+      "[a](getting-started.md#quick-start-npx) [b](../src/) [c](#here) [d](../CONTRIBUTING.md#release)",
+      "[e](https://example.com/x#y) [f](mailto:someone@example.com) [g](../package.json#L1)",
+    ].join("\n");
+
+    expect(checkLinks(page, text)).toEqual([]);
+  });
+
+  it("an invalid json block", () => {
+    const problems = checkJsonBlocks(["text", fence + "json", '{"a": 1,}', fence].join("\n"));
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/^json block at line 3: /);
+  });
+
+  it("an mcpServers block with another server name", () => {
+    const block = {
+      mcpServers: { "camptocamp-server": { command: "npx", args: ["-y", "@olaurendeau/mcp-camptocamp"] } },
+    };
+
+    expect(checkMcpServers([fence + "json", JSON.stringify(block), fence].join("\n"))).toEqual([
+      'mcpServers at line 2: expected the single key "camptocamp", got "camptocamp-server"',
+    ]);
+  });
+
+  it("an mcpServers block with a wrong image tag", () => {
+    const block = {
+      mcpServers: {
+        camptocamp: { command: "docker", args: ["run", "--rm", "-i", "ghcr.io/olaurendeau/mcp-camptocamp:1.3.0"] },
+      },
+    };
+
+    expect(checkMcpServers([fence + "json", JSON.stringify(block), fence].join("\n"))).toEqual([
+      "mcpServers at line 2: camptocamp must run npx -y @olaurendeau/mcp-camptocamp or docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest",
+    ]);
+  });
+
+  it("accepts the npx and Docker variants, with extra keys such as env", () => {
+    const npx = {
+      mcpServers: { camptocamp: { command: "npx", args: ["-y", "@olaurendeau/mcp-camptocamp"], env: {} } },
+    };
+    const docker = {
+      mcpServers: {
+        camptocamp: { command: "docker", args: ["run", "--rm", "-i", "ghcr.io/olaurendeau/mcp-camptocamp:latest"] },
+      },
+    };
+    const text = [fence + "json", JSON.stringify(npx), fence, fence + "json", JSON.stringify(docker), fence].join("\n");
+
+    expect(checkMcpServers(text)).toEqual([]);
+  });
+
+  it("a wrong image tag in prose", () => {
+    expect(checkNames("Run `docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:1.3.0`.")).toEqual([
+      'unexpected name "ghcr.io/olaurendeau/mcp-camptocamp:1.3.0"',
+    ]);
+  });
+
+  it("a misspelt package name or a pinned version", () => {
+    expect(checkNames("npx -y olaurendeau/mcp-camptocamp, npx @olaurendeau/mcp-camptocamp@1.3.0")).toEqual([
+      'unexpected name "olaurendeau/mcp-camptocamp"',
+      'unexpected name "@olaurendeau/mcp-camptocamp@1.3.0"',
+    ]);
+  });
+
+  it("accepts the package, the image, the registry name, the server name and the repository URLs", () => {
+    const text = [
+      "`npx -y @olaurendeau/mcp-camptocamp`, `docker pull ghcr.io/olaurendeau/mcp-camptocamp:latest`.",
+      "Registry name io.github.olaurendeau/mcp-camptocamp; serverInfo name mcp-camptocamp.",
+      "[repo](https://github.com/olaurendeau/mcp-camptocamp/issues) and https://github.com/olaurendeau/mcp-camptocamp.",
+    ].join("\n");
+
+    expect(checkNames(text)).toEqual([]);
+  });
+
+  it("a Node version other than engines.node", () => {
+    expect(checkNodeVersion("Install Node 20 or later.", ">=22")).toEqual([
+      'Node 20: engines.node in package.json is ">=22"',
+    ]);
+    expect(checkNodeVersion("Install Node.js 18.", ">=22")).toEqual([
+      'Node.js 18: engines.node in package.json is ">=22"',
+    ]);
+    expect(checkNodeVersion("Install Node.js 22 or later; check with `node --version`.", ">=22")).toEqual([]);
+  });
+
+  it("an engines.node it cannot read", () => {
+    expect(() => checkNodeVersion("Node 22", "^22")).toThrow('Unsupported engines.node "^22"');
+  });
+
+  it("a client page without a Sources list or a Last verified line", () => {
+    expect(checkSources("# Client\n\nText.")).toEqual([
+      'no "## Sources" section',
+      'no line "Last verified: YYYY-MM-DD against official docs"',
+    ]);
+    expect(checkSources("## Sources\n\n- none\n\nLast verified: 2026-10-04 against official docs")).toEqual([
+      "the Sources section has no https URL",
+    ]);
+    expect(
+      checkSources("## Sources\n\n- https://example.com/docs\n\nLast verified: 2026-10-04 against official docs\n"),
+    ).toEqual([]);
+  });
+});
+
+describe("docs/ and README.md", () => {
+  it("checks the docs index, getting started and troubleshooting pages at least", () => {
+    for (const page of ["README.md", "getting-started.md", "troubleshooting.md"]) {
+      expect(existsSync(join(DOCS, page)), page).toBe(true);
+    }
+  });
+
+  it("resolve every relative link and anchor", () => {
+    expect(problemsIn(checkedFiles, checkLinks)).toEqual([]);
+  });
+
+  it("parse every json block", () => {
+    expect(problemsIn(checkedFiles, (_file, text) => checkJsonBlocks(text))).toEqual([]);
+  });
+
+  it("declare mcpServers only as camptocamp, with the npx or Docker command", () => {
+    expect(problemsIn(checkedFiles, (_file, text) => checkMcpServers(text))).toEqual([]);
+  });
+
+  it("give the Node version of engines.node", () => {
+    expect(problemsIn(checkedFiles, (_file, text) => checkNodeVersion(text, engines))).toEqual([]);
+  });
+
+  it("spell the package and image names one way under docs/", () => {
+    expect(problemsIn(docFiles, (_file, text) => checkNames(text))).toEqual([]);
+  });
+
+  it("end each client and SDK page with Sources and a Last verified line", () => {
+    const sourced = docFiles.filter((file) => {
+      const path = relative(DOCS, file);
+      return path.startsWith("clients/") || path === "agent-sdks.md";
+    });
+
+    expect(problemsIn(sourced, (_file, text) => checkSources(text))).toEqual([]);
+  });
+});
+
+describe("pages", () => {
+  it("the README links the docs index", () => {
+    expect(links(read(README))).toContain("docs/README.md");
+  });
+
+  it("the docs index has the Start here, Clients, Guides and Tool reference sections", () => {
+    expect(headingSlugs(read(join(DOCS, "README.md")))).toEqual(
+      expect.arrayContaining(["start-here", "clients", "guides", "tool-reference"]),
+    );
+  });
+
+  it("getting started gives the launch, pre-warm, smoke-test and Claude Code commands", () => {
+    const code = fencedBlocks(read(join(DOCS, "getting-started.md")))
+      .map((block) => block.content)
+      .join("\n");
+
+    for (const command of [
+      "npx -y @olaurendeau/mcp-camptocamp",
+      "docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest",
+      "docker pull ghcr.io/olaurendeau/mcp-camptocamp:latest",
+      '"method":"tools/list"',
+      "claude mcp add --transport stdio --scope user camptocamp -- npx -y @olaurendeau/mcp-camptocamp",
+    ]) {
+      expect(code, command).toContain(command);
+    }
+  });
+
+  it("troubleshooting covers the 8 symptoms", () => {
+    const text = read(join(DOCS, "troubleshooting.md"));
+
+    for (const symptom of [
+      "startup_timeout_sec", // first-run npx timeout
+      "node --version", // Node older than 22
+      "docker run --rm -i", // Docker without -i
+      "gemini trust", // Gemini CLI untrusted folder
+      "~/Library/Logs/Claude", // Claude Desktop logs and restart
+      "ENOENT", // Windows %APPDATA%
+      "MAX_MCP_OUTPUT_TOKENS", // Claude Code output warning
+      "codex mcp list", // status per client
+    ]) {
+      expect(text, symptom).toContain(symptom);
+    }
+  });
+});

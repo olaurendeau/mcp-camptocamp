@@ -44,6 +44,9 @@ tests/
 │   └── version.test.ts           # Reported version equals package.json
 ├── contract/
 │   └── api.contract.test.ts  # Live Camptocamp API contract tests (npm run test:contract only)
+├── docs/
+│   ├── markdown.ts         # Markdown helpers (files, fenced blocks, inline code, links, GitHub heading slugs) and the docs checks
+│   └── docs.test.ts        # docs/ and README.md: links and anchors, json blocks, mcpServers, package/image names, Node version, Sources
 ├── hooks/
 │   └── guard.test.sh       # Tests for the agent guard hook (.claude/hooks/guard.sh), run on the host
 └── tools/
@@ -60,6 +63,10 @@ tests/
     ├── areas.test.ts       # Tool handler unit tests
     ├── books.test.ts       # Tool handler unit tests
     └── articles.test.ts    # Tool handler unit tests
+docs/
+├── README.md               # Docs index: Start here, Clients, Guides, Tool reference
+├── getting-started.md      # Prerequisites, npx and Docker commands, pre-warm, smoke test, Claude Code and mcpServers config
+└── troubleshooting.md      # Startup timeout, old Node, Docker -i, Gemini trust, Claude Desktop logs, ENOENT, output limit, status
 vitest.config.ts            # npm test / coverage: excludes tests/contract/ and the src/index.ts bootstrap
 vitest.contract.config.ts   # npm run test:contract: only tests/contract/**/*.contract.test.ts, no coverage
 ```
