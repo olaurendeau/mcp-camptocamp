@@ -4,8 +4,9 @@ import {
   handleGetOuting,
   handleSearchOutings,
   outingToolDefinitions,
+  searchOutingsSchema,
 } from "../../src/tools/outings.js";
-import type { SearchOutingsInput } from "../../src/tools/outings.js";
+import type { z } from "zod";
 import * as api from "../../src/api/camptocamp.js";
 import type { OutingListItem, OutingListResponse } from "../../src/api/camptocamp.js";
 
@@ -265,43 +266,23 @@ function listResponse(documents: OutingListItem[], total = documents.length): Ou
   return { total, documents };
 }
 
+/** Calls the handler as the MCP server does: with input parsed by the tool schema, defaults applied. */
+function search(input: z.input<typeof searchOutingsSchema> = {}): Promise<string> {
+  return handleSearchOutings(searchOutingsSchema.parse(input));
+}
+
 describe("handleSearchOutings", () => {
-  describe("validation", () => {
-    it.each<[string, unknown]>([
-      ["an unknown activity", { activity: "ski" }],
-      ["a malformed date", { date_from: "2026-9-1" }],
-      ["a date that does not exist", { date_from: "2026-02-30" }],
-      ["limit 0", { limit: 0 }],
-      ["limit 51", { limit: 51 }],
-      ["a negative route_id", { route_id: -1 }],
-      ["a non-integer area_id", { area_id: 1.5 }],
-      ["a negative offset", { offset: -1 }],
-    ])("rejects %s without calling the API", async (_label, input) => {
-      await expect(handleSearchOutings(input as SearchOutingsInput)).rejects.toThrow("Invalid search_outings input");
-      expect(mockSearchOutings).not.toHaveBeenCalled();
-    });
-
-    it("names the field and the allowed activities", async () => {
-      await expect(handleSearchOutings({ activity: "ski" } as unknown as SearchOutingsInput)).rejects.toThrow(
-        "activity: must be one of: skitouring, snow_ice_mixed, mountain_climbing, rock_climbing, ice_climbing, hiking, snowshoeing, paragliding, mountain_biking, via_ferrata, slacklining",
-      );
-    });
-
-    it("explains the expected date format", async () => {
-      await expect(handleSearchOutings({ date_to: "2026-02-30" })).rejects.toThrow(
-        "date_to: must be a real date in YYYY-MM-DD format",
-      );
-    });
-
+  // Field rules (dates, activity, limit, IDs) are checked by the SDK: tests/server/input-validation.test.ts.
+  describe("cross-field rules", () => {
     it("rejects a reversed date range without calling the API", async () => {
-      await expect(handleSearchOutings({ date_from: "2026-09-30", date_to: "2026-09-01" })).rejects.toThrow(
+      await expect(search({ date_from: "2026-09-30", date_to: "2026-09-01" })).rejects.toThrow(
         "date_from (2026-09-30) must be on or before date_to (2026-09-01).",
       );
       expect(mockSearchOutings).not.toHaveBeenCalled();
     });
 
     it("rejects offset + limit above 10,000 without calling the API", async () => {
-      await expect(handleSearchOutings({ offset: 9995, limit: 10 })).rejects.toThrow(
+      await expect(search({ offset: 9995, limit: 10 })).rejects.toThrow(
         "offset + limit must not exceed 10000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.",
       );
       expect(mockSearchOutings).not.toHaveBeenCalled();
@@ -310,7 +291,7 @@ describe("handleSearchOutings", () => {
     it("accepts offset + limit of exactly 10,000", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([]));
 
-      await handleSearchOutings({ offset: 9990, limit: 10 });
+      await search({ offset: 9990, limit: 10 });
 
       expect(mockSearchOutings).toHaveBeenCalledWith({ limit: 10, offset: 9990 });
     });
@@ -318,7 +299,7 @@ describe("handleSearchOutings", () => {
     it("accepts equal date_from and date_to", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([]));
 
-      await handleSearchOutings({ date_from: "2026-08-10", date_to: "2026-08-10" });
+      await search({ date_from: "2026-08-10", date_to: "2026-08-10" });
 
       expect(mockSearchOutings).toHaveBeenCalledWith({
         date_from: "2026-08-10",
@@ -331,7 +312,7 @@ describe("handleSearchOutings", () => {
     it("treats a whitespace-only query as missing", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([]));
 
-      const result = await handleSearchOutings({ query: "  " });
+      const result = await search({ query: "  " });
 
       expect(mockSearchOutings).toHaveBeenCalledWith({ limit: 10, offset: 0 });
       expect(mockSearchOutings.mock.calls[0]?.[0]).not.toHaveProperty("query");
@@ -343,7 +324,7 @@ describe("handleSearchOutings", () => {
     it("calls the API with defaults and prints no Filters line when no filter is set", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([cosmiques], 346652));
 
-      const result = await handleSearchOutings({});
+      const result = await search({});
 
       expect(mockSearchOutings).toHaveBeenCalledWith({ limit: 10, offset: 0 });
       expect(result.split("\n").slice(0, 2)).toEqual([
@@ -367,7 +348,7 @@ describe("handleSearchOutings", () => {
         offset: 40,
       };
 
-      await handleSearchOutings(input);
+      await search(input);
 
       expect(mockSearchOutings).toHaveBeenCalledWith(input);
     });
@@ -376,7 +357,7 @@ describe("handleSearchOutings", () => {
       const documents = Array.from({ length: 10 }, (_, i) => ({ ...skiTouring, document_id: 1890001 + i }));
       mockSearchOutings.mockResolvedValueOnce(listResponse(documents, 644));
 
-      const result = await handleSearchOutings({
+      const result = await search({
         area_id: 14409,
         activity: "skitouring",
         date_from: "2026-01-01",
@@ -394,7 +375,7 @@ describe("handleSearchOutings", () => {
     it("lists query, dates, route and waypoint filters in a fixed order", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([cosmiques], 625));
 
-      const result = await handleSearchOutings({
+      const result = await search({
         waypoint_id: 37233,
         route_id: 53884,
         date_from: "2026-09-01",
@@ -411,7 +392,7 @@ describe("handleSearchOutings", () => {
     it("describes an until-only date range", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([cosmiques]));
 
-      const result = await handleSearchOutings({ date_to: "2026-01-01" });
+      const result = await search({ date_to: "2026-01-01" });
 
       expect(result.split("\n")[1]).toBe("Filters: dates until 2026-01-01");
     });
@@ -421,7 +402,7 @@ describe("handleSearchOutings", () => {
     it("formats a real list item, listing only range areas", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([cosmiques], 14));
 
-      const result = await handleSearchOutings({ route_id: 53884, date_from: "2026-06-01", date_to: "2026-09-30" });
+      const result = await search({ route_id: 53884, date_from: "2026-06-01", date_to: "2026-09-30" });
 
       expect(result.split("\n")[3]).toBe(
         "- [1938453] Aiguille du Midi : Arête des Cosmiques (mountain_climbing, snow_ice_mixed) | 2026-08-10 | Conditions: average | Max elevation: 3842m | Elevation gain: 300m | Global rating: AD | Areas: Mont-Blanc [14410] | Author: Keagan B.",
@@ -431,7 +412,7 @@ describe("handleSearchOutings", () => {
     it("shows ski and Labande ratings when global_rating is null", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([skiTouring]));
 
-      const result = await handleSearchOutings({ activity: "skitouring" });
+      const result = await search({ activity: "skitouring" });
 
       expect(result).toContain("Conditions: good");
       expect(result).toContain("Ski rating: 2.3");
@@ -476,7 +457,7 @@ describe("handleSearchOutings", () => {
         ]),
       );
 
-      const result = await handleSearchOutings({});
+      const result = await search({});
 
       expect(result.split("\n")[2]).toBe(
         "- [7] Tour complet (mountain_climbing, rock_climbing) | 2026-01-06 → 2026-03-01 | Conditions: excellent | Max elevation: 4808m | Elevation gain: 0m | Global rating: D | Ski rating: 4.1 | Labande: AD | Rock free rating: 5c | Ice rating: 3 | Hiking rating: T5 | Snowshoe rating: R3 | Areas: Mont-Blanc [14410], Aiguilles Rouges [14328] | Author: o.laurendeau",
@@ -486,7 +467,7 @@ describe("handleSearchOutings", () => {
     it("prints only id, Untitled and activities for an empty outing", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([{ document_id: 4, locales: [], activities: ["hiking"] }]));
 
-      const result = await handleSearchOutings({});
+      const result = await search({});
 
       expect(result.split("\n")[2]).toBe("- [4] Untitled (hiking)");
     });
@@ -525,7 +506,7 @@ describe("handleSearchOutings", () => {
         ]),
       );
 
-      const result = await handleSearchOutings({});
+      const result = await search({});
 
       expect(result.split("\n").slice(2)).toEqual(["- [4] Untitled (hiking)", "- [5] Untitled (hiking)"]);
       for (const absent of ["undefined", "null", "NaN"]) {
@@ -550,7 +531,7 @@ describe("handleSearchOutings", () => {
         ]),
       );
 
-      const result = await handleSearchOutings({ query: "gamma" });
+      const result = await search({ query: "gamma" });
 
       expect(result.split("\n")[3]).toBe(
         "- [1500001] Resegone : Via Ferrata Gamma 2 (via_ferrata) | 2026-09-20 | Areas: Prealpi Lombarde [14462], Untitled [14999]",
@@ -562,7 +543,7 @@ describe("handleSearchOutings", () => {
     it("names the filters when nothing matches, without claiming the ID does not exist", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([]));
 
-      const result = await handleSearchOutings({ route_id: 53884 });
+      const result = await search({ route_id: 53884 });
 
       expect(result).toBe("No outings found matching route 53884.");
     });
@@ -570,13 +551,13 @@ describe("handleSearchOutings", () => {
     it("says no outings found when no filter is set", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([]));
 
-      expect(await handleSearchOutings({})).toBe("No outings found.");
+      expect(await search({})).toBe("No outings found.");
     });
 
     it("propagates API errors", async () => {
       mockSearchOutings.mockRejectedValueOnce(new Error("Camptocamp API error: 500 Internal Server Error"));
 
-      await expect(handleSearchOutings({})).rejects.toThrow("Camptocamp API error: 500 Internal Server Error");
+      await expect(search({})).rejects.toThrow("Camptocamp API error: 500 Internal Server Error");
     });
   });
 });
