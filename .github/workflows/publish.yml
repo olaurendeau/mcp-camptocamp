@@ -102,12 +102,15 @@ jobs:
             if ./mcp-publisher publish 2>&1 | tee "$LOG"; then
               exit 0
             fi
-            if ! grep -q "not found" "$LOG" || [ "$attempt" -eq 4 ]; then
+            if ! grep -qF "version '$VERSION' was not found" "$LOG" || [ "$attempt" -eq 4 ]; then
               echo "::error::MCP Registry publish failed (attempt $attempt/4)"
               exit 1
             fi
             DELAY=$((15 * 2 ** (attempt - 1)))
             echo "Attempt $attempt/4: npm version not yet visible to the MCP Registry, retrying in ${DELAY}s"
             sleep "$DELAY"
-            ./mcp-publisher login github-oidc
+            if ! ./mcp-publisher login github-oidc; then
+              echo "::error::MCP Registry login failed before retry $((attempt + 1))/4"
+              exit 1
+            fi
           done
