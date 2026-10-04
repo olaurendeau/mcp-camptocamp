@@ -1338,8 +1338,8 @@ describe("get_article lang", () => {
 
 // AC1.7 on #210: get_article names the sections written only in other languages.
 describe("get_article Text in other languages", () => {
-  // Article 1307778 of GET /articles/1307778 (2026-10-05): its fr, sl and es locales, the fr description cut to
-  // its first sentence; nulls kept as sent. es has no description.
+  // Article 1307778 of GET /articles/1307778 (2026-10-05): its fr, sl and es locales, the fr description cut after
+  // its first sentence, punctuation as sent; nulls kept as sent. es has no description.
   const sac: ArticleDetail = {
     document_id: 1307778,
     locales: [
@@ -1348,7 +1348,7 @@ describe("get_article Text in other languages", () => {
         title: "Le contenu du sac : Escalade en couenne",
         summary: null,
         description:
-          "Dans le topoguide Camptocamp, le champ matériel spécifique ne désigne pas le matériel nécessaire.",
+          "Dans le topoguide Camptocamp, le champ matériel spécifique ne désigne pas le matériel nécessaire pour réaliser un itinéraire.",
       },
       { lang: "sl", title: "V nahrbtniku: Plezališče", summary: null, description: "V pripravi" },
       { lang: "es", title: "material para deportivas", summary: null, description: null },

@@ -1248,8 +1248,8 @@ describe("get_book lang", () => {
 
 // AC1.7 on #210: get_book names the sections written only in other languages.
 describe("get_book Text in other languages", () => {
-  // Book 14592 of GET /books/14592 (2026-10-05): its es and fr locales, each description cut to its first line,
-  // associations left out. Only fr has a summary.
+  // Book 14592 of GET /books/14592 (2026-10-05): its es and fr locales, each text cut after its first line or
+  // sentence, punctuation as sent; associations left out. Only fr has a summary.
   const rebuffat = {
     document_id: 14592,
     locales: [

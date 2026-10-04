@@ -335,7 +335,7 @@ describe("formatUserTexts", () => {
   });
 
   it("skips a section whose key is absent from the locale", () => {
-    // Route 675555's locales have no slope key at all (GET /routes/675555, 2026-10-05).
+    // Like route 675555's locales, which have no slope key at all (GET /routes/675555, 2026-10-05); placeholder text.
     const locale: { summary?: string | null; description?: string | null; gear?: string | null } = {
       description: "Dal parcheggio",
     };

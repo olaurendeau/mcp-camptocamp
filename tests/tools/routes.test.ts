@@ -1999,10 +1999,9 @@ describe("get_route lang", () => {
   });
 });
 
-// AC5.2 on #153: search_routes sends the requested language to searchRoutes (pl=<lang>) and names each route
-// in the locale Camptocamp returns for it.
-// Route 54085 of GET /routes/54085 (2026-10-05): its four locales with every free-text field, each cut to its
-// first line; nulls kept as sent. fr has no gear; de, en and it have no summary, route_history or external_resources.
+// Route 54085 of GET /routes/54085 (2026-10-05): its four locales with every free-text field, each cut after its
+// first line or sentence, punctuation as sent; a text cut elsewhere ends with "…". Nulls kept as sent. fr has no
+// gear; de, en and it have no summary, route_history or external_resources.
 const route54085Texts = {
   document_id: 54085,
   locales: [
@@ -2015,15 +2014,17 @@ const route54085Texts = {
       slope: "40°",
       remarks: "- Orientation générale W puis NW.",
       gear: null,
-      route_history: "- Premier parcours de la partie du [[routes/54080/fr|Col des Roches]] au sommet : 4 octobre",
-      external_resources: "- *Mont Pourri or Mont Thuriaz* par W. A. B. Coolidge",
+      route_history:
+        "- Premier parcours de la partie du [[routes/54080/fr|Col des Roches]] au sommet : 4 octobre 1860 - Michel Croz. ",
+      external_resources:
+        "- *Mont Pourri or Mont Thuriaz* par W. A. B. Coolidge, [*Alpine Journal*, vol. 9, 1878, n<sup>o</sup>62, p.97-98](https://books.google.fr/books?id=N6dJAAAAYAAJ&pg=PA97&hl=fr&source=gbs_toc_r&cad=3#v=onepage&q&f=false) : chronique de l'ascension de 1878 (en anglais).",
     },
     {
       lang: "de",
       title: "Voie normale du Glacier du Geay",
       title_prefix: "Mont Pourri",
       summary: null,
-      description: "Zustieg zur Mont-Pourri Hütte über das Ponturin-Tal (Peisey-Nancroix)",
+      description: "Zustieg zur Mont-Pourri Hütte über das Ponturin-Tal (Peisey-Nancroix): …",
       slope: "40°",
       remarks: "Großer Höhenunterschied beim zweiten Vanoise-Gipfel.\r",
       gear: "Seil und Gletscherausrüstung, Steigeisen für den Gipfel.",
@@ -2035,7 +2036,7 @@ const route54085Texts = {
       title: "Normal route from Glacier du Geay",
       title_prefix: "Mont Pourri",
       summary: null,
-      description: "Access to Mont Pourri refuge via Vallée du Ponturin (Peisey-Nancroix)",
+      description: "Access to Mont Pourri refuge via Vallée du Ponturin (Peisey-Nancroix): …",
       slope: "40°",
       remarks: "A large HD for the summit second of Vanoise.\r",
       gear: "Rope and glacier equipment, crampons for the summit.",
@@ -2047,7 +2048,7 @@ const route54085Texts = {
       title: "Voie normale du Glacier du Geay",
       title_prefix: "Mont Pourri",
       summary: null,
-      description: "Accesso al rifugio del Mont Pourri dalla valle del Ponturin (Peisey-Nancroix)",
+      description: "Accesso al rifugio del Mont Pourri dalla valle del Ponturin (Peisey-Nancroix): …",
       slope: "40°",
       remarks: "Un notevole dislivello per la seconda cima di Vanoise.\r",
       gear: "Corda e attrezzatura da ghiacciaio, ramponi per la vetta.",
@@ -2060,8 +2061,8 @@ const route54085Texts = {
   ski_rating: "4.1",
 };
 
-// Route 675555 of GET /routes/675555 (2026-10-05): locales [it, en], every free-text field cut to its first line,
-// nulls kept as sent; neither locale has a slope key. it has no summary or gear.
+// Route 675555 of GET /routes/675555 (2026-10-05): locales [it, en], every free-text field cut after its first
+// line or sentence, punctuation as sent; nulls kept as sent; neither locale has a slope key. it has no summary or gear.
 const route675555Texts = {
   document_id: 675555,
   locales: [
@@ -2070,8 +2071,10 @@ const route675555Texts = {
       title: "Via Ferrata Gamma 2",
       title_prefix: "Resegone",
       summary: null,
-      description: "## Attacco\r\nDai **Piani d'Erna 1330m**, prendere il sentiero numero 1",
-      remarks: "E' considerata una delle ferrate più impegnative delle alpi.",
+      description:
+        "## Attacco\r\nDai **Piani d'Erna 1330m**, prendere il sentiero numero 1 che porta alla via normale del Resegone.",
+      remarks:
+        'E\' considerata una delle ferrate più impegnative delle alpi insieme alla "Costantini" e alla "Tabaretta".',
       gear: null,
       route_history: null,
       external_resources: null,
@@ -2080,9 +2083,11 @@ const route675555Texts = {
       lang: "en",
       title: "Via ferrata Gamma 2 - al Dente del Resegone",
       title_prefix: "Resegone",
-      summary: "Very fun climbing in a variety of interesting situations, long + committing, big views.",
+      summary:
+        'Very fun climbing in a variety of interesting situations, long + committing, big views, rather difficult -- especially for "free" rock-climbing moves, Gamma 2 ranks with the very best in the Dolomites.',
       description: "Good things about this route ...",
-      remarks: '- Could be preceded by climbing the interesting "via ferrata Gamma 1 al Pizzo d\'Erna".',
+      remarks:
+        '- Could be preceded by climbing the interesting "via ferrata Gamma 1 al Pizzo d\'Erna" (instead of riding up the funivia lift).',
       gear: "- via ferrata kit (see under Remarks for special concerns or modifications).",
       route_history: null,
       external_resources: null,
@@ -2184,6 +2189,8 @@ describe("get_route Text in other languages", () => {
   });
 });
 
+// AC5.2 on #153: search_routes sends the requested language to searchRoutes (pl=<lang>) and names each route
+// in the locale Camptocamp returns for it.
 describe("search_routes lang", () => {
   // Trimmed from GET /routes?q=Glacier du Geay&pl=de (2026-10-04): route 54085 with its single de locale.
   const geayDe = {

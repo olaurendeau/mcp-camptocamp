@@ -435,7 +435,7 @@ describe("handleGetOuting", () => {
 // AC1.7 on #210: get_outing names the sections written only in other languages.
 describe("get_outing Text in other languages", () => {
   // Derived from outing 170463 of GET /outings/170463 (2026-10-05): its en and fr locales with every free-text
-  // field, each cut to its first line; nulls kept as sent. Edited: the en weather, live text in both locales, is
+  // field, each cut after its first sentence, punctuation as sent; nulls kept as sent. Edited: the en weather, live text in both locales, is
   // set to null here, since every live text of this outing is written in both languages.
   const benedetti = {
     document_id: 170463,

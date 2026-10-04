@@ -243,7 +243,8 @@ describe("formatOtherLanguagesLine", () => {
     ["gear", "Gear"],
   ] as const;
 
-  // Route 54085 of GET /routes/54085 (2026-10-04), texts cut: fr has no gear, de, en and it have no summary.
+  // Shaped like route 54085 of GET /routes/54085 (2026-10-05): fr has no gear, de, en and it have no summary. The
+  // texts are placeholders, not Camptocamp's.
   const pourri = [
     { lang: "fr", summary: "Grande course", description: "Approche par Le Miroir", gear: null },
     { lang: "de", summary: null, description: "Zustieg von Le Miroir", gear: "Pickel, Steigeisen" },
@@ -302,7 +303,8 @@ describe("formatOtherLanguagesLine", () => {
   });
 
   it("compares with the locale shown after a fallback, not the requested one", () => {
-    // Route 675555 asked in fr: no fr locale, so en is shown; it has every text it, the only other one, has.
+    // Shaped like route 675555 asked in fr (placeholder texts): no fr locale, so en is shown, and it has every
+    // section it, the only other locale, has.
     const resegone = [
       { lang: "it", summary: null, description: "Dal parcheggio", gear: null },
       { lang: "en", summary: "Ferrata", description: "From the car park", gear: "Via ferrata kit" },

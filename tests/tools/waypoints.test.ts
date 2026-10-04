@@ -795,15 +795,15 @@ describe("get_waypoint lang", () => {
 
 // AC1.7 on #210: get_waypoint names the sections written only in other languages.
 describe("get_waypoint Text in other languages", () => {
-  // Hut 104022 of GET /waypoints/104022 (2026-10-05): its four locales with every free-text field, each cut to its
-  // first line; nulls kept as sent. fr has no access; en and it have one.
+  // Hut 104022 of GET /waypoints/104022 (2026-10-05): its four locales with every free-text field, each cut after
+  // its first line, as sent; nulls kept as sent. fr has no access; en and it have one.
   const durier = {
     document_id: 104022,
     locales: [
       {
         lang: "fr",
         title: "Refuge Durier",
-        summary: "Le refuge Durier est un petit refuge de haute montagne dont le bâtiment actuel date de 1987.",
+        summary: "Le refuge Durier est un petit refuge de haute montagne dont le bâtiment actuel date de 1989.",
         description: "[img=137864 right]Refuge Durier[/img]",
         access: null,
         access_period: "Mi-juin à mi-septembre",
@@ -820,7 +820,8 @@ describe("get_waypoint Text in other languages", () => {
         lang: "en",
         title: "Refuge Durier",
         summary: null,
-        description: "The hut is at col, (Col de Miage 3358m) between  the SW ridge of the Bionnassay",
+        description:
+          "The hut is at col, (Col de Miage 3358m) between  the SW ridge of the Bionnassay and the ridge leading to the Dôme de Miage.\r",
         access: "**To the Plan Glacier hut** (2680m) : 2 options\r",
         access_period: "Mid June to mid September",
       },
