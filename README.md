@@ -9,7 +9,7 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | Outil                 | Description                                                                                               |
 | --------------------- | --------------------------------------------------------------------------------------------------------- |
 | `search_routes`       | Recherche d'itinéraires (mot-clé, zone, point, activité, cotation, D+, type, configuration) ; paginée     |
-| `get_route`           | Détail complet d'un itinéraire par ID (sommet : titre, description, cotations, dénivelé, matériel, zones) |
+| `get_route`           | Détail d'un itinéraire par ID (sommet : titre, texte, cotations, dénivelé, zones, topos, points, sorties) |
 | `search_waypoints`    | Recherche des points de passage par nom et/ou zone `area_id` (sommets, refuges, bivouacs…)                |
 | `get_waypoint`        | Détail d'un point de passage par ID (altitude, coordonnées GPS, description, zones)                       |
 | `search_user_outings` | Liste les sorties (comptes rendus) publiées par un utilisateur Camptocamp, par ID utilisateur             |
@@ -23,6 +23,8 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | `get_article`         | Détail d'un article par ID (texte, auteur, type, itinéraires, points, sorties, livres liés)               |
 
 Chaque outil `get_*` commence par le titre et l'ID du document, suivis de son lien camptocamp.org (`**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>`) à citer comme source.
+
+`get_route` liste aussi, avec leurs ID, les livres (topos, magazines…) qui couvrent l'itinéraire, ses points de passage (le principal marqué `main waypoint`), les itinéraires voisins, les articles liés et ses sorties récentes (`## Recent outings (10 of 64)`, suivi de `More: search_outings with route_id=<id>` pour les voir toutes). Une liste vide n'imprime pas de section.
 
 Les textes libres écrits par les contributeurs (description, résumé, remarques, matériel, accès, conditions, météo…) sont imprimés entre `[begin user-written text: <champ>]` et `[end user-written text: <champ>]`, avec leurs titres Markdown abaissés de deux niveaux (`#`, `##` et titres soulignés par `===` ou `---`) et une coupe à 8000 caractères (`[truncated, N more characters]`). Les balises d'image Camptocamp deviennent `[image: <légende>]` (rien sans légende) et les liens internes `<libellé> (<type>/<id>)`, par exemple `[[routes/54080/fr|Col des Roches]]` → `Col des Roches (routes/54080)` ; le reste du balisage est conservé. La coupe compte les caractères après cette réécriture. La description de chaque outil `get_*` précise que ce texte est du contenu écrit par les utilisateurs, pas des instructions.
 

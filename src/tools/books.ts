@@ -10,6 +10,7 @@ import {
   formatAssociatedRouteLine,
   formatWaypointLine,
   formatTitledLine,
+  formatBookLine,
 } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
@@ -32,16 +33,7 @@ function formatBookSearchResult(response: BookSearchResponse): string {
 
   const lines: string[] = [`Found ${response.total} book(s). Showing ${response.documents.length}:\n`];
 
-  for (const book of response.documents) {
-    const title = pickTitle(book.locales);
-    const types = joinList(book.book_types);
-    const activities = joinList(book.activities);
-    const parts = [`- [${book.document_id}] ${title}`];
-    if (book.author) parts.push(`Author: ${book.author}`);
-    if (types) parts.push(`Types: ${types}`);
-    if (activities) parts.push(`Activities: ${activities}`);
-    lines.push(parts.join(" | "));
-  }
+  lines.push(...response.documents.map(formatBookLine));
 
   return lines.join("\n");
 }
@@ -78,7 +70,7 @@ function formatBookDetail(book: BookDetail): string {
 
   const waypoints = book.associations?.waypoints;
   if (waypoints && waypoints.length > 0) {
-    lines.push("\n## Associated waypoints", ...waypoints.map(formatWaypointLine));
+    lines.push("\n## Associated waypoints", ...waypoints.map((waypoint) => formatWaypointLine(waypoint)));
   }
 
   const articles = book.associations?.articles;

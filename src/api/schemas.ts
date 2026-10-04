@@ -85,6 +85,33 @@ function searchResponseSchema<T extends z.ZodTypeAny>(document: T) {
   return z.object({ documents: z.array(document), total: z.number() });
 }
 
+// Items of GET /outings?sort=-date_end… (search_outings) and of a route or waypoint's
+// associations.recent_outings; only range areas are listed, by area_type.
+export const outingListItemSchema = z.object({
+  document_id: z.number(),
+  locales: z.array(localeSchema),
+  activities: z.array(z.string()),
+  date_start: z.string().nullish(),
+  date_end: z.string().nullish(),
+  condition_rating: z.string().nullish(),
+  elevation_max: z.number().nullish(),
+  height_diff_up: z.number().nullish(),
+  ...ratingFields,
+  areas: z.array(titledAssociationSchema.extend({ area_type: z.string().nullish() })).nullish(),
+  author: optionalAuthorSchema,
+});
+
+// Items of GET /books?q=… (search_books) and the books associated with a route.
+export const bookSearchResultSchema = z.object({
+  document_id: z.number(),
+  locales: z.array(localeSchema.extend({ summary: z.string().nullish() })),
+  author: z.string().nullish(),
+  activities: z.array(z.string()).nullish(),
+  book_types: z.array(z.string()).nullish(),
+  available_langs: z.array(z.string()).nullish(),
+  quality: z.string().nullish(),
+});
+
 // Routes
 
 export const routeSearchResultSchema = z.object({
@@ -116,9 +143,20 @@ export const routeDetailSchema = z.object({
   ...ratingFields,
   // Not displayed yet; typed because the live API sends them, often as null.
   durations: z.array(z.string()).nullish(),
-  main_waypoint_id: z.number().nullish(),
+  main_waypoint_id: z.number().nullish(), // marks this waypoint among associations.waypoints
   geometry: z.object({ geom_detail: z.string().nullish() }).nullish(),
   areas: z.array(areaSummarySchema).nullish(),
+  // images and xreports are left out on purpose: no tool can follow them. Route 54085 sends empty lists.
+  associations: z
+    .object({
+      waypoints: z.array(waypointAssociationSchema).nullish(),
+      routes: z.array(routeAssociationSchema).nullish(),
+      books: z.array(bookSearchResultSchema).nullish(), // the same fields as a /books search result
+      articles: z.array(titledAssociationSchema).nullish(),
+      // The 10 latest outings, shaped like /outings list items, and the route's outing count.
+      recent_outings: searchResponseSchema(outingListItemSchema).nullish(),
+    })
+    .nullish(),
 });
 
 // Waypoints
@@ -187,20 +225,6 @@ export const outingDetailSchema = z.object({
   associations: z.object({ routes: z.array(routeAssociationSchema).nullish() }).nullish(),
 });
 
-// Items of GET /outings?sort=-date_end… (search_outings); only range areas are listed, by area_type.
-export const outingListItemSchema = z.object({
-  document_id: z.number(),
-  locales: z.array(localeSchema),
-  activities: z.array(z.string()),
-  date_start: z.string().nullish(),
-  date_end: z.string().nullish(),
-  condition_rating: z.string().nullish(),
-  elevation_max: z.number().nullish(),
-  height_diff_up: z.number().nullish(),
-  ...ratingFields,
-  areas: z.array(titledAssociationSchema.extend({ area_type: z.string().nullish() })).nullish(),
-  author: optionalAuthorSchema,
-});
 export const outingListResponseSchema = searchResponseSchema(outingListItemSchema);
 
 // Areas
@@ -223,15 +247,6 @@ export const areaDetailSchema = z.object({
 
 // Books
 
-export const bookSearchResultSchema = z.object({
-  document_id: z.number(),
-  locales: z.array(localeSchema.extend({ summary: z.string().nullish() })),
-  author: z.string().nullish(),
-  activities: z.array(z.string()).nullish(),
-  book_types: z.array(z.string()).nullish(),
-  available_langs: z.array(z.string()).nullish(),
-  quality: z.string().nullish(),
-});
 export const bookSearchResponseSchema = searchResponseSchema(bookSearchResultSchema);
 
 export const bookDetailSchema = z.object({

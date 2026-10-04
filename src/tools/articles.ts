@@ -81,7 +81,7 @@ function formatArticleDetail(article: ArticleDetail): string {
 
   const waypoints = associations?.waypoints;
   if (waypoints && waypoints.length > 0) {
-    lines.push("\n## Associated waypoints", ...waypoints.map(formatWaypointLine));
+    lines.push("\n## Associated waypoints", ...waypoints.map((waypoint) => formatWaypointLine(waypoint)));
   }
 
   const titled: Array<[string, Associations["articles"]]> = [

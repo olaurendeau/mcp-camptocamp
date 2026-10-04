@@ -28,7 +28,7 @@ function formatWaypointSearchResult(response: WaypointSearchResponse, areaId?: n
 
   const lines: string[] = [`Found ${response.total} waypoint(s)${scope}. Showing ${response.documents.length}:\n`];
 
-  lines.push(...response.documents.map(formatWaypointLine));
+  lines.push(...response.documents.map((waypoint) => formatWaypointLine(waypoint)));
   return lines.join("\n");
 }
 
