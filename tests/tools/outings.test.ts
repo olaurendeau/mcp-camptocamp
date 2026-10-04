@@ -1461,8 +1461,12 @@ describe("outingToolDefinitions", () => {
     expect(outingToolDefinitions.map((t) => t.name)).toEqual(["search_user_outings", "get_outing", "search_outings"]);
   });
 
+  // #211: per-field details live in the input-field descriptions, which the LLM reads with the tool description.
   it("describes ordering, date overlap, period, user, paging and where IDs come from", () => {
-    const description = outingToolDefinitions.find((t) => t.name === "search_outings")?.description ?? "";
+    const description = [
+      outingToolDefinitions.find((t) => t.name === "search_outings")?.description ?? "",
+      ...Object.values(searchOutingsSchema.shape).map((field) => field.description ?? ""),
+    ].join("\n");
 
     for (const phrase of [
       "most recent first",
@@ -1481,6 +1485,39 @@ describe("outingToolDefinitions", () => {
       "10,000-result window",
     ]) {
       expect(description).toContain(phrase);
+    }
+  });
+
+  // #211: what the tool description keeps on its own, without the input-field descriptions.
+  it("keeps the filter logic, ordering, unknown IDs and the tools to call in the search_outings description", () => {
+    const description = outingToolDefinitions.find((t) => t.name === "search_outings")?.description ?? "";
+
+    for (const phrase of [
+      "All filters are optional and combine with AND",
+      "most recent first",
+      "An unknown area/route/waypoint/user ID yields no results, not an error",
+      "Call get_outing with an ID",
+      "area_id (from search_areas)",
+      "route_id (from search_routes)",
+      "waypoint_id (from search_waypoints)",
+    ]) {
+      expect(description).toContain(phrase);
+    }
+  });
+
+  // #211: the date and period details moved to the fields they are about.
+  it("gives the date overlap and the period limits on their input fields", () => {
+    const { date_from, date_to, period_start, period_end } = searchOutingsSchema.shape;
+
+    for (const field of [date_from, date_to]) {
+      expect(field.description).toContain("overlaps the requested range");
+      expect(field.description).toContain("one bound only for 'since' / 'until'");
+    }
+    for (const field of [period_start, period_end]) {
+      expect(field.description).toContain("cannot wrap around the new year, so make two calls for 12-20 → 01-10");
+      expect(field.description).toContain(
+        "Camptocamp's period filter can miss outings on the first or last day of the range",
+      );
     }
   });
 
