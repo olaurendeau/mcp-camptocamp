@@ -41,7 +41,7 @@ function formatRouteDetail(route: RouteDetail): string {
   const locale = pickLocale(route.locales);
   const lines: string[] = [];
 
-  lines.push(formatHeader(locale?.title ?? "Untitled", route.document_id));
+  lines.push(formatHeader(pickTitle(route.locales), route.document_id));
   lines.push(`\n**Activities**: ${route.activities.join(", ")}`);
 
   if (route.global_rating) lines.push(`**Global rating**: ${route.global_rating}`);
