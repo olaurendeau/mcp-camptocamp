@@ -99,7 +99,7 @@ Mistral documents `vibe mcp add` only with the flags of remote servers (`--url`)
 
 Vibe asks before it runs an MCP tool, with its default agent, `accept-edits`, which auto-approves only file edits, and with the `ask` agent, which asks before every tool. A `[tools.<tool name>]` table with `permission = "always"` lets one tool run without asking; `permission = "ask"` keeps the prompt. An MCP tool's name is `{server_name}_{tool_name}`.
 
-The agent names come from the Vibe README and source code. Mistral's documentation site still lists a `default` agent that "asks before running any tool": the Vibe changelog renamed it to `ask` in version 2.24.1 (2026-08-11) and made `accept-edits` the default agent, and the latest release on 2026-10-05, v2.25.8, has no `default` agent.
+The agent names come from the Vibe README and source code. Mistral's documentation site still lists a `default` agent that "asks before running any tool": the Vibe changelog renamed it to `ask` in version 2.24.1 (2026-08-11) and made `accept-edits` the default agent, and v2.25.8 (2026-09-23), the latest release as of 2026-10-05, has no `default` agent.
 
 Mistral documents no wildcard for permissions (the glob patterns of `enabled_tools` and `disabled_tools` only choose which tools are available), so the block above lists the 13 tools one by one. When this server adds a tool, add its table too.
 
