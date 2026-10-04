@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage } from "./paging.js";
-import { ACTIVITIES as OUTING_ACTIVITIES } from "./enums.js";
+import { ACTIVITIES, enumValue } from "./enums.js";
 import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
 import type { OutingSearchResponse, OutingDetail, OutingListItem, OutingListResponse } from "../api/camptocamp.js";
 import {
@@ -50,12 +50,9 @@ const periodDay = () =>
 export const searchOutingsSchema = z.object({
   query: searchQuery("Keyword matched against outing titles (e.g. 'cosmiques')", { allowBlank: true }).optional(),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14409 for Vanoise)").optional(),
-  activity: z
-    .enum(OUTING_ACTIVITIES, {
-      errorMap: () => ({ message: `must be one of: ${OUTING_ACTIVITIES.join(", ")}` }),
-    })
+  activity: enumValue(ACTIVITIES)
     .optional()
-    .describe(`Activity, one of: ${OUTING_ACTIVITIES.join(", ")}`),
+    .describe(`Activity, one of: ${ACTIVITIES.join(", ")}`),
   date_from: isoDate()
     .optional()
     .describe("Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it"),

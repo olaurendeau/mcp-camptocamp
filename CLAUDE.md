@@ -121,19 +121,19 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`              |
 | `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas)             |
-| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`; paged with `offset`                         |
+| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`, narrowed by `waypoint_type`; paged          |
 | `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                                        |
 | `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings                    |
 | `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings)             |
 | `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged             |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                               |
-| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable; paged with `offset`  |
+| `search_books`        | Search books by title only (author/ISBN unreliable), filtered by `book_type` and `activity`; paged               |
 | `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)                |
 | `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type; paged with `offset` |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)                       |
 
-`search_routes` needs at least one filter (D5 on #58); any one is enough. Rating bounds are checked against the scale of `rating_system` (`ROUTE_RATING_SYSTEMS` in `src/tools/ratings.ts`) and list values against `src/tools/enums.ts` before any request, since Camptocamp silently ignores an unknown value (R7).
+`search_routes` needs at least one filter (D5 on #58); any one is enough. Rating bounds are checked against the scale of `rating_system` (`ROUTE_RATING_SYSTEMS` in `src/tools/ratings.ts`) and list values against `src/tools/enums.ts` before any request, since Camptocamp silently ignores an unknown value (R7). The same goes for `waypoint_type` on `search_waypoints` (`WAYPOINT_TYPES`, 26 values; not a filter on its own, so a query or `area_id` is still required) and `book_type` / `activity` on `search_books` (`BOOK_TYPES`, 9 values; `ACTIVITIES`).
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 
@@ -151,7 +151,7 @@ Locale: searches send `pl=fr`, which returns one locale per document, French whe
   - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.
   - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
 - `GET /routes/{id}`
-- `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}][&offset={n}]` (at least one of `q` and `a`)
+- `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}][&wtyp={waypoint_type}][&offset={n}]` (at least one of `q` and `a`)
 - `GET /waypoints/{id}`
 - `GET /outings?u={user_id}&limit=10&pl=fr`
 - `GET /outings/{id}`
@@ -159,7 +159,7 @@ Locale: searches send `pl=fr`, which returns one locale per document, French whe
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
 - `GET /areas?q={query}&limit=10&pl=fr[&atyp={type}][&offset={n}]`
 - `GET /areas/{id}`
-- `GET /books?q={query}&limit=10&pl=fr[&offset={n}]`
+- `GET /books?q={query}&limit=10&pl=fr[&btyp={book_type}][&act={activity}][&offset={n}]`
 - `GET /books/{id}`
 - `GET /articles?q={query}&limit=10&pl=fr[&offset={n}]`
 - `GET /articles/{id}`

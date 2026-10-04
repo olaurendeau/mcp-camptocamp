@@ -66,6 +66,7 @@ interface KeywordOrAreaSearchOptions {
   limit?: number; // default DEFAULT_LIMIT
 }
 export interface WaypointSearchOptions extends KeywordOrAreaSearchOptions {
+  waypoint_type?: string;
   offset?: number; // sent only when given
 }
 
@@ -129,7 +130,10 @@ interface KeywordSearchOptions {
   limit?: number; // default DEFAULT_LIMIT
   offset?: number; // sent only when given
 }
-export type BookSearchOptions = KeywordSearchOptions;
+export interface BookSearchOptions extends KeywordSearchOptions {
+  book_type?: string;
+  activity?: string;
+}
 export type ArticleSearchOptions = KeywordSearchOptions;
 
 function keywordParams(options: KeywordSearchOptions): URLSearchParams {
@@ -165,6 +169,7 @@ export async function getRoute(id: number): Promise<RouteDetail> {
 export async function searchWaypoints(options: WaypointSearchOptions): Promise<WaypointSearchResponse> {
   const params = keywordOrAreaParams(options);
   if (options.offset !== undefined) params.set("offset", String(options.offset));
+  if (options.waypoint_type !== undefined) params.set("wtyp", options.waypoint_type);
   return getJson({ path: "/waypoints", params, schema: waypointSearchResponseSchema });
 }
 
@@ -251,7 +256,10 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
 }
 
 export async function searchBooks(options: BookSearchOptions): Promise<BookSearchResponse> {
-  return getJson({ path: "/books", params: keywordParams(options), schema: bookSearchResponseSchema });
+  const params = keywordParams(options);
+  if (options.book_type !== undefined) params.set("btyp", options.book_type);
+  if (options.activity !== undefined) params.set("act", options.activity);
+  return getJson({ path: "/books", params, schema: bookSearchResponseSchema });
 }
 
 export async function getBook(id: number): Promise<BookDetail> {

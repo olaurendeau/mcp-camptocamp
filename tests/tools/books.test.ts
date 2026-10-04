@@ -209,6 +209,103 @@ describe("search_books paging", () => {
   });
 });
 
+// AC9.3, R7: book type and activity filters, checked against Camptocamp's closed lists.
+describe("search_books type and activity filters", () => {
+  const BOOK_TYPE_LIST = "topo, environment, historical, biography, photos-art, novel, technics, tourism, magazine";
+  const ACTIVITY_LIST =
+    "skitouring, snow_ice_mixed, mountain_climbing, rock_climbing, ice_climbing, hiking, snowshoeing, paragliding, mountain_biking, via_ferrata, slacklining";
+
+  // The live GET /books?q=vanoise&btyp=topo&act=skitouring&limit=10&pl=fr response (2026-10-04), first 2 of 3.
+  const VANOISE_SKI_TOPOS = {
+    documents: [
+      {
+        document_id: 1520795,
+        version: 1,
+        locales: [{ version: 1, lang: "fr", title: "Toponeige Vanoise 3", summary: null }],
+        quality: "empty",
+        author: "Leïla et Volodia Shahshahani",
+        activities: ["skitouring"],
+        book_types: ["topo"],
+        available_langs: ["fr"],
+        protected: false,
+        type: "b",
+      },
+      {
+        document_id: 142109,
+        version: 5,
+        locales: [{ version: 4, lang: "fr", title: "Les Plus Belles Traces de la Vanoise Occidentale", summary: null }],
+        quality: "medium",
+        author: "Christophe Hagenmuller",
+        activities: ["skitouring"],
+        book_types: ["topo", "environment"],
+        available_langs: ["fr"],
+        protected: false,
+        type: "b",
+      },
+    ],
+    total: 3,
+  };
+
+  it("forwards book_type and activity and names them in the Filters line", async () => {
+    mockSearchBooks.mockResolvedValueOnce(VANOISE_SKI_TOPOS);
+
+    const result = await search({ query: "vanoise", book_type: "topo", activity: "skitouring", limit: 2 });
+
+    expect(mockSearchBooks).toHaveBeenCalledWith({
+      query: "vanoise",
+      limit: 2,
+      offset: 0,
+      book_type: "topo",
+      activity: "skitouring",
+    });
+    expect(result.split("\n")).toEqual([
+      "Found 3 book(s). Showing 2 from offset 0:",
+      'Filters: query "vanoise", book type topo, activity skitouring',
+      "",
+      "- [1520795] Toponeige Vanoise 3 | Author: Leïla et Volodia Shahshahani | Types: topo | Activities: skitouring",
+      "- [142109] Les Plus Belles Traces de la Vanoise Occidentale | Author: Christophe Hagenmuller | Types: topo, environment | Activities: skitouring",
+      "",
+      "Next page: offset=2",
+    ]);
+  });
+
+  it("names the type filter in the empty-result line", async () => {
+    mockSearchBooks.mockResolvedValueOnce({ documents: [], total: 0 });
+
+    expect(await search({ query: "vanoise", book_type: "magazine" })).toBe(
+      'No books found matching query "vanoise", book type magazine.',
+    );
+  });
+
+  it("accepts each of the 9 book types", () => {
+    for (const book_type of BOOK_TYPE_LIST.split(", ")) {
+      expect(searchBooksSchema.safeParse({ query: "vanoise", book_type }).success).toBe(true);
+    }
+  });
+
+  it("rejects an unknown book_type, listing the 9 valid values", () => {
+    const parsed = searchBooksSchema.safeParse({ query: "vanoise", book_type: "guidebook" });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues).toEqual([
+      expect.objectContaining({ path: ["book_type"], message: `must be one of: ${BOOK_TYPE_LIST}` }),
+    ]);
+  });
+
+  it("rejects an unknown activity, listing the 11 valid values", () => {
+    const parsed = searchBooksSchema.safeParse({ query: "vanoise", activity: "skiing" });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues).toEqual([
+      expect.objectContaining({ path: ["activity"], message: `must be one of: ${ACTIVITY_LIST}` }),
+    ]);
+  });
+
+  it("lists the valid values in the field descriptions", () => {
+    const shape = searchBooksSchema.shape;
+    expect(shape.book_type.description).toContain(BOOK_TYPE_LIST);
+    expect(shape.activity.description).toContain(ACTIVITY_LIST);
+  });
+});
+
 describe("handleSearchBooks", () => {
   it("forwards query, limit and offset and prints the total header", async () => {
     mockSearchBooks.mockResolvedValueOnce(MONT_BLANC_SEARCH);
