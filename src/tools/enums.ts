@@ -64,6 +64,23 @@ export const BOOK_TYPES = [
   "magazine",
 ] as const;
 
+// An article's categories (`acat`) and types (`atyp`), in v6_common's order.
+export const ARTICLE_CATEGORIES = [
+  "mountain_environment",
+  "gear",
+  "technical",
+  "topoguide_supplements",
+  "soft_mobility",
+  "expeditions",
+  "stories",
+  "c2c_meetings",
+  "tags",
+  "site_info",
+  "association",
+] as const;
+
+export const ARTICLE_TYPES = ["collab", "personal"] as const;
+
 // The languages of Camptocamp documents, defined with the other lists the API client sends (`pl`).
 export { LANGS } from "../api/values.js";
 export type { Lang } from "../api/values.js";

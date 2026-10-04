@@ -102,6 +102,10 @@ const ROUTES_FILTER_MESSAGE =
   "Error: search_routes needs at least one filter: query, area_id, waypoint_id, activity, rating_system, " +
   "height_diff_up_min/max, route_types or configuration. Use search_areas to find an area_id.";
 
+// D3 of #210: search_articles needs a query or one of its filters.
+const ARTICLES_FILTER_MESSAGE =
+  "Error: search_articles needs a query or at least one filter: category, article_type, activity.";
+
 // Every search tool with a free-text `query`.
 const QUERY_TOOLS = [
   "search_routes",
@@ -136,7 +140,7 @@ describe("search query inputs", () => {
   });
 
   // D3: a blank query would list the whole collection, never a useful answer.
-  describe.each(["search_areas", "search_books", "search_articles"])("%s", (tool) => {
+  describe.each(["search_areas", "search_books"])("%s", (tool) => {
     it.each(["", "   "])("rejects the blank query %j without calling Camptocamp", async (query) => {
       const fetchMock = stubFetch();
       const client = await connect();
@@ -155,6 +159,7 @@ describe("search query inputs", () => {
       "search_waypoints",
       "Error: search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.",
     ],
+    ["search_articles", ARTICLES_FILTER_MESSAGE],
   ])("%s treats a blank query as missing", async (tool, message) => {
     const fetchMock = stubFetch();
     const client = await connect();
@@ -327,6 +332,7 @@ describe("cross-field rules", () => {
       {},
       "Error: search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.",
     ],
+    ["search_articles", "neither query nor filter", {}, ARTICLES_FILTER_MESSAGE],
   ])("%s rejects %s with its message", async (tool, _label, args, message) => {
     const fetchMock = stubFetch();
     const client = await connect();
@@ -542,6 +548,56 @@ describe("search_waypoints and search_books type inputs", () => {
       btyp: "topo",
       act: "skitouring",
     });
+  });
+});
+
+// AC3.5 of #210, R7: the API ignores an unknown acat, atyp or act and lists every article, so each is refused.
+describe("search_articles filter inputs", () => {
+  it.each<[Record<string, unknown>, string, string]>([
+    [
+      { category: "bogus" },
+      "category",
+      "must be one of: mountain_environment, gear, technical, topoguide_supplements, soft_mobility, expeditions, stories, c2c_meetings, tags, site_info, association",
+    ],
+    [{ article_type: "wiki" }, "article_type", "must be one of: collab, personal"],
+    [{ activity: "ski" }, "activity", `must be one of: ${OUTING_ACTIVITY_LIST}`],
+  ])("rejects %j without calling Camptocamp", async (args, field, message) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_articles", arguments: args });
+
+    expect(validationIssues(result, "search_articles")).toEqual([`${message} at ${field}`]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends acat, atyp and act, and no q for a blank query", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH), jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    await client.callTool({
+      name: "search_articles",
+      arguments: {
+        query: "avalanche",
+        category: "mountain_environment",
+        article_type: "collab",
+        activity: "skitouring",
+      },
+    });
+    const blank = await client.callTool({ name: "search_articles", arguments: { query: "  ", category: "gear" } });
+
+    const [all, gear] = fetchMock.mock.calls.map(([url]) => new URL(url as string).searchParams);
+    expect(Object.fromEntries(all)).toEqual({
+      q: "avalanche",
+      limit: "10",
+      offset: "0",
+      pl: "fr",
+      acat: "mountain_environment",
+      atyp: "collab",
+      act: "skitouring",
+    });
+    expect(Object.fromEntries(gear)).toEqual({ limit: "10", offset: "0", pl: "fr", acat: "gear" });
+    expect(resultText(blank)).toBe("No articles found matching category gear.");
   });
 });
 
