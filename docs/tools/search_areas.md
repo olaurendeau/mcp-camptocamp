@@ -26,6 +26,75 @@ Find Camptocamp areas by name: mountain ranges, administrative subdivisions such
 
 <!-- generated:inputs end -->
 
+## Output format
+
+```text
+Found <total> area(s). Showing <n> from offset <offset>:
+Filters: query "<query>", area type <area_type>
+
+- [<id>] <title> (<area_type>)
+
+Next page: offset=<N>
+```
+
+- The first line gives how many areas Camptocamp found, how many are shown and from which offset. The `Filters:` line repeats the query, in quotes, and `area type <area_type>` only when `area_type` is given.
+- Each result is one line: the area ID in brackets, its title in the language picked by `lang` (or the first available in the fallback order), and its type code, `range`, `admin_limits` or `country`, copied verbatim.
+- The last line is `Next page: offset=N` when more results follow, `Next page: offset=N (limit at most M)` near the end of the 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` See [Paging](../using-with-llms.md#paging).
+- When nothing matches, the whole output is one line: `No areas found matching query "<query>".`, followed by `, area type <area_type>` before the period when it is given.
+
+## Example
+
+`search_areas {query: "valais", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+```text
+Found 5 area(s). Showing 3 from offset 0:
+Filters: query "valais"
+
+- [14384] Valais (admin_limits)
+- [14437] Valais W - Alpes Pennines W (range)
+- [14436] Valais E - Alpes Pennines E (range)
+
+Next page: offset=3
+```
+
+The Swiss canton (`admin_limits`) and the two ranges named after it come back together. Pass `area_type: "range"` to keep only mountain ranges, then use the ID as `area_id`: `search_routes {area_id: 14437}`.
+
+## Limits
+
+- **Titles match approximately and in any language.** Check the returned titles before using an ID. `search_areas {query: "savoie", area_type: "admin_limits", limit: 3}`, captured from v1.3.0 on 2026-10-05, also returns an Italian province:
+
+  ```text
+  Found 3 area(s). Showing 3 from offset 0:
+  Filters: query "savoie", area type admin_limits
+
+  - [14295] Savoie (admin_limits)
+  - [14366] Haute-Savoie (admin_limits)
+  - [280059] Province de Savone (admin_limits)
+  ```
+
+  The German name finds the same canton: `search_areas {query: "wallis", lang: "de", limit: 3}` returned `[14384] Wallis (admin_limits)` first on 2026-10-05, with the titles in German.
+
+- **Towns are not areas.** Search for the range or the département instead. `search_areas {query: "chamonix", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  No areas found matching query "chamonix".
+  ```
+
+- **`query` is required and must not be blank.** `search_areas {query: " ", limit: 3}` is refused before any request, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  MCP error -32602: Input validation error: Invalid arguments for tool search_areas: must not be blank at query
+  ```
+
+- **`area_type` takes only `range`, `admin_limits` or `country`.** Any other value is refused with the valid list. `search_areas {query: "valais", area_type: "massif", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  MCP error -32602: Input validation error: Invalid arguments for tool search_areas: Invalid enum value. Expected 'range' | 'admin_limits' | 'country', received 'massif' at area_type
+  ```
+
+- **Paging stops at 10,000 results**: a call where `offset + limit` exceeds 10,000 is refused before any request.
+- **No geometry, no coordinates and no counts.** A result gives no outline, no parent area and no number of routes. Pass the ID as `area_id` to [`search_routes`](search_routes.md) or [`search_waypoints`](search_waypoints.md) to list what the area contains.
+
 ## Related tools
 
 - [`get_area`](get_area.md): read an area's summary and description.

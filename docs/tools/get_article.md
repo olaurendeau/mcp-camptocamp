@@ -20,6 +20,90 @@ Read one article from its ID: its text, summary, author, type (`collab` or `pers
 
 <!-- generated:inputs end -->
 
+## Output format
+
+```text
+# <title> (ID: <id>)
+**URL**: https://www.camptocamp.org/articles/<id>
+**Language**: <shown> (no <requested> version; available: <languages>)
+**Text in other languages**: <field> (<languages>)
+
+**Type**: <article_type>
+**Author**: <name> (user ID: <user_id>)
+**Categories**: <categories>
+**Activities**: <activities>
+**Quality**: <quality>
+
+## Summary
+[begin user-written text: summary]
+<text>
+[end user-written text: summary]
+
+## Description
+[begin user-written text: description]
+<text>
+[end user-written text: description]
+
+## Associated routes
+- [<id>] <summit> : <title> | <ratings>
+
+## Associated waypoints
+- [<id>] <title> (<waypoint_type>) | <elevation>m
+
+## Associated articles
+- [<id>] <title>
+
+## Associated outings
+- [<id>] <title>
+
+## Associated books
+- [<id>] <title>
+```
+
+- The title is in the language picked by `lang`, or the first available in the fallback order. The `**URL**` line is the article's page on camptocamp.org, to cite as the source.
+- `**Language**` is printed only when the article has no version in the requested language: it says which language is shown and which exist.
+- `**Text in other languages**` is printed only when the shown version has no summary or no description and another language has one. It gives the field name, `summary` or `description`, with those languages: call again with one of them as `lang` to read it. **This line is not in v1.3.0**: it comes with the release after v1.3.0. See [`get_area`](get_area.md#example) for an example.
+- `**Type**` is `collab` (community-edited reference) or `personal` (one author's view). The person is labelled `**Author**` on a `personal` article and `**Created by**` on a `collab` article, which many users edit after its creator.
+- Each labelled line is left out when Camptocamp has no value for it. Categories, activities and the quality are codes, copied verbatim.
+- `## Summary` and `## Description` are printed only when the text exists, between the markers described in [User-written text](../using-with-llms.md#user-written-text).
+- The five association lists are printed only when they are not empty, with every item Camptocamp sends and no count. A route line gives the route's ratings, each labelled with its system. A waypoint line gives its type and elevation; a `virtual` waypoint has no elevation. An item Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`.
+
+## Example
+
+`get_article {id: 226838}`, captured from v1.3.0 on 2026-10-05:
+
+```text
+# Les crampons (ID: 226838)
+**URL**: https://www.camptocamp.org/articles/226838
+
+**Type**: collab
+**Created by**: Thomas Ribière (user ID: 4060)
+**Categories**: gear
+**Activities**: mountain_climbing, snow_ice_mixed, hiking, snowshoeing, skitouring, ice_climbing
+**Quality**: great
+
+## Description
+[begin user-written text: description]
+… (76 lines omitted in this documentation)
+[end user-written text: description]
+
+## Associated articles
+- [1204346] Portail Matériel
+```
+
+The article is community-edited, so the user who created it is labelled `**Created by**`, not `**Author**`. It has no summary and links to one other article, which `get_article {id: 1204346}` opens.
+
+## Limits
+
+- **A `personal` article is one author's view**, not a community consensus: say so when you quote it. A `collab` article can have been rewritten by many users since its creation.
+- **Long texts are cut at 8,000 characters**, ending with `[truncated, N more characters]`. Read the rest on the page given on the `**URL**` line.
+- **Each language version is written separately**, so two versions of an article can say different things, and either can be missing.
+- **An unknown ID is an error.** `get_article {id: 999999999}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  Error: Camptocamp API error: 404 Not Found (article 999999999): document not found
+  ```
+
 ## Related tools
 
 - [`search_articles`](search_articles.md): find an article ID.

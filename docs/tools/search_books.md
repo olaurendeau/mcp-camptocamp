@@ -28,6 +28,69 @@ Find books on Camptocamp.org (guidebooks, history, novels, photo books, techniqu
 
 <!-- generated:inputs end -->
 
+## Output format
+
+```text
+Found <total> book(s). Showing <n> from offset <offset>:
+Filters: query "<query>", book type <book_type>, activity <activity>
+
+- [<id>] <title> | Author: <author> | Types: <book types> | Activities: <activities>
+
+Next page: offset=<N>
+```
+
+- The first line gives how many books Camptocamp found, how many are shown and from which offset. The `Filters:` line repeats the query, in quotes, then `book type <book_type>` and `activity <activity>` only when they are given.
+- Each result is one line: the book ID in brackets, its title in the language picked by `lang`, then the author, the book types and the activities. A part is left out when Camptocamp has no value for it. Titles and authors are printed as Camptocamp stores them, spaces included; book types and activities are codes, copied verbatim.
+- The editor, publication date, ISBN, pages and the routes the book covers are only in [`get_book`](get_book.md).
+- The last line is `Next page: offset=N` when more results follow, `Next page: offset=N (limit at most M)` near the end of the 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` See [Paging](../using-with-llms.md#paging).
+- When nothing matches, the whole output is one line: `No books found matching query "<query>".`, with the other filters before the period when they are given.
+
+## Example
+
+`search_books {query: "mont blanc", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+```text
+Found 79 book(s). Showing 3 from offset 0:
+Filters: query "mont blanc"
+
+- [373877] Mont Blanc Classique & Plaisir | Author: Marco Romelli | Types: topo | Activities: mountain_climbing, snow_ice_mixed
+- [14738] DVD   Mont Blanc | Author: Mont Blanc Pictures | Types: novel | Activities: mountain_climbing, snow_ice_mixed
+- [14746] Hugo et le Mont Blanc | Author: Colette Cosnier | Types: novel
+
+Next page: offset=3
+```
+
+The query matches any book with "Mont Blanc" in its title, novels included. Book 14746 has no activity on Camptocamp, so its line has no `Activities` part. To keep only guidebooks, add `book_type: "topo"` and an `activity`: `search_books {query: "ecrins", book_type: "topo", activity: "rock_climbing", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+```text
+Found 1 book(s). Showing 1 from offset 0:
+Filters: query "ecrins", book type topo, activity rock_climbing
+
+- [14556] Le Massif des Écrins - Les 100 plus belles courses et randonnées | Author: Gaston Rébuffat | Types: topo | Activities: mountain_climbing, snow_ice_mixed, rock_climbing, hiking
+```
+
+A book is listed when one of its activities is the one given: this guidebook also covers mountaineering and hiking.
+
+## Limits
+
+- **The query matches titles only.** A search by author name or ISBN is unreliable, so an empty result does not mean that the book is missing from Camptocamp. The author of book 14556 above finds nothing, `search_books {query: "Gaston Rébuffat", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  No books found matching query "Gaston Rébuffat".
+  ```
+
+  Search a word of the title instead, or browse with `book_type` and `activity`.
+
+- **`query` is required and must not be blank.** It cannot be left out, even with `book_type` or `activity`.
+- **`book_type` and `activity` take only the listed codes.** `topo` means guidebook. Any other value is refused with the valid list, `search_books {query: "vanoise", book_type: "guidebook", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  MCP error -32602: Input validation error: Invalid arguments for tool search_books: must be one of: topo, environment, historical, biography, photos-art, novel, technics, tourism, magazine at book_type
+  ```
+
+- **Paging stops at 10,000 results**: a call where `offset + limit` exceeds 10,000 is refused before any request.
+- **No stock, price or availability.** Camptocamp describes books; it does not sell them.
+
 ## Related tools
 
 - [`get_book`](get_book.md): read a book's author, editor, ISBN and the routes it covers.
