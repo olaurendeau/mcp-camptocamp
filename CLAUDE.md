@@ -31,6 +31,10 @@ src/
     ├── areas.ts          # Tools: search_areas, get_area
     ├── books.ts          # Tools: search_books, get_book
     └── articles.ts       # Tools: search_articles, get_article
+scripts/                  # Dev-only, outside src/: neither built nor shipped
+├── docs-tools.ts         # npm run docs:tools: writes docs/tools/<tool>.md, creating missing pages
+└── docs/
+    └── inputs.ts         # Renders each tool's Inputs block (between the generated:inputs markers) from its registered JSON Schema
 tests/
 ├── api/
 │   ├── camptocamp.test.ts  # API client unit tests with mocked fetch (URLs, parameters)
@@ -46,7 +50,8 @@ tests/
 │   └── api.contract.test.ts  # Live Camptocamp API contract tests (npm run test:contract only)
 ├── docs/
 │   ├── markdown.ts         # Markdown helpers (files, fenced blocks, inline code, links, GitHub heading slugs) and the docs checks
-│   └── docs.test.ts        # docs/ and README.md: links and anchors, json blocks, mcpServers, package/image names, Node version, Sources
+│   ├── docs.test.ts        # docs/ and README.md: links and anchors, json blocks, mcpServers, package/image names, Node version, Sources
+│   └── inputs.test.ts      # docs:tools generator: rendered Inputs block, markers, page idempotence, all 13 schemas
 ├── hooks/
 │   └── guard.test.sh       # Tests for the agent guard hook (.claude/hooks/guard.sh), run on the host
 └── tools/
@@ -89,6 +94,9 @@ docker compose run --rm dev npm test
 
 # Live contract tests against the real Camptocamp API (not part of npm test or make check)
 make test-contract
+
+# Regenerate the Inputs block of docs/tools/<tool>.md from the registered input schemas
+docker compose run --rm dev npm run docs:tools
 
 # Watch mode during development
 docker compose run --rm dev npm run test:watch
