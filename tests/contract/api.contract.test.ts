@@ -51,6 +51,39 @@ function expectNonEmptySearch(result: Search): void {
   }
 }
 
+// The API silently ignores an unknown parameter or value (`conf=nonsense` returns the unfiltered total),
+// so a renamed or dropped filter only shows as a total equal to the unfiltered one: a filter must match
+// something, and fewer documents than the same search without it.
+function expectNarrows(filtered: Search, unfiltered: Search): void {
+  expectNonEmptySearch(filtered);
+  expect(filtered.total, `filtered total ${filtered.total}, unfiltered ${unfiltered.total}`).toBeLessThan(
+    unfiltered.total,
+  );
+}
+
+// Whether the filter reads the intended field: most results carry the filtered value. Not all of them: the
+// search index lags edits (route 1698307, a hiking route without ski rating, still matched `trat=3.1,4.1`).
+function expectMostMatch<T extends { document_id: number }>(
+  documents: T[],
+  matches: (document: T) => boolean,
+  filter: string,
+): void {
+  const others = documents.filter((document) => !matches(document)).map((document) => document.document_id);
+  expect(others.length, `results not matching ${filter}: ${others.join(", ")}`).toBeLessThan(documents.length / 2);
+}
+
+// One request per unfiltered search, shared by the tests that compare against it.
+function once<T>(load: () => Promise<T>): () => Promise<T> {
+  let result: Promise<T> | undefined;
+  return () => (result ??= load());
+}
+
+const VANOISE = 14409;
+const routesInVanoise = once(() => searchRoutes({ area_id: VANOISE }));
+const mountBlancBooks = once(() => searchBooks({ query: "Mont Blanc" }));
+const allOutings = once(() => searchOutings());
+const outingsAtWaypoint37916 = once(() => searchOutings({ waypoint_id: 37916 }));
+
 describe("document details (AC8.2, AC8.3)", () => {
   it.each([
     ["route", 53914, getRoute],
@@ -98,19 +131,19 @@ describe("searches (AC8.2, AC8.3)", () => {
   });
 
   // `u=`, behind search_outings {user_id} and its search_user_outings alias.
-  it("outings of user 430052, each by that user", async () => {
+  it("outings of user 430052, each by that user, fewer than all outings", async () => {
     const result = await searchOutings({ user_id: 430052 });
 
-    expectNonEmptySearch(result);
+    expectNarrows(result, await allOutings());
     for (const outing of result.documents) expect(outing.author).toEqual({ ...AUTHOR, user_id: 430052 });
   });
 
   // `period=2020-06-01,2020-06-30`: the same days in every year.
   // An outing may start or end outside June (05-30 → 06-02): it only has to overlap a June.
-  it("outings at waypoint 37916 in the period 06-01 → 06-30, each overlapping June", async () => {
+  it("outings at waypoint 37916 in the period 06-01 → 06-30, each overlapping June, fewer than all its outings", async () => {
     const result = await searchOutings({ waypoint_id: 37916, period: { start: "06-01", end: "06-30" } });
 
-    expectNonEmptySearch(result);
+    expectNarrows(result, await outingsAtWaypoint37916());
     for (const outing of result.documents) {
       const start = outing.date_start ?? outing.date_end ?? "";
       const end = outing.date_end ?? outing.date_start ?? "";
@@ -123,7 +156,7 @@ describe("searches (AC8.2, AC8.3)", () => {
   });
 
   it("books by keyword", async () => {
-    expectNonEmptySearch(await searchBooks({ query: "Mont Blanc" }));
+    expectNonEmptySearch(await mountBlancBooks());
   });
 
   it("articles by keyword", async () => {
@@ -142,6 +175,71 @@ describe("searches (AC8.2, AC8.3)", () => {
       route?.locales.map((locale) => locale.lang),
       "route 675555 is found but its locale changed: pl=fr no longer returns the API's single fallback locale",
     ).toEqual(["en"]);
+  });
+});
+
+// Each filter of search_routes, search_waypoints and search_books narrows the same search without it; the
+// outing filters `u` and `period` are checked the same way in "searches". Where the search results carry
+// the filtered field, most results must also carry the filtered value.
+describe("search filters narrow live results", () => {
+  describe(`routes in Vanoise (area ${VANOISE})`, () => {
+    it("act: activity skitouring", async () => {
+      const result = await searchRoutes({ area_id: VANOISE, activity: "skitouring" });
+
+      expectNarrows(result, await routesInVanoise());
+      expectMostMatch(result.documents, (route) => route.activities.includes("skitouring"), "act=skitouring");
+    });
+
+    it("trat: ski rating 3.1 → 4.1", async () => {
+      const result = await searchRoutes({ area_id: VANOISE, rating: { system: "ski_rating", min: "3.1", max: "4.1" } });
+
+      expectNarrows(result, await routesInVanoise());
+      const inRange = ["3.1", "3.2", "3.3", "4.1"];
+      expectMostMatch(result.documents, (route) => inRange.includes(route.ski_rating ?? ""), "trat=3.1,4.1");
+    });
+
+    it("hdif: height difference up 1500 → 2000 m", async () => {
+      const result = await searchRoutes({ area_id: VANOISE, height_diff_up: { min: 1500, max: 2000 } });
+
+      expectNarrows(result, await routesInVanoise());
+      const inRange = (up?: number | null) => up != null && up >= 1500 && up <= 2000;
+      expectMostMatch(result.documents, (route) => inRange(route.height_diff_up), "hdif=1500,2000");
+    });
+
+    // Route types and configuration are not in the search results: only the totals tell.
+    it("rtyp: route type traverse", async () => {
+      expectNarrows(await searchRoutes({ area_id: VANOISE, route_types: ["traverse"] }), await routesInVanoise());
+    });
+
+    it("conf: configuration edge", async () => {
+      expectNarrows(await searchRoutes({ area_id: VANOISE, configuration: ["edge"] }), await routesInVanoise());
+    });
+  });
+
+  it(`wtyp: huts in Vanoise (area ${VANOISE})`, async () => {
+    const [result, unfiltered] = await Promise.all([
+      searchWaypoints({ area_id: VANOISE, waypoint_type: "hut" }),
+      searchWaypoints({ area_id: VANOISE }),
+    ]);
+
+    expectNarrows(result, unfiltered);
+    expectMostMatch(result.documents, (waypoint) => waypoint.waypoint_type === "hut", "wtyp=hut");
+  });
+
+  describe("books about Mont Blanc", () => {
+    it("btyp: book type topo", async () => {
+      const result = await searchBooks({ query: "Mont Blanc", book_type: "topo" });
+
+      expectNarrows(result, await mountBlancBooks());
+      expectMostMatch(result.documents, (book) => book.book_types?.includes("topo") ?? false, "btyp=topo");
+    });
+
+    it("act: activity skitouring", async () => {
+      const result = await searchBooks({ query: "Mont Blanc", activity: "skitouring" });
+
+      expectNarrows(result, await mountBlancBooks());
+      expectMostMatch(result.documents, (book) => book.activities?.includes("skitouring") ?? false, "act=skitouring");
+    });
   });
 });
 
