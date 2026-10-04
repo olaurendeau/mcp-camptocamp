@@ -100,7 +100,7 @@ Next page: offset=<N>
   - `Author:`, the Camptocamp user who wrote the report. [`get_outing`](get_outing.md) does not give it.
 - **The footer** is `Next page: offset=N` when more outings follow, `Next page: offset=N (limit at most M)` near the end of Camptocamp's 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` There is no footer on the last page. See [Paging](../using-with-llms.md#paging).
 - **No match** prints a single line, `No outings found matching <filters>.` (`No outings found.` without filters), followed by the `Note:` line for a period search.
-- An item Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`. See [Missing data](../using-with-llms.md#missing-data).
+- An item Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`, or by `- (not shown: Camptocamp sent an item in an unexpected format)` when its ID is unreadable. See [Missing data](../using-with-llms.md#missing-data).
 - `lang` picks the language of titles and range names. A search prints no `**Language**` line, unlike the `get_*` tools.
 
 ## Example
@@ -125,7 +125,17 @@ The period matches June of every year: here 2026 and 2025. `get_outing {id: 1912
 
 ## Limits
 
-- **Edge days of a period can be missed.** Camptocamp's period filter can leave out outings dated on `period_start` or `period_end`, depending on the year; the `Note:` line says so on every period search. When those days matter, widen the period by one day on each side (`period_start: "05-31"`, `period_end: "07-01"` for June) and leave out the outings dated outside it.
+- **Edge days of a period can be missed.** Camptocamp's period filter can leave out outings dated on `period_start` or `period_end`, depending on the year; the `Note:` line says so on every period search. When those days matter, widen the period by one day on each side (`period_start: "05-31"`, `period_end: "07-01"` for June) and leave out the outings dated outside it. Measured on the live API on 2026-10-05, the June outings of one year (`date_from` and `date_to` alone, then with the June period, then with the widened period):
+
+  | Year | Dates only | `06-01` → `06-30` | `05-31` → `07-01` |
+  | ---- | ---------- | ----------------- | ----------------- |
+  | 2019 | 1363       | 1244              | 1363              |
+  | 2021 | 1358       | 1313              | 1357              |
+  | 2024 | 1519       | 1456              | 1518              |
+
+  A period that starts on `01-01` or ends on `12-31` cannot be widened past the new year. Use `date_from` and `date_to` for those days instead, one year per call.
+
+- **An outing spanning the new year matches no period.** Outing 1362640, from 2020-12-17 to 2021-10-28, is never returned by a period search. `date_from` and `date_to` do return it.
 - **A period cannot wrap around the new year.** `period_end` must be on or after `period_start`; for 20 December to 10 January, make two calls. `search_outings {area_id: 14409, activity: "skitouring", period_start: "12-20", period_end: "01-10", limit: 3}`, captured from v1.3.0 on 2026-10-05:
 
   ```text

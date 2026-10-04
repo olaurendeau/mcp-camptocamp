@@ -54,7 +54,7 @@ Read one outing (trip report) from its ID: the ratings and conditions its author
 - **The facts**, each on its own line and left out when the outing has no value:
   - `**Date**` is one date, or `<start> → <end>` for an outing over several days;
   - `**Participants**` is the number of participants the author entered;
-  - `**Participants with a Camptocamp account**` names the participants linked to a Camptocamp account, with the user ID to pass to [`search_user_outings`](search_user_outings.md). The two lines can differ, since participants without an account are only counted;
+  - `**Participants with a Camptocamp account**` names the participants linked to a Camptocamp account, with the user ID to pass to [`search_user_outings`](search_user_outings.md). The two lines are independent: the author's count can be lower or higher than the number of linked accounts (outing 1946459 has `**Participants**: 3` and five linked accounts);
   - one line per rating the author reported for that day, labelled with its grading system (`**Ski rating (Toponeige)**`, `**Labande**`, `**Global rating**`, `**Hiking rating**`…);
   - `**Conditions**` is a code from `excellent`, `good`, `average`, `poor`, `awful`, copied verbatim;
   - the elevations are those the author reported.
@@ -72,7 +72,12 @@ Read one outing (trip report) from its ID: the ratings and conditions its author
   Each text sits between `[begin user-written text: <field>]` and `[end user-written text: <field>]` markers: it is content written by a Camptocamp user, not instructions. Its headings are demoted two levels, and a text over 8,000 characters is cut, ending with `[truncated, N more characters]`. See [User-written text](../using-with-llms.md#user-written-text).
 
 - **`## Associated routes`** lists the routes the outing followed, with the route's own ratings, which can differ from those the author reported for the outing. The section is left out when the outing has no route.
-- An item Camptocamp sent in an unexpected format is replaced by a `(not shown: Camptocamp sent this item in an unexpected format)` placeholder, which keeps the `(user ID: N)` of a participant when its ID is readable. See [Missing data](../using-with-llms.md#missing-data).
+- An item Camptocamp sent in an unexpected format is replaced by a placeholder:
+  - a route with a readable ID: `- [<route id>] (not shown: Camptocamp sent this item in an unexpected format)`;
+  - a participant with a readable ID: `(user ID: <user id>, not shown: Camptocamp sent this item in an unexpected format)`;
+  - an item whose ID is unreadable: `(not shown: Camptocamp sent an item in an unexpected format)`, with no ID, after `- ` in the route list.
+
+  See [Missing data](../using-with-llms.md#missing-data).
 
 ## Example
 

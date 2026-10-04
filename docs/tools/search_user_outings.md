@@ -63,7 +63,7 @@ All three outings were written by Loïc Perrin and list LaurentB2 as a participa
 
 ## Limits
 
-- **Participants, not only authors.** The list holds every outing the user is listed on, including those other users wrote. To keep only the outings a user wrote, check the `Author:` part of each line.
+- **Participants, not only authors.** The list holds every outing the user is listed on, including those other users wrote. The `Author:` part of each line is a name, not a user ID. To find the outings a user wrote, take the user's name from a `**Participants with a Camptocamp account**` line of [`get_outing`](get_outing.md), which pairs each name with its user ID (`LaurentB2 (user ID: 211581)`), then compare it with `Author:`. Camptocamp names are not guaranteed to be unique, so a matching name is a strong hint, not a proof.
 - **No search by name.** No tool finds a Camptocamp user from a name. The user ID is the number in the user's camptocamp.org profile URL, or comes from the `**Participants with a Camptocamp account**` line of [`get_outing`](get_outing.md).
 - **No other filter.** For a user's outings in an area, an activity, a rating range, conditions, dates, a period, a route or a waypoint, call `search_outings {user_id}` with those filters.
 - **An unknown user ID returns no results, not an error.** `search_user_outings {user_id: 999999999, limit: 3}`, captured from v1.3.0 on 2026-10-05:
