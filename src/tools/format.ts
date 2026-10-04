@@ -17,8 +17,9 @@ import type {
 import { formatRatingParts } from "./ratings.js";
 import type { Lang } from "./enums.js";
 
-// Locale fallback order after the requested language: the API's own `pl` fallback (#141 on #153). Only
-// [it, en] → en was observed live (route 675555 has [it, en] and a `pl=fr` search returns en).
+// Locale fallback order after the requested language: the API's own `pl` fallback (#141 on #153). The live
+// contract tests pin it on searches for fr before en, sl and es, en before it and ca, it before de, sl and es,
+// es before ca, eu and sl (#203); de/es, ca/eu, eu/sl and sl/zh were not observed.
 export const LANG_ORDER = ["fr", "en", "it", "de", "es", "ca", "eu", "sl", "zh"] as const satisfies readonly Lang[];
 
 // Detail endpoints return every locale in no useful order (book 373877: it, fr, en; article 716039:
