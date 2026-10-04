@@ -129,10 +129,13 @@ export const routeDetailSchema = z.object({
   document_id: z.number(),
   locales: z.array(
     routeLocaleSchema.extend({
+      summary: z.string().nullish(),
       description: z.string().nullish(),
+      slope: z.string().nullish(), // free text ("40°" on route 54085), printed as user-written text
       remarks: z.string().nullish(),
       gear: z.string().nullish(),
       route_history: z.string().nullish(),
+      external_resources: z.string().nullish(),
     }),
   ),
   activities: z.array(z.string()),
@@ -141,9 +144,19 @@ export const routeDetailSchema = z.object({
   height_diff_up: z.number().nullish(),
   height_diff_down: z.number().nullish(),
   ...ratingFields,
-  // Not displayed yet; typed because the live API sends them, often as null.
+  // Practical facts, printed verbatim (R2 on #58): enum codes such as "glacier_safety_gear" are never translated,
+  // and durations are day counts sent as strings ("1"). The live API sends null for unset ones (route 54085's
+  // height_diff_access).
+  height_diff_difficulties: z.number().nullish(),
+  height_diff_access: z.number().nullish(),
+  orientations: z.array(z.string()).nullish(),
   durations: z.array(z.string()).nullish(),
+  route_types: z.array(z.string()).nullish(),
+  configuration: z.array(z.string()).nullish(),
+  glacier_gear: z.string().nullish(),
+  lift_access: z.boolean().nullish(),
   main_waypoint_id: z.number().nullish(), // marks this waypoint among associations.waypoints
+  // Typed because the live API sends it; never displayed.
   geometry: z.object({ geom_detail: z.string().nullish() }).nullish(),
   areas: z.array(areaSummarySchema).nullish(),
   // images and xreports are left out on purpose: no tool can follow them. Route 54085 sends empty lists.
