@@ -204,6 +204,21 @@ describe("searches (AC8.2, AC8.3)", () => {
       "route 675555 is found but its locale changed: pl=fr no longer returns the API's single fallback locale",
     ).toEqual(["en"]);
   });
+
+  // AC5.2, AC5.3: `pl=<lang>` returns the requested language instead of fr (route 54085 has fr, de, en and it).
+  it("route 54085 comes back from a de search with its single de locale", async () => {
+    const result = await searchRoutes({ query: "Glacier du Geay", lang: "de" });
+    const route = wellFormed(result.documents).find((document) => document.document_id === 54085);
+    const found = wellFormed(result.documents)
+      .map((document) => document.document_id)
+      .join(", ");
+
+    expect(route, `route 54085 is not in the results anymore (found: ${found}); pick another route`).toBeDefined();
+    expect(
+      route?.locales.map((locale) => locale.lang),
+      "route 54085 is found but its locale changed: pl=de no longer returns the single de locale",
+    ).toEqual(["de"]);
+  });
 });
 
 // Each filter of search_routes, search_waypoints, search_outings and search_books narrows the same search
