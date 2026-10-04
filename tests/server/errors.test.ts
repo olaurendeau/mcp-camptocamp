@@ -107,6 +107,30 @@ describe("network errors", () => {
   });
 });
 
+describe("timeout", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("ends a never-answering request in an error result after 15 s", async () => {
+    const fetchMock = stubFetch();
+    fetchMock.mockImplementationOnce(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    );
+    const client = await connect();
+    vi.useFakeTimers();
+
+    const call = callForText(client, "get_route", { id: 53914 });
+    await vi.advanceTimersByTimeAsync(15_000);
+    const text = await call;
+
+    expect(text).toBe("Error: Camptocamp API error: request timed out after 15 s");
+  });
+});
+
 describe("non-Error throws", () => {
   afterEach(() => {
     vi.doUnmock("../../src/api/http.js");
