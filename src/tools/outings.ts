@@ -43,11 +43,22 @@ function isRealDate(s: string): boolean {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === s;
 }
 
+// Factories, not shared instances: a shared instance becomes a JSON Schema `$ref` to the first
+// field using it, and strict clients then show that field's description for the others.
 const DATE_MESSAGE = "must be a real date in YYYY-MM-DD format";
-const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, DATE_MESSAGE)
-  .refine(isRealDate, DATE_MESSAGE);
+const isoDate = () =>
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, DATE_MESSAGE)
+    .refine(isRealDate, DATE_MESSAGE);
+
+// A day of the year for `period`, checked in 2020 (a leap year) like the API layer sends it.
+const PERIOD_DAY_MESSAGE = "must be a real day in MM-DD format (e.g. 06-01; 02-29 allowed)";
+const periodDay = () =>
+  z
+    .string()
+    .regex(/^\d{2}-\d{2}$/, PERIOD_DAY_MESSAGE)
+    .refine((s) => isRealDate(`2020-${s}`), PERIOD_DAY_MESSAGE);
 
 export const searchOutingsSchema = z.object({
   query: searchQuery("Keyword matched against outing titles (e.g. 'cosmiques')", { allowBlank: true }).optional(),
@@ -58,14 +69,21 @@ export const searchOutingsSchema = z.object({
     })
     .optional()
     .describe(`Activity, one of: ${OUTING_ACTIVITIES.join(", ")}`),
-  date_from: isoDate
+  date_from: isoDate()
     .optional()
     .describe("Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it"),
-  date_to: isoDate
+  date_to: isoDate()
     .optional()
     .describe("Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it"),
+  period_start: periodDay()
+    .optional()
+    .describe("First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01)"),
+  period_end: periodDay()
+    .optional()
+    .describe("Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30)"),
   route_id: documentId("Camptocamp route ID from search_routes").optional(),
   waypoint_id: documentId("Camptocamp waypoint ID from search_waypoints").optional(),
+  user_id: documentId("Camptocamp user ID of the outings' author (the number in their profile URL)").optional(),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   offset: searchOffset(),
 });
@@ -140,6 +158,7 @@ function formatOutingDetail(outing: OutingDetail): string {
 
 function describeFilters(params: SearchOutingsInput): string[] {
   const filters: string[] = [];
+  if (params.user_id !== undefined) filters.push(`user ${params.user_id}`);
   if (params.query !== undefined) filters.push(`query "${params.query}"`);
   if (params.area_id !== undefined) filters.push(`area ${params.area_id}`);
   if (params.activity !== undefined) filters.push(`activity ${params.activity}`);
@@ -149,6 +168,9 @@ function describeFilters(params: SearchOutingsInput): string[] {
     filters.push(`dates from ${params.date_from}`);
   } else if (params.date_to !== undefined) {
     filters.push(`dates until ${params.date_to}`);
+  }
+  if (params.period_start !== undefined && params.period_end !== undefined) {
+    filters.push(`period ${params.period_start} → ${params.period_end} of every year`);
   }
   if (params.route_id !== undefined) filters.push(`route ${params.route_id}`);
   if (params.waypoint_id !== undefined) filters.push(`waypoint ${params.waypoint_id}`);
@@ -177,6 +199,10 @@ function formatOutingLine(outing: OutingListItem): string {
   return [head, ...parts].join(" | ");
 }
 
+// D1: the period is sent as given, so no outing outside it is shown, and the gap is stated.
+// Camptocamp computes it with a 365.2425-day year, so a boundary day can drop out depending on the year.
+const PERIOD_NOTE = "Note: Camptocamp's period filter can miss outings on the first or last day of the range.";
+
 function formatOutingList(response: OutingListResponse, params: SearchOutingsInput): string {
   return formatSearchPage({
     kind: "outing",
@@ -185,6 +211,7 @@ function formatOutingList(response: OutingListResponse, params: SearchOutingsInp
     limit: params.limit,
     lines: response.documents.map(formatOutingLine),
     filters: describeFilters(params),
+    notes: params.period_start !== undefined ? [PERIOD_NOTE] : [],
     order: ", most recent first",
   });
 }
@@ -198,9 +225,21 @@ export async function handleSearchOutings(input: SearchOutingsInput): Promise<st
   if (params.date_from !== undefined && params.date_to !== undefined && params.date_from > params.date_to) {
     throw new Error(`date_from (${params.date_from}) must be on or before date_to (${params.date_to}).`);
   }
+  const { period_start, period_end, ...filters } = params;
+  if ((period_start === undefined) !== (period_end === undefined)) {
+    throw new Error("period_start and period_end must be given together (MM-DD, e.g. 06-01 and 06-30).");
+  }
+  if (period_start !== undefined && period_end !== undefined && period_start > period_end) {
+    // Camptocamp returns no outing at all for a wrapping period.
+    throw new Error(
+      `period cannot wrap around the new year; make two calls (${period_start} → 12-31 and 01-01 → ${period_end})`,
+    );
+  }
   assertResultWindow(params.offset, params.limit);
 
-  const response = await searchOutings(params);
+  const period =
+    period_start !== undefined && period_end !== undefined ? { start: period_start, end: period_end } : undefined;
+  const response = await searchOutings(period ? { ...filters, period } : filters);
   return formatOutingList(response, params);
 }
 
@@ -236,7 +275,7 @@ export const outingToolDefinitions = [
     name: "search_outings",
     title: "Search outings",
     description:
-      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), route_id (from search_routes), waypoint_id (from search_waypoints). Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow, or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text.",
+      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), period_start / period_end (MM-DD, both together; the same days in every year, e.g. 06-01 → 06-30 for all Junes; combine with date_from / date_to to limit the years; a period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range), route_id (from search_routes), waypoint_id (from search_waypoints), user_id (the author's Camptocamp user ID). Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow — or 'Next page: offset=N (limit at most M)' near the window's end, where limit must be lowered to M — or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint/user ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text.",
     inputSchema: searchOutingsSchema,
     handler: handleSearchOutings,
   },
