@@ -113,12 +113,13 @@ segments=$(perl -e '
 ' <<<"$raw")
 
 # Global options may sit between the program and its subcommand (git -C <path> push, git -c k=v tag,
-# npm --prefix . version, make -C . publish), and their value may be quoted.
-# Only the options listed here take their value as the next word.
+# npm --otp 123456 publish, make -C . publish), and their value may be quoted.
+# Any npm/pnpm/yarn option may take the next word as its value. For the version bump (a Perl regex),
+# that word must not be a subcommand that reads, so `npm --json view version` views the version.
 value='("[^"]*"|'\''[^'\'']*'\''|[^-[:space:]][^[:space:]]*)'
 git='git([[:space:]]+((-C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix)[[:space:]]+'"$value"'|-[^[:space:]]*))*[[:space:]]+'
-pkg_opts='--prefix|-C|--cwd|--dir|-w|--workspace|--filter|-F|--userconfig|--globalconfig|--registry|--cache|--loglevel'
-pkg='(npm|pnpm|yarn)([[:space:]]+(('"$pkg_opts"')[[:space:]]+'"$value"'|-[^[:space:]]*))*[[:space:]]+'
+pkg='(npm|pnpm|yarn)([[:space:]]+-[^[:space:]]*([[:space:]]+'"$value"')?)*[[:space:]]+'
+reads='view|info|show|v|run|run-script'
 # The start of a command: subshell or group, keywords, variable assignments, a path to the program.
 start='^[[:space:](){!]*(([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*|if|then|elif|else|do|while|until|time|command|env)[[:space:]]+)*([^[:space:]]*/)?'
 
@@ -126,7 +127,7 @@ publish="${pkg}publish"
 publish+='|make[[:space:]](.*[[:space:]])?publish([[:space:]]|$)'
 publish+='|mcp-publisher[[:space:]]+publish'
 publish+='|gh[[:space:]].*release[[:space:]]+(create|upload|edit|delete)'
-bump="${pkg}version"
+bump='(?:npm|pnpm|yarn)(?:\s+-\S*(?:\s+(?!(?:'"$reads"')(?:\s|$))(?:"[^"]*"|\x27[^\x27]*\x27|[^-\s]\S*))?)*\s+version'
 no_git_tag='[[:space:]]--no-git-tag-version([[:space:]"'\'']|$)'
 git_tag='[[:space:]]--git-tag-version|--no-git-tag-version[[:space:]]+["'\'']?(true|false)(["'\''[:space:]]|$)'
 tag_create="${git}"'tag[[:space:]].*v[0-9]'
@@ -152,29 +153,36 @@ write='[[:space:]](-f|-F|--field|--raw-field|--input|-d|--data[-a-z]*|--json|--f
 get="${method}GET"
 api_refs='git/refs([/"'\''[:space:]?]|$)'
 api_releases='/releases([/"'\''[:space:]?]|$)'
+ref_mutation='(create|update|delete)Refs?[[:space:]]*\('
 
 has() { grep -Eq -- "$2" <<<"$1"; }
 has_i() { grep -Eiq -- "$2" <<<"$1"; }
+has_p() { perl -e 'exit($ARGV[0] =~ /$ARGV[1]/ ? 0 : 1)' -- "$1" "$2"; }
 # An API call that changes something: POST/PUT/PATCH/DELETE, and not forced back to GET.
 api_writes() { { has "$1" "$write" || has "$1" "${method}DELETE"; } && ! has "$1" "$get"; }
+# The command names only branches. The ref may sit in a field, a JSON heredoc or the path, so look in the raw command.
+branch_only() { grep -q 'refs/heads/' <<<"$raw" && ! grep -q 'refs/tags' <<<"$raw"; }
 
 while IFS= read -r seg; do
   if has "$seg" "$publish" || { has "$seg" "$api_releases" && api_writes "$seg"; }; then
     deny "Manual publication (npm/pnpm/yarn publish, make publish, mcp-publisher publish, gh release create/upload/edit/delete, writes to …/releases through the API) is blocked for every agent. Publication happens only through publish.yml, triggered by the coordinator pushing tag vX.Y.Z on main."
   fi
 
-  # The tag may sit in a quoted field or a JSON heredoc (--input -), so look for it in the raw command.
-  # Creating it (POST …/git/refs) is a tag push; writing to an existing one (…/git/refs/tags/…) moves or deletes it.
-  if has "$seg" "$api_refs" && api_writes "$seg" && grep -q 'refs/tags' <<<"$raw"; then
+  # Any ref write through the API that is not known to target a branch (refs/heads/) may be a tag.
+  # Creating one (POST …/git/refs) is a tag push; updating or deleting one (PATCH/DELETE …/git/refs/…) moves it.
+  if has "$seg" "$api_refs" && api_writes "$seg" && ! branch_only; then
     if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$seg" 'git/refs/tags/'; then
-      deny "No agent moves or deletes a tag through the API (PATCH/DELETE …/git/refs/tags/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
+      deny "No agent moves or deletes a tag through the API (PATCH/DELETE on …/git/refs/… other than refs/heads/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
     fi
     if [ "$agent" != "coordinator" ]; then
       deny "Only the coordinator creates version tags (POST …/git/refs or git push origin vX.Y.Z), on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
     fi
   fi
+  if [ "$agent" != "coordinator" ] && has "$seg" 'graphql' && grep -Eq "$ref_mutation" <<<"$raw" && ! branch_only; then
+    deny "Only the coordinator writes tag refs (GraphQL createRef/updateRef/deleteRef outside refs/heads/). Report to the coordinator instead."
+  fi
 
-  if has "$seg" "$bump"; then
+  if has_p "$seg" "$bump"; then
     if [ "$agent" != "developer" ]; then
       deny "Only a developer bumps the version, in a bump PR for a release the human asked for. Ask the coordinator to dispatch a developer."
     fi

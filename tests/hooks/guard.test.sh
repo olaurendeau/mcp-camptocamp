@@ -283,6 +283,11 @@ TAG_API_CREATE=(
   'gh api -X POST repos/o/r/git/refs -f ref=refs/tags/v1.0.5 -f sha=abc'
   "$(lines 'gh api repos/o/r/git/refs --input - <<EOF' '{"ref":"refs/tags/v1.0.5","sha":"abc"}' 'EOF')"
   "curl -H \"Authorization: token \$T\" https://api.github.com/repos/o/r/git/refs -d '{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}'"
+  # The ref may not appear in the command at all: only a branch (refs/heads/) is free for every role.
+  'gh api repos/o/r/git/refs --input ref.json'
+  'curl -X POST https://api.github.com/repos/o/r/git/refs -d @ref.json'
+  "gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { ref { name } } }'"
+  "gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \$name, oid: \"abc\"}) { ref { name } } }' -f name=v1.0.5"
 )
 for cmd in "${TAG_API_CREATE[@]}"; do
   check allow coordinator "$cmd"
@@ -307,8 +312,20 @@ for role in coordinator developer pr-reviewer ""; do
   check allow "$role" 'gh api repos/o/r/git/refs/tags -F per_page=100 --method GET'
   check allow "$role" 'gh api repos/o/r/releases --jq ".[0].tag_name"'
   check allow "$role" 'gh api repos/o/r/releases/latest'
+  # Branches stay free through the API
+  check allow "$role" 'gh api repos/o/r/git/refs -f ref=refs/heads/feat/x -f sha=abc'
+  check allow "$role" 'gh api -X PATCH repos/o/r/git/refs/heads/feat/x -f sha=abc -F force=true'
+  check allow "$role" 'gh api -X DELETE repos/o/r/git/refs/heads/feat/old-tool'
+  check allow "$role" "gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \"refs/heads/feat/x\", oid: \"abc\"}) { ref { name } } }'"
+  check allow "$role" "gh api graphql -f query='query { repository(owner: \"o\", name: \"r\") { refs(refPrefix: \"refs/tags/\", first: 5) { nodes { name } } } }'"
 done
-check allow developer   'gh api repos/o/r/git/refs -f ref=refs/heads/feat/x -f sha=abc'
+# A ref the command does not name is not known to be a branch: updating or deleting it may move a tag
+check deny  coordinator 'gh api -X PATCH "repos/o/r/git/refs/$REF" -f sha=abc -F force=true'
+check deny  coordinator 'gh api -X DELETE "repos/o/r/git/refs/$REF"'
+for role in developer pr-reviewer ""; do
+  check deny "$role" "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { ref { name } } }'"
+  check deny "$role" "gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+done
 
 # make with options or other targets before publish
 for role in coordinator developer pr-reviewer ""; do
@@ -330,11 +347,22 @@ for role in coordinator developer pr-reviewer ""; do
   check deny  "$role" 'git config push.followTags ON'
 done
 
-# npm/pnpm/yarn: only options that take a value consume the next word
+# npm/pnpm/yarn: an option may take the next word as its value, unless that word is a subcommand
+# that reads (npm --json view version views the version, it does not bump it)
 for role in coordinator developer pr-reviewer ""; do
   check allow "$role" 'npm --json view version'
   check allow "$role" 'npm --silent view @olaurendeau/mcp-camptocamp version'
+  check allow "$role" 'npm --json info @olaurendeau/mcp-camptocamp version'
+  check allow "$role" 'npm --silent run version'
+  check deny  "$role" 'npm --otp 123456 publish'
+  check deny  "$role" 'npm --access public publish'
+  check deny  "$role" 'npm --tag next publish'
+  check deny  "$role" 'pnpm --reporter silent publish'
+  check deny  "$role" 'npm --tag next version patch'
+  check deny  "$role" 'npm --tag next version 1.2.0'
+  check deny  "$role" 'npm --otp 1 version patch'
 done
+check allow developer   'npm --tag next version 1.2.0 --no-git-tag-version'
 check deny  developer   'npm --registry https://r.example version patch'
 check deny  developer   'npm --loglevel silent version 1.1.0'
 check deny  developer   'npm --json version patch'
@@ -384,6 +412,10 @@ for role in coordinator developer pr-reviewer ""; do
   check allow "$role" 'gh pr view 5 --json mergeStateStatus'
   check allow "$role" "$READ"
   check allow "$role" "$(lines 'git commit -F - <<EOF' 'chore: note that gh pr merge and npm publish are restricted' 'EOF')"
+  check allow "$role" 'gh pr checks 217 --watch --interval 30'
+  check allow "$role" 'gh pr comment 217 --body-file /tmp/review.md'
+  check allow "$role" 'docker compose run --rm dev sh -c "npm ci && npm run check"'
+  check allow "$role" 'git -C /repo status --short'
 done
 
 if [ "$failures" -gt 0 ]; then
