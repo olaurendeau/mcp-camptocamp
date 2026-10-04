@@ -250,6 +250,90 @@ describe("handleGetOuting", () => {
   });
 });
 
+describe("zero values and partial dates", () => {
+  it("prints 0 for participant_count, the elevations and the height differences in get_outing", async () => {
+    mockGetOuting.mockResolvedValueOnce({
+      document_id: 46,
+      locales: [{ lang: "fr", title: "Psicobloc au Moulon" }],
+      activities: ["rock_climbing"],
+      date_start: "2026-08-10",
+      date_end: "2026-08-10",
+      participant_count: 0,
+      elevation_max: 0,
+      elevation_min: 0,
+      height_diff_up: 0,
+      height_diff_down: 0,
+    });
+
+    const result = await handleGetOuting({ id: 46 });
+
+    expect(result.split("\n").slice(3)).toEqual([
+      "**Activities**: rock_climbing",
+      "**Date**: 2026-08-10",
+      "**Participants**: 0",
+      "**Max elevation**: 0m",
+      "**Min elevation**: 0m",
+      "**Elevation gain**: 0m",
+      "**Elevation loss**: 0m",
+    ]);
+  });
+
+  it("prints nothing for null participant_count, elevations and height differences in get_outing", async () => {
+    mockGetOuting.mockResolvedValueOnce({
+      document_id: 47,
+      locales: [{ lang: "fr", title: "Sortie sans chiffres" }],
+      activities: ["hiking"],
+      date_start: null,
+      date_end: null,
+      participant_count: null,
+      elevation_max: null,
+      elevation_min: null,
+      height_diff_up: null,
+      height_diff_down: null,
+    });
+
+    const result = await handleGetOuting({ id: 47 });
+
+    expect(result.split("\n").slice(3)).toEqual(["**Activities**: hiking"]);
+  });
+
+  it("prints the end date of an outing without a start date in get_outing", async () => {
+    mockGetOuting.mockResolvedValueOnce({
+      document_id: 48,
+      locales: [{ lang: "fr", title: "Aiguille du Midi : Arête des Cosmiques" }],
+      activities: ["mountain_climbing"],
+      date_start: null,
+      date_end: "2026-08-10",
+    });
+
+    const result = await handleGetOuting({ id: 48 });
+
+    expect(result.split("\n").slice(3)).toEqual(["**Activities**: mountain_climbing", "**Date**: 2026-08-10"]);
+  });
+
+  it("prints the end date of an outing without a start date and an elevation of 0 in search_user_outings", async () => {
+    mockSearchOutings.mockResolvedValueOnce({
+      total: 1,
+      documents: [
+        {
+          document_id: 5,
+          locales: [{ lang: "fr", title: "Psicobloc au Moulon" }],
+          activities: ["rock_climbing"],
+          date_start: null,
+          date_end: "2026-08-10",
+          elevation_max: 0,
+        },
+      ],
+    });
+
+    const result = await handleSearchUserOutings({ user_id: 430052, limit: 10, offset: 0 });
+
+    expect(result.split("\n").slice(3)).toEqual([
+      "- [5] Psicobloc au Moulon (rock_climbing) | 2026-08-10 | Max elevation: 0m",
+    ]);
+  });
+});
+
 // Mirrors GET /outings?r=53884&date=2026-06-01,2026-09-30&sort=-date_end&lang=fr (2026-10-03):
 // list items omit absent ratings instead of sending null, and areas mix country, range and admin_limits.
 const cosmiques: OutingListItem = {
@@ -675,6 +759,22 @@ describe("handleSearchOutings", () => {
       expect(result.split("\n")[2]).toBe(
         "- [7] Tour complet (mountain_climbing, rock_climbing) | 2026-01-06 → 2026-03-01 | Conditions: excellent | Max elevation: 4808m | Elevation gain: 0m | Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: D | Rock free rating: 5c | Ice rating: 3 | Hiking rating: T5 | Snowshoe rating: R3 | Areas: Mont-Blanc [14410], Aiguilles Rouges [14328] | Author: o.laurendeau",
       );
+    });
+
+    it("prints the end date of an outing without a start date", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([{ ...cosmiques, date_start: null }]));
+
+      const result = await search({ route_id: 53884 });
+
+      expect(result.split("\n")[3]).toMatch(/^- \[1938453\] .* \| 2026-08-10 \| Conditions: average \| /);
+    });
+
+    it("prints the start date of an outing without an end date", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([{ ...cosmiques, date_end: null }]));
+
+      const result = await search({ route_id: 53884 });
+
+      expect(result.split("\n")[3]).toMatch(/^- \[1938453\] .* \| 2026-08-10 \| Conditions: average \| /);
     });
 
     it("prints only id, Untitled and activities for an empty outing", async () => {
