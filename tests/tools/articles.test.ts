@@ -595,6 +595,45 @@ const ARTICLE_220929 = {
   author: { name: "Marcel Maurice Demont", user_id: 169325 },
 };
 
+// Trimmed from the live GET /articles/812624?lang=fr response (2026-10-04): the description, routes, articles,
+// user and images removed; the first 2 of 32 virtual waypoints kept, with only document_id, locale lang/title,
+// waypoint_type and elevation.
+const ARTICLE_812624 = {
+  document_id: 812624,
+  locales: [
+    { lang: "it", title: "Aperture" },
+    { lang: "en", title: "First Ascents Portal" },
+    { lang: "fr", title: "Portail Ouvertures" },
+  ],
+  quality: "medium",
+  categories: ["topoguide_supplements"],
+  activities: ["rock_climbing"],
+  article_type: "collab",
+  associations: {
+    waypoints: [
+      {
+        document_id: 1945740,
+        locales: [
+          { lang: "en", title: "First Ascents in 1865" },
+          { lang: "fr", title: "Ouvertures 1865" },
+        ],
+        waypoint_type: "virtual",
+        elevation: 0,
+      },
+      {
+        document_id: 1947492,
+        locales: [
+          { lang: "en", title: "First Ascents in 2013" },
+          { lang: "fr", title: "Ouvertures 2013" },
+        ],
+        waypoint_type: "virtual",
+        elevation: 0,
+      },
+    ],
+  },
+  author: { name: "CHNOS5808", user_id: 2674 },
+};
+
 describe("handleGetArticle", () => {
   it("prints the heading, the labelled lines with raw values, the description and linked articles", async () => {
     mockGetArticle.mockResolvedValueOnce(ARTICLE_226838);
@@ -820,6 +859,23 @@ describe("handleGetArticle", () => {
         "- [45148] Le Portalet : Face N | Ski rating (Toponeige): 5.1 | Ski exposure: E3 | Labande: S5 / TD- | Global rating: AD-\n" +
         "- [53804] Traversée Midi - Plan | Global rating: AD | Engagement: III | Equipment: P3",
     );
+  });
+
+  it("prints no elevation for virtual waypoints, even a non-zero one", async () => {
+    // Derived: the second waypoint's placeholder elevation 0 set to 7999.
+    const [first, second] = ARTICLE_812624.associations.waypoints;
+    mockGetArticle.mockResolvedValueOnce({
+      ...ARTICLE_812624,
+      associations: { waypoints: [first, { ...second, elevation: 7999 }] },
+    });
+
+    const result = await handleGetArticle({ id: 812624 });
+
+    expect(result).toContain(
+      "\n## Associated waypoints\n- [1945740] Ouvertures 1865 (virtual)\n- [1947492] Ouvertures 2013 (virtual)",
+    );
+    expect(result).not.toContain("7999m");
+    expect(result).not.toContain("| 0m");
   });
 
   it("lists waypoints, routes, articles and outings in order", async () => {
