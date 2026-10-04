@@ -40,7 +40,7 @@ The output is plain text, in this order:
    - [<id>] <title> (<waypoint_type>) | <elevation>m
    ```
 
-   The elevation is left out when Camptocamp has none, and always for a `virtual` waypoint. A waypoint Camptocamp sent in a format the server cannot read is shown as `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`.
+   The elevation is left out when Camptocamp has none, and always for a `virtual` waypoint. A waypoint Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`, or by `- (not shown: Camptocamp sent an item in an unexpected format)` when its ID is unreadable. See [Missing data](../using-with-llms.md#missing-data).
 
 4. When more waypoints follow, a blank line and a footer: `Next page: offset=N`, `Next page: offset=N (limit at most M)` near the end of the 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` See [Paging](../using-with-llms.md#paging).
 

@@ -59,7 +59,7 @@ The output is plain text, in this order:
    - `<summit> : <title>` is the route's name as Camptocamp shows it. A route without a summit prefix shows its title alone.
    - `Max elevation` and `Elevation gain` are left out when Camptocamp has no value for them.
    - `<ratings>` lists every rating the route has, each labelled with its grading system, in this order: `Ski rating (Toponeige)`, `Ski exposure`, `Labande`, `Global rating`, `Engagement`, `Risk rating`, `Equipment`, `Rock free rating`, `Rock required rating`, `Rock exposure`, `Aid rating`, `Ice rating`, `Mixed rating`, `Via ferrata rating`, `Hiking rating`, `Hiking/MTB exposure`, `Snowshoe rating`, `MTB up rating`, `MTB down rating`. `Labande` prints its ski and global halves as `S4 / AD`, or the only half Camptocamp has.
-   - A route Camptocamp sent in a format the server cannot read is shown as `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`.
+   - A route Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`, or by `- (not shown: Camptocamp sent an item in an unexpected format)` when its ID is unreadable. See [Missing data](../using-with-llms.md#missing-data).
 
 4. When more routes follow, a blank line and a footer: `Next page: offset=N`, `Next page: offset=N (limit at most M)` near the end of the 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` See [Paging](../using-with-llms.md#paging).
 
