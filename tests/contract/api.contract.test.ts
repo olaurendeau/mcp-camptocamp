@@ -227,24 +227,25 @@ describe("searches (AC8.2, AC8.3)", () => {
 
 // #203: the server instructions and LANG_NOTE state that a document without the requested language comes in
 // the first available of LANG_ORDER; on searches the API picks it through `pl`. Each route below lacks the
-// requested language (its languages as of 2026-10-04, in the detail's order). All but 480854 and 327059 list the
-// expected language after another one, so a pick of the first locale would fail on them; those two list es
-// first and only show that the API does not prefer ca or eu. Pairs covered: fr before en, sl and es, en before
-// ca, it before de, sl and es, es before ca, eu and sl; en before it is the AC3.4 case above.
+// requested language (its languages as of 2026-10-04, in the detail's order). `notFirst` says whether the detail
+// lists the expected language after another one, so that a pick of the first locale would fail: true for all
+// but 480854 and 327059, which list es first and only show that the API does not prefer ca or eu. Pairs covered:
+// fr before en, sl and es, en before ca, it before de, sl and es, es before ca, eu and sl; en before it is the
+// AC3.4 case above.
 describe("searches fall back to the first available of LANG_ORDER (#203)", () => {
   it.each([
-    [668432, "Tominskova", "de", ["en", "fr", "sl"], "fr"],
-    [925530, "Via dei Camini", "de", ["es", "fr"], "fr"],
-    [326458, "Volta al massis de Montserrat", "fr", ["ca", "en"], "en"],
-    [47328, "Za Cmirom", "fr", ["sl", "de", "it"], "it"],
-    [47328, "Za Cmirom", "en", ["sl", "de", "it"], "it"],
-    [1196778, "Via dei Camini", "de", ["es", "it"], "it"],
-    [480854, "GEDE Montserrat", "fr", ["es", "ca"], "es"],
-    [327059, "Kanal Haundi", "ca", ["es", "eu"], "es"],
-    [1268880, "Prusik Szalay", "it", ["sl", "es"], "es"],
+    [668432, "Tominskova", "de", ["en", "fr", "sl"], "fr", true],
+    [925530, "Via dei Camini", "de", ["es", "fr"], "fr", true],
+    [326458, "Volta al massis de Montserrat", "fr", ["ca", "en"], "en", true],
+    [47328, "Za Cmirom", "fr", ["sl", "de", "it"], "it", true],
+    [47328, "Za Cmirom", "en", ["sl", "de", "it"], "it", true],
+    [1196778, "Via dei Camini", "de", ["es", "it"], "it", true],
+    [480854, "GEDE Montserrat", "fr", ["es", "ca"], "es", false],
+    [327059, "Kanal Haundi", "ca", ["es", "eu"], "es", false],
+    [1268880, "Prusik Szalay", "it", ["sl", "es"], "es", true],
   ] as const)(
     "route %i (search %j, lang %s, languages %j) comes back in %s",
-    async (id, query, lang, langs, expected) => {
+    async (id, query, lang, langs, expected, notFirst) => {
       const [result, detail] = await Promise.all([searchRoutes({ query, lang }), getRoute(id)]);
       const route = wellFormed(result.documents).find((document) => document.document_id === id);
       const found = wellFormed(result.documents)
@@ -256,6 +257,12 @@ describe("searches fall back to the first available of LANG_ORDER (#203)", () =>
         detail.locales.map((locale) => locale.lang).sort(),
         `route ${id}'s languages changed: it no longer tests this fallback; pick another route`,
       ).toEqual([...langs].sort());
+      expect(
+        detail.locales[0]?.lang !== expected,
+        notFirst
+          ? `route ${id} now lists ${expected} first: a pick of the first locale would pass; pick another route`
+          : `route ${id} no longer lists ${expected} first: set its notFirst to true`,
+      ).toBe(notFirst);
       expect(
         route?.locales.map((locale) => locale.lang),
         `pl=${lang} on [${langs.join(", ")}] no longer returns ${expected}: the API's fallback order changed`,
