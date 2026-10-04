@@ -60,6 +60,7 @@ export async function handleGetArea(input: GetAreaInput): Promise<string> {
 export const areaToolDefinitions = [
   {
     name: "search_areas",
+    title: "Search areas",
     description:
       "Search Camptocamp.org areas by name (titles match in any language, fuzzily — check the returned titles; towns are not areas, search the range or département instead). area_type: range = mountain range/massif; admin_limits = administrative subdivision such as a French département or Swiss canton; country = country. Returns ID, title and type. Pass the returned ID as area_id to search_routes, search_waypoints and search_outings.",
     inputSchema: searchAreasSchema,
@@ -67,6 +68,7 @@ export const areaToolDefinitions = [
   },
   {
     name: "get_area",
+    title: "Get area details",
     description:
       "Get a Camptocamp.org area by ID: title, type, summary and description as published (Camptocamp markup included). No geometry, no route count; use search_routes / search_waypoints with area_id for those.",
     inputSchema: getAreaSchema,

@@ -100,6 +100,7 @@ export async function handleGetWaypoint(input: GetWaypointInput): Promise<string
 export const waypointToolDefinitions = [
   {
     name: "search_waypoints",
+    title: "Search waypoints",
     description:
       "Search for waypoints (summits, shelters, huts, bivouacs) on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching waypoints with basic info (ID, title, type, elevation).",
     inputSchema: searchWaypointsSchema,
@@ -107,6 +108,7 @@ export const waypointToolDefinitions = [
   },
   {
     name: "get_waypoint",
+    title: "Get waypoint details",
     description:
       "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, description, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings.",
     inputSchema: getWaypointSchema,

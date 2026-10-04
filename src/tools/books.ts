@@ -105,6 +105,7 @@ export async function handleGetBook(input: GetBookInput): Promise<string> {
 export const bookToolDefinitions = [
   {
     name: "search_books",
+    title: "Search books",
     description:
       "Search books (guidebooks/topos, history, novels, photo books, technique) on Camptocamp.org by title keyword. The query matches book TITLES only: searching by author name or ISBN is unreliable and can return unrelated books or nothing, so an empty result does not mean the book does not exist. Returns ID, title, author, book types and activities; use get_book for editor, date, ISBN and covered routes/waypoints.",
     inputSchema: searchBooksSchema,
@@ -112,6 +113,7 @@ export const bookToolDefinitions = [
   },
   {
     name: "get_book",
+    title: "Get book details",
     description:
       "Get full details of a specific book from Camptocamp.org by its ID: author, editor, publication date, ISBN, pages, languages, website, book types, activities, summary, description, the routes and waypoints it covers, and its related articles (with IDs for get_route, get_waypoint and get_article). Values are shown exactly as Camptocamp stores them; missing fields are left out.",
     inputSchema: getBookSchema,

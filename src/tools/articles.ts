@@ -114,6 +114,7 @@ export async function handleGetArticle(input: GetArticleInput): Promise<string> 
 export const articleToolDefinitions = [
   {
     name: "search_articles",
+    title: "Search articles",
     description:
       "Search Camptocamp.org articles by keyword. Articles cover gear, climbing and mountaineering techniques, mountain environment (avalanches, snow, weather), stories, and topoguide supplements (route lists, useful links). Each result shows article_type: `collab` (community-edited reference) or `personal` (one author's view, not community consensus), plus categories and activities. Use get_article for the full text and linked routes, waypoints, articles, outings and books.",
     inputSchema: searchArticlesSchema,
@@ -121,6 +122,7 @@ export const articleToolDefinitions = [
   },
   {
     name: "get_article",
+    title: "Get article details",
     description:
       "Get a Camptocamp.org article by ID: full text (Camptocamp markup kept as is), summary, author, type (collab/personal), categories, activities, quality, and the IDs of associated routes, waypoints, articles, outings and books, which can be followed with get_route, get_waypoint, get_article, get_outing and get_book. The Language line gives the language of the returned text (fr when available, otherwise another locale).",
     inputSchema: getArticleSchema,

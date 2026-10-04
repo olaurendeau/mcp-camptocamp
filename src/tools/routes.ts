@@ -93,6 +93,7 @@ export async function handleGetRoute(input: GetRouteInput): Promise<string> {
 export const routeToolDefinitions = [
   {
     name: "search_routes",
+    title: "Search routes",
     description:
       "Search for mountain routes on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching routes with basic info (ID, title, activities, elevation, rating).",
     inputSchema: searchRoutesSchema,
@@ -100,6 +101,7 @@ export const routeToolDefinitions = [
   },
   {
     name: "get_route",
+    title: "Get route details",
     description:
       "Get full details of a specific route from Camptocamp.org by its ID, including description, ratings, elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings.",
     inputSchema: getRouteSchema,
