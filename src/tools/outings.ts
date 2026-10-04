@@ -17,6 +17,7 @@ import {
   formatListItems,
   formatMalformed,
   formatLanguageLine,
+  formatOtherLanguagesLine,
   MALFORMED_ITEM_NOTE,
 } from "./format.js";
 import { isMalformed } from "../api/schemas.js";
@@ -24,7 +25,7 @@ import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { describeRange, heightDiffUp, rangeFilter, ratingBound, ratingFilter, ratingScales } from "./filters.js";
 import { formatUserTexts, USER_TEXT_NOTE, type TextSection } from "./text.js";
 
-// The free-text sections get_outing prints, in print order.
+// The free-text sections get_outing prints, in print order; a field name the locale lacks fails the typecheck.
 const OUTING_TEXT = [
   ["description", "Description"],
   ["route_description", "Route description"],
@@ -32,7 +33,7 @@ const OUTING_TEXT = [
   ["weather", "Weather"],
   ["timing", "Timing"],
   ["participants", "Participants"],
-] as const satisfies readonly TextSection<string>[];
+] as const satisfies readonly TextSection<keyof OutingDetail["locales"][number]>[];
 
 export const getOutingSchema = z.object({
   id: documentId("Outing ID from Camptocamp"),
@@ -158,6 +159,7 @@ function formatOutingDetail(outing: OutingDetail, lang?: Lang): string {
 
   lines.push(...formatHeader(pickTitle(outing.locales, lang), outing.document_id, "outings"));
   lines.push(...formatLanguageLine(outing.locales, lang));
+  lines.push(...formatOtherLanguagesLine(outing.locales, locale, OUTING_TEXT));
 
   lines.push(`\n**Activities**: ${outing.activities.join(", ")}`);
 

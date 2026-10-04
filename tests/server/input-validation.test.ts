@@ -767,6 +767,16 @@ describe("get_* lang input", () => {
       expect(description).toContain(DETAIL_LANG_NOTE);
     },
   );
+
+  // AC1.10 on #210: the note explains the Text line, how to read that text, and that versions are not translations.
+  it("states what the Text in other languages line lists and how to read it", () => {
+    expect(DETAIL_LANG_NOTE).toContain("'**Language**: en (no de version; available: it, en)'");
+    expect(DETAIL_LANG_NOTE).toContain(
+      "'**Text in other languages**: gear (de, en)' lists sections written only in other languages",
+    );
+    expect(DETAIL_LANG_NOTE).toContain("call again with one of those lang values to read them");
+    expect(DETAIL_LANG_NOTE).toContain("Language versions are written separately and may differ.");
+  });
 });
 
 // AC5.1, AC5.2 on #153: the seven searches take an optional lang, checked before any request and sent as pl
