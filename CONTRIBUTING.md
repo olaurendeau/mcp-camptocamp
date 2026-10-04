@@ -31,7 +31,7 @@ Une PR qui dépasse 1000 lignes se découpe : d'abord le refactoring préparatoi
 ### Suivi des dépendances
 
 - **Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) propose chaque lundi les mises à jour npm, GitHub Actions et Docker. Les montées mineures et correctives npm sont groupées (une PR pour la production, une pour le dev) ; chaque montée majeure npm arrive seule et reste une décision de l'humain. Les mises à jour de sécurité arrivent sans délai, une PR chacune. Une PR Dependabot suit le même cycle que les autres : checks requis, revue agent, merge par le coordinateur.
-- **Audit hebdomadaire** ([`.github/workflows/audit.yml`](.github/workflows/audit.yml), lundi et à la demande, jamais requis) : échoue sur toute vulnérabilité _moderate_ ou plus en production. L'audit complet (dépendances de dev comprises) est seulement informatif tant que vitest 2 traîne des alertes connues ([#138](https://github.com/olaurendeau/mcp-camptocamp/issues/138)) ; il deviendra bloquant (seuil _high_) avec cette montée de version.
+- **Audit hebdomadaire** ([`.github/workflows/audit.yml`](.github/workflows/audit.yml), lundi et à la demande, jamais requis) : échoue sur toute vulnérabilité _moderate_ ou plus en production. L'audit complet (dépendances de dev comprises) échoue sur toute vulnérabilité _high_ ou plus.
 
 ## Équipe d'agents
 
