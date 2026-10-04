@@ -20,6 +20,94 @@ Read one area from its ID: its title, type, summary and description. It gives no
 
 <!-- generated:inputs end -->
 
+## Output format
+
+```text
+# <title> (ID: <id>)
+**URL**: https://www.camptocamp.org/areas/<id>
+**Language**: <shown> (no <requested> version; available: <languages>)
+**Text in other languages**: <field> (<languages>), …
+
+**Type**: <area_type>
+
+## Summary
+[begin user-written text: summary]
+<text>
+[end user-written text: summary]
+
+## Description
+[begin user-written text: description]
+<text>
+[end user-written text: description]
+```
+
+- The title is in the language picked by `lang`, or the first available in the fallback order. The `**URL**` line is the area's page on camptocamp.org, to cite as the source.
+- `**Language**` is printed only when the area has no version in the requested language: it says which language is shown and which exist. This line needs v1.3.0 or later. See [Language](../using-with-llms.md#language).
+- `**Text in other languages**` is printed only when the shown version has no summary or no description and another language has one. It names each such section by its API name, `summary` or `description`, without its text, followed by its languages; when both are missing, both are listed, separated by a comma. Call again with one of the listed `lang` values to read it. **This line is not in v1.3.0**: it comes with the release after v1.3.0.
+- `**Type**` is the code `range`, `admin_limits` or `country`, copied verbatim.
+- `## Summary` and `## Description` are printed only when the text exists. The text is written by Camptocamp users and printed between markers, as described in [User-written text](../using-with-llms.md#user-written-text): headings demoted two levels, internal links shown as `<label> (<type>/<id>)`, and a cut after 8,000 characters.
+
+## Example
+
+`get_area {id: 14384}`, captured from v1.3.0 on 2026-10-05; only the space at the end of the line `… qui sont :` is gone, removed by this repository's formatter:
+
+```text
+# Valais (ID: 14384)
+**URL**: https://www.camptocamp.org/areas/14384
+
+**Type**: admin_limits
+
+## Description
+[begin user-written text: description]
+Le Canton du Valais est un canton de Suisse, situé au cœur des Alpes. Son chef-lieu est Sion, et l'allemand et le français en sont les deux langues officielles.
+
+Le territoire du canton se répartit en 9 "massifs" qui sont :
+
+- Alpes Bernoises (areas/14442)
+- Alpes Vaudoises (areas/14421)
+- Alpes Tessinoises (areas/14422)
+- Alpes Uranaises (areas/14435)
+- Chablais (areas/14411)
+- Haut-Giffre (areas/14404)
+- Mont-Blanc (areas/14410)
+- Alpes Pennines E (areas/14436)
+- Alpes Pennines W (areas/14437)
+
+
+Le massif "Alpes Pennines" est subdivisé sur c2c en sa partie E (areas/14436) et sa partie W (areas/14437). On trouve en Valais [48 sommets de plus de 4000m](/waypoints#a=14384&walt=4000%252C8850&wtyp=summit).
+
+####Info transport
+Calculateur d'itinéraire en transport en commun sur le site de l'[UTP Valais](http://www.utpvs.ch/transport-valais/horaire.html),
+Site avec l'[état d'ouverture des routes](https://sitonline.vs.ch/transports_communication/Police_trafic/fr/).
+
+[end user-written text: description]
+```
+
+The area has no summary, so there is no `## Summary` section. The internal links of the description end with `(areas/<id>)`: each ID can be passed to `get_area`, or as `area_id` to the search tools. The `####Info transport` heading was `##Info transport` on Camptocamp.
+
+The same area in English, `get_area {id: 14384, lang: "en"}`, captured from main at 9381eba on 2026-10-05, with a local build:
+
+```text
+# Valais (ID: 14384)
+**URL**: https://www.camptocamp.org/areas/14384
+**Text in other languages**: description (fr)
+
+**Type**: admin_limits
+```
+
+The English version has a title but no text, and the French one has a description: `lang: "fr"` shows it. v1.3.0 prints the same output without the `**Text in other languages**` line.
+
+## Limits
+
+- **No geometry and no counts.** The output has no outline, no coordinates, no parent area and no number of routes or waypoints. Pass the ID as `area_id` to [`search_routes`](search_routes.md), [`search_waypoints`](search_waypoints.md) or [`search_outings`](search_outings.md) to list what the area contains.
+- **Long texts are cut at 8,000 characters.** The description of the Écrins, `get_area {id: 14403}`, ended with `[truncated, 1741 more characters]`, captured from v1.3.0 on 2026-10-05. Read the rest on the page given on the `**URL**` line.
+- **Each language version is written separately**, so the French and English texts of an area can differ, and either can be missing.
+- **An unknown ID is an error.** `get_area {id: 999999999}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  Error: Camptocamp API error: 404 Not Found (area 999999999): document not found
+  ```
+
 ## Related tools
 
 - [`search_areas`](search_areas.md): find an area ID.
