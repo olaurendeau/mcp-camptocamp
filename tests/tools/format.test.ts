@@ -1,0 +1,167 @@
+import { describe, it, expect } from "vitest";
+import {
+  pickLocale,
+  pickTitle,
+  joinList,
+  formatHeader,
+  formatRouteLine,
+  formatWaypointLine,
+  formatTitledLine,
+  formatAreaLine,
+  formatAreasSection,
+} from "../../src/tools/format.js";
+import type { AreaSearchResult } from "../../src/api/camptocamp.js";
+
+// Mirrors GET /areas?q=valais&limit=10&lang=fr (2026-10-03): fr is not the first locale.
+const valaisCanton: AreaSearchResult = {
+  document_id: 14384,
+  area_type: "admin_limits",
+  locales: [
+    { lang: "zh", title: "瓦莱州" },
+    { lang: "fr", title: "Valais" },
+    { lang: "de", title: "Wallis" },
+    { lang: "it", title: "Vallese" },
+  ],
+  available_langs: ["zh", "fr", "de", "it"],
+};
+
+const ecrins: AreaSearchResult = {
+  document_id: 14403,
+  area_type: "range",
+  locales: [{ lang: "fr", title: "Écrins" }],
+  available_langs: ["fr"],
+};
+
+// Mirrors the associated route 53781 of GET /books/209293?lang=fr (2026-10-03), trimmed to three locales.
+const areteDesBosses = {
+  document_id: 53781,
+  locales: [
+    { lang: "it", title: "Monte Bianco via Bossesgrat", title_prefix: "Monte Bianco" },
+    { lang: "fr", title: "Arête des Bosses", title_prefix: "Mont Blanc" },
+    { lang: "en", title: "Arête des Bosses", title_prefix: "Mont Blanc" },
+  ],
+};
+
+describe("pickLocale", () => {
+  it("returns the fr locale when it is not first", () => {
+    expect(pickLocale(valaisCanton.locales)).toEqual({ lang: "fr", title: "Valais" });
+  });
+
+  it("falls back to the first locale when there is no fr", () => {
+    // GET /routes?q=Dente del Resegone returns 675555 with [it, en] locales on its detail.
+    const locales = [
+      { lang: "it", title: "Dente del Resegone" },
+      { lang: "en", title: "Resegone Tooth" },
+    ];
+    expect(pickLocale(locales)).toBe(locales[0]);
+  });
+
+  it("returns undefined for no locales", () => {
+    expect(pickLocale([])).toBeUndefined();
+  });
+});
+
+describe("pickTitle", () => {
+  it("returns the fr title", () => {
+    expect(pickTitle(valaisCanton.locales)).toBe("Valais");
+  });
+
+  it('returns "Untitled" for no locales', () => {
+    expect(pickTitle([])).toBe("Untitled");
+  });
+});
+
+describe("joinList", () => {
+  it("returns undefined for null, undefined and an empty list", () => {
+    expect(joinList(null)).toBeUndefined();
+    expect(joinList(undefined)).toBeUndefined();
+    expect(joinList([])).toBeUndefined();
+  });
+
+  it("joins values with a comma", () => {
+    expect(joinList(["a", "b"])).toBe("a, b");
+  });
+});
+
+describe("formatHeader", () => {
+  it("writes a level-1 heading with the document ID", () => {
+    expect(formatHeader("Écrins", 14403)).toBe("# Écrins (ID: 14403)");
+  });
+});
+
+describe("formatRouteLine", () => {
+  it("prefixes the fr title with its title_prefix", () => {
+    expect(formatRouteLine(areteDesBosses)).toBe("- [53781] Mont Blanc : Arête des Bosses");
+  });
+
+  it("writes the title alone when title_prefix is empty, null or missing", () => {
+    // Route 46381 of GET /books/1925012?lang=fr (2026-10-03) has title_prefix "".
+    expect(
+      formatRouteLine({
+        document_id: 46381,
+        locales: [{ lang: "fr", title: "Traversée Brévent - Aiguillette des Houches", title_prefix: "" }],
+      }),
+    ).toBe("- [46381] Traversée Brévent - Aiguillette des Houches");
+    expect(formatRouteLine({ document_id: 1, locales: [{ lang: "fr", title: "T", title_prefix: null }] })).toBe(
+      "- [1] T",
+    );
+    expect(formatRouteLine({ document_id: 2, locales: [{ lang: "fr", title: "T" }] })).toBe("- [2] T");
+  });
+
+  it('writes "Untitled" without locales', () => {
+    expect(formatRouteLine({ document_id: 3, locales: [] })).toBe("- [3] Untitled");
+  });
+});
+
+describe("formatWaypointLine", () => {
+  // Mirrors waypoint 37295 of GET /books/209293?lang=fr (2026-10-03).
+  const domes = {
+    document_id: 37295,
+    locales: [{ lang: "fr", title: "Dômes de Miage - Sommet W" }],
+    waypoint_type: "summit",
+  };
+
+  it("prints the elevation, including 0", () => {
+    expect(formatWaypointLine({ ...domes, elevation: 3670 })).toBe(
+      "- [37295] Dômes de Miage - Sommet W (summit) | 3670m",
+    );
+    expect(formatWaypointLine({ ...domes, elevation: 0 })).toBe("- [37295] Dômes de Miage - Sommet W (summit) | 0m");
+  });
+
+  it("prints nothing for a null or missing elevation", () => {
+    expect(formatWaypointLine({ ...domes, elevation: null })).toBe("- [37295] Dômes de Miage - Sommet W (summit)");
+    expect(formatWaypointLine(domes)).toBe("- [37295] Dômes de Miage - Sommet W (summit)");
+  });
+});
+
+describe("formatTitledLine", () => {
+  it("writes the ID and the fr title", () => {
+    expect(formatTitledLine(valaisCanton)).toBe("- [14384] Valais");
+  });
+
+  it('writes "Untitled" without locales', () => {
+    expect(formatTitledLine({ document_id: 5, locales: [] })).toBe("- [5] Untitled");
+  });
+});
+
+describe("formatAreaLine", () => {
+  it("writes the ID, the fr title and the area type", () => {
+    expect(formatAreaLine(valaisCanton)).toBe("- [14384] Valais (admin_limits)");
+  });
+});
+
+describe("formatAreasSection", () => {
+  it("returns an empty list when areas are missing or empty", () => {
+    expect(formatAreasSection(undefined)).toEqual([]);
+    expect(formatAreasSection(null)).toEqual([]);
+    expect(formatAreasSection([])).toEqual([]);
+  });
+
+  it("returns a heading and one line per area in API order", () => {
+    expect(formatAreasSection([valaisCanton, ecrins])).toEqual([
+      "\n## Areas",
+      "- [14384] Valais (admin_limits)",
+      "- [14403] Écrins (range)",
+    ]);
+  });
+});

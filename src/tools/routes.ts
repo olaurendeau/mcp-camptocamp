@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteSearchResponse, RouteDetail } from "../api/camptocamp.js";
-import { formatAreasSection } from "./areas.js";
+import { pickLocale, pickTitle, formatHeader, formatAreasSection } from "./format.js";
 
 export const searchRoutesSchema = z.object({
   query: z.string().optional().describe("Search query for routes (e.g. 'Mont Blanc voie normale')"),
@@ -30,8 +30,7 @@ function formatRouteSearchResult(response: RouteSearchResponse, areaId?: number)
   const lines: string[] = [`Found ${response.total} route(s)${scope}. Showing ${response.documents.length}:\n`];
 
   for (const route of response.documents) {
-    const locale = route.locales.find((l) => l.lang === "fr") ?? route.locales[0];
-    const title = locale?.title ?? "Untitled";
+    const title = pickTitle(route.locales);
     const activities = route.activities.join(", ");
     const elevation = route.elevation_max ? ` | Max elevation: ${route.elevation_max}m` : "";
     const rating = route.global_rating ? ` | Rating: ${route.global_rating}` : "";
@@ -43,10 +42,10 @@ function formatRouteSearchResult(response: RouteSearchResponse, areaId?: number)
 }
 
 function formatRouteDetail(route: RouteDetail): string {
-  const locale = route.locales.find((l) => l.lang === "fr") ?? route.locales[0];
+  const locale = pickLocale(route.locales);
   const lines: string[] = [];
 
-  lines.push(`# ${locale?.title ?? "Untitled"} (ID: ${route.document_id})`);
+  lines.push(formatHeader(locale?.title ?? "Untitled", route.document_id));
   lines.push(`\n**Activities**: ${route.activities.join(", ")}`);
 
   if (route.global_rating) lines.push(`**Global rating**: ${route.global_rating}`);
