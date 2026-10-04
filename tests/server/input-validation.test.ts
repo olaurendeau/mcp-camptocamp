@@ -36,6 +36,7 @@ const ID_FIELDS: IdField[] = [
   { tool: "get_article", field: "id", args: (id) => ({ id }), response: ARTICLE },
   { tool: "search_user_outings", field: "user_id", args: (user_id) => ({ user_id }), response: EMPTY_SEARCH },
   { tool: "search_routes", field: "area_id", args: (area_id) => ({ area_id }), response: EMPTY_SEARCH },
+  { tool: "search_routes", field: "waypoint_id", args: (waypoint_id) => ({ waypoint_id }), response: EMPTY_SEARCH },
   { tool: "search_waypoints", field: "area_id", args: (area_id) => ({ area_id }), response: EMPTY_SEARCH },
   { tool: "search_outings", field: "area_id", args: (area_id) => ({ area_id }), response: EMPTY_SEARCH },
   { tool: "search_outings", field: "route_id", args: (route_id) => ({ route_id }), response: EMPTY_SEARCH },
@@ -80,6 +81,11 @@ describe("integer ID inputs", () => {
 });
 
 const MAX_QUERY_LENGTH = 200;
+
+// D5 on #58: any single filter is enough, a call without one is refused.
+const ROUTES_FILTER_MESSAGE =
+  "Error: search_routes needs at least one filter: query, area_id, waypoint_id, activity, rating_system, " +
+  "height_diff_up_min/max, route_types or configuration. Use search_areas to find an area_id.";
 
 type Client = Awaited<ReturnType<typeof connect>>;
 
@@ -142,16 +148,20 @@ describe("search query inputs", () => {
   });
 
   // Where query is optional, a blank query still counts as missing.
-  it.each(["search_routes", "search_waypoints"])("%s treats a blank query as missing", async (tool) => {
+  it.each([
+    ["search_routes", ROUTES_FILTER_MESSAGE],
+    [
+      "search_waypoints",
+      "Error: search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.",
+    ],
+  ])("%s treats a blank query as missing", async (tool, message) => {
     const fetchMock = stubFetch();
     const client = await connect();
 
     const result = await client.callTool({ name: tool, arguments: { query: "   " } });
 
     expect(result.isError).toBe(true);
-    expect(resultText(result)).toBe(
-      `Error: ${tool} needs a query, an area_id, or both. Use search_areas to find an area_id.`,
-    );
+    expect(resultText(result)).toBe(message);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -249,6 +259,7 @@ describe("cross-field rules", () => {
       { offset: 9995, limit: 10 },
       "Error: offset + limit must not exceed 10000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.",
     ],
+    ["search_routes", "a call without any filter", {}, ROUTES_FILTER_MESSAGE],
     [
       "search_outings",
       "period_start without period_end",
@@ -263,9 +274,21 @@ describe("cross-field rules", () => {
     ],
     [
       "search_routes",
-      "neither query nor area_id",
-      {},
-      "Error: search_routes needs a query, an area_id, or both. Use search_areas to find an area_id.",
+      "offset + limit above 10,000",
+      { query: "mont blanc", offset: 9995, limit: 10 },
+      "Error: offset + limit must not exceed 10000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.",
+    ],
+    [
+      "search_routes",
+      "an off-scale rating bound",
+      { area_id: 14409, rating_system: "global_rating", rating_min: "XX" },
+      'Error: rating_min "XX" is not a valid global_rating value; valid values: F, F+, PD-, PD, PD+, AD-, AD, AD+, D-, D, D+, TD-, TD, TD+, ED-, ED, ED+, ED4, ED5, ED6, ED7',
+    ],
+    [
+      "search_routes",
+      "reversed rating bounds",
+      { rating_system: "ski_rating", rating_min: "4.2", rating_max: "3.1" },
+      "Error: rating_min must not be above rating_max",
     ],
     [
       "search_waypoints",
@@ -310,5 +333,73 @@ describe("cross-field rules", () => {
     const params = new URL(String(fetchMock.mock.calls[0][0])).searchParams;
     expect(params.get("period")).toBe("2020-06-01,2020-06-30");
     expect(params.get("u")).toBe("430052");
+  });
+});
+
+// R7: the SDK refuses a value outside Camptocamp's closed lists, naming the field and the valid values.
+describe("search_routes field inputs", () => {
+  it.each<[string, Record<string, unknown>, string, string]>([
+    ["an unknown activity", { activity: "skiing" }, "activity", `must be one of: ${OUTING_ACTIVITY_LIST}`],
+    [
+      "an unknown configuration",
+      { area_id: 14409, configuration: ["edge", "arete"] },
+      "configuration",
+      "must be one of: edge, pillar, face, corridor, goulotte, glacier",
+    ],
+    [
+      "an unknown route type",
+      { area_id: 14409, route_types: ["one_way"] },
+      "route_types",
+      "must be one of: return_same_way, loop, loop_hut, traverse, raid, expedition",
+    ],
+    ["an unknown rating system", { rating_system: "rating", rating_min: "AD" }, "rating_system", "must be one of: "],
+    ["a negative elevation gain", { height_diff_up_min: -1 }, "height_diff_up_min", "too_small"],
+  ])("rejects %s without calling Camptocamp", async (_label, args, field, message) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_routes", arguments: args });
+
+    expect(result.isError).toBe(true);
+    const text = resultText(result);
+    expect(text).toContain("Invalid arguments for tool search_routes");
+    expect(text).toContain(`"${field}"`);
+    expect(text).toContain(message);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends the filters of AC4.1, AC4.4 and AC4.5 as Camptocamp search parameters", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH), jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    await client.callTool({
+      name: "search_routes",
+      arguments: {
+        area_id: 14409,
+        activity: "skitouring",
+        rating_system: "ski_rating",
+        rating_min: "3.1",
+        rating_max: "4.1",
+        height_diff_up_min: 1000,
+        height_diff_up_max: 1500,
+        route_types: ["traverse"],
+        configuration: ["edge", "face"],
+      },
+    });
+    await client.callTool({ name: "search_routes", arguments: { waypoint_id: 37916, activity: "skitouring" } });
+
+    const [first, second] = fetchMock.mock.calls.map(([url]) => new URL(String(url)).searchParams);
+    expect(Object.fromEntries(first)).toEqual({
+      limit: "10",
+      offset: "0",
+      pl: "fr",
+      a: "14409",
+      act: "skitouring",
+      trat: "3.1,4.1",
+      hdif: "1000,1500",
+      rtyp: "traverse",
+      conf: "edge,face",
+    });
+    expect(Object.fromEntries(second)).toEqual({ limit: "10", offset: "0", pl: "fr", w: "37916", act: "skitouring" });
   });
 });

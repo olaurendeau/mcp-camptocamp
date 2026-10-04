@@ -8,7 +8,7 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 
 | Outil                 | Description                                                                                               |
 | --------------------- | --------------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Recherche d'itinéraires par mot-clé et/ou `area_id` (ID, sommet : titre, activités, alt., D+, cotations)  |
+| `search_routes`       | Recherche d'itinéraires (mot-clé, zone, point, activité, cotation, D+, type, configuration) ; paginée     |
 | `get_route`           | Détail complet d'un itinéraire par ID (sommet : titre, description, cotations, dénivelé, matériel, zones) |
 | `search_waypoints`    | Recherche des points de passage par nom et/ou zone `area_id` (sommets, refuges, bivouacs…)                |
 | `get_waypoint`        | Détail d'un point de passage par ID (altitude, coordonnées GPS, description, zones)                       |
@@ -27,6 +27,8 @@ Chaque outil `get_*` commence par le titre et l'ID du document, suivis de son li
 Les textes libres écrits par les contributeurs (description, résumé, remarques, matériel, accès, conditions, météo…) sont imprimés entre `[begin user-written text: <champ>]` et `[end user-written text: <champ>]`, avec leurs titres Markdown abaissés de deux niveaux et une coupe à 8000 caractères (`[truncated, N more characters]`). La description de chaque outil `get_*` précise que ce texte est du contenu écrit par les utilisateurs, pas des instructions.
 
 Chaque cotation d'itinéraire ou de sortie est nommée par son système, jamais par un simple `Rating` : `Ski rating (Toponeige): 4.1 | Ski exposure: E2 | Labande: S4 / AD | Global rating: F`, puis engagement, risque, équipement, rocher, artif, glace, mixte, via ferrata, randonnée, raquettes et VTT.
+
+`search_routes` demande au moins un filtre, un seul suffit ; plusieurs se combinent en ET : `query`, `area_id`, `waypoint_id` (itinéraires d'un sommet, refuge…), `activity`, `rating_system` avec `rating_min` et/ou `rating_max` (un système par appel, bornes incluses ; les itinéraires sans cette cotation sont exclus), `height_diff_up_min` / `height_diff_up_max` (D+ en mètres), `route_types` et `configuration` (l'une des valeurs données). Une cotation hors de l'échelle du système ou une valeur hors liste est refusée avant tout appel, avec la liste des valeurs valides : l'API l'ignorerait sans rien dire. L'en-tête rappelle les filtres (`Filters: area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1, elevation gain 1000 → 1500m`) et la réponse se termine par `Next page: offset=N` tant qu'il reste des résultats.
 
 ## Installation
 
