@@ -21,7 +21,7 @@ export interface SearchPage {
   lines: string[];
   /** Applied filters, e.g. `query "x"`, `area 14409`; printed in the given order. */
   filters?: string[];
-  /** Lines printed after the filters, before the results. */
+  /** Lines printed after the filters, before the results; also after the nothing-found line. */
   notes?: string[];
   /** Appended to the total, e.g. ", most recent first". */
   order?: string;
@@ -49,7 +49,8 @@ export function formatSearchPage({
 }: SearchPage): string {
   const filterText = filters.join(", ");
   if (total === 0) {
-    return filterText ? `No ${kind}s found matching ${filterText}.` : `No ${kind}s found.`;
+    const empty = filterText ? `No ${kind}s found matching ${filterText}.` : `No ${kind}s found.`;
+    return [empty, ...notes].join("\n");
   }
 
   const output = [`Found ${total} ${kind}(s)${order}. Showing ${lines.length} from offset ${offset}:`];

@@ -82,6 +82,20 @@ describe("tool registration", () => {
     }
   });
 
+  // A shared zod instance becomes a `$ref` to the first field, which strict draft-07 clients
+  // resolve to that field's description instead of the field's own.
+  it("gives every input field its own schema, without $ref", async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+
+    for (const tool of tools) {
+      for (const [field, schema] of Object.entries(tool.inputSchema.properties ?? {})) {
+        expect(schema, `${tool.name}.${field}`).not.toHaveProperty("$ref");
+        expect(schema, `${tool.name}.${field}`).toHaveProperty("type");
+      }
+    }
+  });
+
   it("keeps the input JSON Schema of every tool", async () => {
     const client = await connect();
     const { tools } = await client.listTools();
