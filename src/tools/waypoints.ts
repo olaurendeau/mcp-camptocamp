@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentId } from "./inputs.js";
 import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointSearchResponse, WaypointDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, formatHeader, formatAreasSection } from "./format.js";
@@ -6,16 +7,11 @@ import { pickLocale, pickTitle, formatHeader, formatAreasSection } from "./forma
 export const searchWaypointsSchema = z.object({
   query: z.string().optional().describe("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')"),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
-  area_id: z
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .describe("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)"),
+  area_id: documentId("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)").optional(),
 });
 
 export const getWaypointSchema = z.object({
-  id: z.number().int().positive().describe("Waypoint ID from Camptocamp"),
+  id: documentId("Waypoint ID from Camptocamp"),
 });
 
 export type SearchWaypointsInput = z.infer<typeof searchWaypointsSchema>;

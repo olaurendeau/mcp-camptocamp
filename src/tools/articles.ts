@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentId } from "./inputs.js";
 import { searchArticles, getArticle } from "../api/camptocamp.js";
 import type { ArticleSearchResponse, ArticleDetail } from "../api/camptocamp.js";
 import {
@@ -17,7 +18,7 @@ export const searchArticlesSchema = z.object({
 });
 
 export const getArticleSchema = z.object({
-  id: z.number().int().positive().describe("Article ID from Camptocamp"),
+  id: documentId("Article ID from Camptocamp"),
 });
 
 export type SearchArticlesInput = z.infer<typeof searchArticlesSchema>;
