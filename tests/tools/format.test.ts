@@ -19,6 +19,7 @@ import {
   formatRecentOutings,
   formatMalformed,
   formatListItems,
+  formatLanguageLine,
 } from "../../src/tools/format.js";
 import type { AreaSearchResult } from "../../src/api/camptocamp.js";
 
@@ -153,6 +154,39 @@ describe("pickLocale", () => {
 
   it("returns undefined for no locales", () => {
     expect(pickLocale([])).toBeUndefined();
+    expect(pickLocale([], "de")).toBeUndefined();
+  });
+
+  // AC5.6 on #153: the requested language, then fr, en, it, de, es, ca, eu, sl, zh, then the first locale.
+  it("returns the requested language first, wherever the API lists it", () => {
+    expect(pickLocale(valaisCanton.locales, "de")).toEqual({ lang: "de", title: "Wallis" });
+    expect(pickLocale(valaisCanton.locales, "zh")).toEqual({ lang: "zh", title: "瓦莱州" });
+    expect(pickLocale(valaisCanton.locales, "fr")).toEqual({ lang: "fr", title: "Valais" });
+  });
+
+  it("falls back along fr, en, it, de, es, ca, eu, sl, zh when the requested language is missing", () => {
+    // Route 675555 of GET /routes/675555 (2026-10-04) has [it, en]: lang de gets en, as a pl=de search does.
+    const locales = [
+      { lang: "it", title: "Via Ferrata Gamma 2" },
+      { lang: "en", title: "Via ferrata Gamma 2 - al Dente del Resegone" },
+    ];
+    expect(pickLocale(locales, "de")).toBe(locales[1]);
+    expect(pickLocale(locales, "it")).toBe(locales[0]);
+
+    const order = ["fr", "en", "it", "de", "es", "ca", "eu", "sl", "zh"];
+    for (let i = 0; i < order.length; i++) {
+      const locales = [...order.slice(i)].reverse().map((lang) => ({ lang, title: lang }));
+      expect(pickLocale(locales, "xx")?.lang).toBe(order[i]);
+    }
+  });
+
+  it("falls back to the first locale when neither the requested nor a listed language is present", () => {
+    const locales = [
+      { lang: "xx", title: "First" },
+      { lang: "yy", title: "Second" },
+    ];
+    expect(pickLocale(locales, "de")).toBe(locales[0]);
+    expect(pickLocale(locales, "yy")).toBe(locales[1]);
   });
 });
 
@@ -163,6 +197,40 @@ describe("pickTitle", () => {
 
   it('returns "Untitled" for no locales', () => {
     expect(pickTitle([])).toBe("Untitled");
+    expect(pickTitle([], "de")).toBe("Untitled");
+  });
+
+  it("returns the title in the requested language", () => {
+    expect(pickTitle(valaisCanton.locales, "it")).toBe("Vallese");
+    expect(pickTitle(ecrins.locales, "de")).toBe("Écrins");
+  });
+});
+
+// D3 on #153: the Language line of the detail tools, printed only when the requested language is missing.
+describe("formatLanguageLine", () => {
+  // Route 675555 of GET /routes/675555 (2026-10-04): locales [it, en] in that order.
+  const resegone = [
+    { lang: "it", title: "Via Ferrata Gamma 2" },
+    { lang: "en", title: "Via ferrata Gamma 2 - al Dente del Resegone" },
+  ];
+
+  it("names the language shown, the missing one and the available ones in API order", () => {
+    expect(formatLanguageLine(resegone, "de")).toEqual(["**Language**: en (no de version; available: it, en)"]);
+    expect(formatLanguageLine(resegone, "zh")).toEqual(["**Language**: en (no zh version; available: it, en)"]);
+  });
+
+  it("defaults to fr", () => {
+    expect(formatLanguageLine(resegone)).toEqual(["**Language**: en (no fr version; available: it, en)"]);
+  });
+
+  it("prints no line when the requested language is present", () => {
+    expect(formatLanguageLine(resegone, "it")).toEqual([]);
+    expect(formatLanguageLine(resegone, "en")).toEqual([]);
+    expect(formatLanguageLine(valaisCanton.locales)).toEqual([]);
+  });
+
+  it("prints no line without locales", () => {
+    expect(formatLanguageLine([], "de")).toEqual([]);
   });
 });
 
@@ -573,5 +641,111 @@ describe("formatListItems", () => {
       "- (not shown: Camptocamp sent an item in an unexpected format)",
       "- [14403] Écrins (range)",
     ]);
+  });
+});
+
+// AC5.6–AC5.7 on #153: every shared line formatter picks its titles in the requested language, fr by default.
+describe("the shared line formatters with a requested language", () => {
+  // Route 54085 as a pl=de search returns it (GET /routes?q=Glacier du Geay&pl=de, 2026-10-04), with the fr locale.
+  const route54085 = {
+    document_id: 54085,
+    activities: ["skitouring"],
+    locales: [
+      { lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" },
+      { lang: "de", title: "Voie normale du Glacier du Geay", title_prefix: "Mont Pourri" },
+    ],
+    elevation_max: 3779,
+  };
+
+  // Area 14274 of GET /routes/54085 areas (2026-10-04), trimmed to three locales.
+  const france = {
+    document_id: 14274,
+    area_type: "country",
+    locales: [
+      { lang: "fr", title: "France" },
+      { lang: "de", title: "Frankreich" },
+      { lang: "zh", title: "法国" },
+    ],
+  };
+
+  it("formatRouteLine and formatAssociatedRouteLine", () => {
+    expect(formatRouteLine(route54085, "de")).toBe(
+      "- [54085] Mont Pourri : Voie normale du Glacier du Geay (skitouring) | Max elevation: 3779m",
+    );
+    expect(formatRouteLine(route54085)).toBe(
+      "- [54085] Mont Pourri : Versant W par le Glacier du Geay (skitouring) | Max elevation: 3779m",
+    );
+    expect(formatAssociatedRouteLine(areteDesBosses, "it")).toBe(
+      "- [53781] Monte Bianco : Monte Bianco via Bossesgrat",
+    );
+    expect(formatAssociatedRouteLine(areteDesBosses, "de")).toBe("- [53781] Mont Blanc : Arête des Bosses");
+  });
+
+  it("formatWaypointLine, next to the main marker", () => {
+    expect(formatWaypointLine(ouvertures2013, { lang: "en" })).toBe("- [1947492] First Ascents in 2013 (virtual)");
+    expect(formatWaypointLine(ouvertures2013, { main: true, lang: "en" })).toBe(
+      "- [1947492] First Ascents in 2013 (virtual) | main waypoint",
+    );
+    expect(formatWaypointLine(ouvertures2013, { lang: "de" })).toBe("- [1947492] Ouvertures 2013 (virtual)");
+  });
+
+  it("formatBookLine", () => {
+    const book = {
+      document_id: 14643,
+      locales: [
+        { lang: "fr", title: "Le topo de la Vanoise" },
+        { lang: "en", title: "The Vanoise guidebook" },
+      ],
+      author: null,
+      book_types: ["topo"],
+      activities: [],
+    };
+    expect(formatBookLine(book, "en")).toBe("- [14643] The Vanoise guidebook | Types: topo");
+    expect(formatBookLine(book)).toBe("- [14643] Le topo de la Vanoise | Types: topo");
+  });
+
+  it("formatOutingLine and formatRecentOutings, area titles included", () => {
+    const outing = {
+      ...outing1900552,
+      locales: [...outing1900552.locales, { lang: "de", title: "Mont Pourri über den Glacier du Geay" }],
+      areas: [{ ...france, area_type: "range" }],
+    };
+    const line =
+      "- [1900552] Mont Pourri über den Glacier du Geay (skitouring) | 2026-04-26 | Conditions: good | " +
+      "Max elevation: 3779m | Elevation gain: 1425m | Ski rating (Toponeige): 4.1 | Labande: AD | " +
+      "Areas: Frankreich [14274] | Author: krok";
+
+    expect(formatOutingLine(outing, "de")).toBe(line);
+    expect(formatRecentOutings({ documents: [outing], total: 1 }, "more", "de")).toEqual([
+      "\n## Recent outings (1 of 1)",
+      line,
+    ]);
+    expect(formatOutingLine(outing)).toContain("- [1900552] Mont Pourri : Versant W par le Glacier du Geay (");
+    expect(formatOutingLine(outing)).toContain("Areas: France [14274]");
+  });
+
+  it("formatTitledLine, formatAreaLine and formatAreasSection", () => {
+    expect(formatTitledLine(france, "zh")).toBe("- [14274] 法国");
+    expect(formatAreaLine(france, "de")).toBe("- [14274] Frankreich (country)");
+    expect(formatAreasSection([france, ecrins], "de")).toEqual([
+      "\n## Areas",
+      "- [14274] Frankreich (country)",
+      "- [14403] Écrins (range)",
+    ]);
+  });
+});
+
+// Review of #188: a malformed main waypoint keeps its "main waypoint" marker on its placeholder line.
+describe("formatWaypointLine for a malformed waypoint", () => {
+  it("prints the placeholder line, with the main marker when it is the main waypoint", () => {
+    expect(formatWaypointLine({ malformed: true, document_id: 37916 }, { main: true })).toBe(
+      "- [37916] (not shown: Camptocamp sent this item in an unexpected format) | main waypoint",
+    );
+    expect(formatWaypointLine({ malformed: true, document_id: 104151 })).toBe(
+      "- [104151] (not shown: Camptocamp sent this item in an unexpected format)",
+    );
+    expect(formatWaypointLine({ malformed: true }, { main: false })).toBe(
+      "- (not shown: Camptocamp sent an item in an unexpected format)",
+    );
   });
 });

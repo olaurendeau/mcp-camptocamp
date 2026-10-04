@@ -184,8 +184,12 @@ function formatRouteAssociations(route: RouteDetail): string[] {
 
   section(
     "Associated waypoints",
-    formatListItems(associations?.waypoints ?? [], (waypoint) =>
-      formatWaypointLine(waypoint, { main: waypoint.document_id === route.main_waypoint_id }),
+    // formatWaypointLine prints a malformed waypoint's placeholder itself, so a malformed main waypoint keeps
+    // its marker; a placeholder without a readable ID is never the main waypoint.
+    (associations?.waypoints ?? []).map((waypoint) =>
+      formatWaypointLine(waypoint, {
+        main: waypoint.document_id !== undefined && waypoint.document_id === route.main_waypoint_id,
+      }),
     ),
   );
   section("Associated routes", formatListItems(associations?.routes ?? [], formatAssociatedRouteLine));
