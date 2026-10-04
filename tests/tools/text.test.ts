@@ -118,8 +118,10 @@ describe("formatUserText", () => {
   });
 
   // Accepted side effect of D6 on #153 (no confusables table): bracketed non-Latin text shaped like a
-  // marker (words of 3 or 5, then 4, 7 and 4 letters) gets its "[" turned into "(". Change only with a
-  // new decision.
+  // marker gets its "[" turned into "(". FAKE_MARKER matches, after "[" and optional spaces, a word of
+  // 3 or 5 letters, spaces, 4 letters, a possibly empty run of spaces, "_" and "-", 7 letters, spaces,
+  // then 4 letters (more may follow), each letter non-ASCII or the marker's own. Change only with a new
+  // decision.
   it("turns the bracket of non-Latin text shaped like a marker into (", () => {
     expect(body("Avant [абв гдеж зийклмн опрс] après.")).toBe("Avant (абв гдеж зийклмн опрс] après.");
   });
