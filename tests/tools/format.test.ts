@@ -646,18 +646,21 @@ describe("formatListItems", () => {
 
 // AC5.6–AC5.7 on #153: every shared line formatter picks its titles in the requested language, fr by default.
 describe("the shared line formatters with a requested language", () => {
-  // Route 54085 as a pl=de search returns it (GET /routes?q=Glacier du Geay&pl=de, 2026-10-04), with the fr locale.
+  // Route 54085: activities and elevation_max of GET /routes/54085 (2026-10-04); its four locales as listed in
+  // the route associations of GET /outings/1880674 (2026-10-04, see tests/tools/outings.test.ts).
   const route54085 = {
     document_id: 54085,
     activities: ["skitouring"],
     locales: [
       { lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" },
       { lang: "de", title: "Voie normale du Glacier du Geay", title_prefix: "Mont Pourri" },
+      { lang: "en", title: "Normal route from Glacier du Geay", title_prefix: "Mont Pourri" },
+      { lang: "it", title: "Voie normale du Glacier du Geay", title_prefix: "Mont Pourri" },
     ],
     elevation_max: 3779,
   };
 
-  // Area 14274 of GET /routes/54085 areas (2026-10-04), trimmed to three locales.
+  // Area 14274 of GET /routes/54275?lang=fr areas (see tests/tools/routes.test.ts), trimmed to three locales.
   const france = {
     document_id: 14274,
     area_type: "country",
@@ -669,8 +672,8 @@ describe("the shared line formatters with a requested language", () => {
   };
 
   it("formatRouteLine and formatAssociatedRouteLine", () => {
-    expect(formatRouteLine(route54085, "de")).toBe(
-      "- [54085] Mont Pourri : Voie normale du Glacier du Geay (skitouring) | Max elevation: 3779m",
+    expect(formatRouteLine(route54085, "en")).toBe(
+      "- [54085] Mont Pourri : Normal route from Glacier du Geay (skitouring) | Max elevation: 3779m",
     );
     expect(formatRouteLine(route54085)).toBe(
       "- [54085] Mont Pourri : Versant W par le Glacier du Geay (skitouring) | Max elevation: 3779m",
@@ -690,38 +693,51 @@ describe("the shared line formatters with a requested language", () => {
   });
 
   it("formatBookLine", () => {
+    // Book 373877 of GET /books?q=mont blanc&limit=2&lang=fr (2026-10-03, see tests/tools/books.test.ts).
     const book = {
-      document_id: 14643,
+      document_id: 373877,
       locales: [
-        { lang: "fr", title: "Le topo de la Vanoise" },
-        { lang: "en", title: "The Vanoise guidebook" },
+        { lang: "it", title: "Monte Bianco Classico & Plaisir", summary: null },
+        { lang: "fr", title: "Mont Blanc Classique & Plaisir", summary: null },
+        { lang: "en", title: "Mont Blanc Classic & Plaisir", summary: null },
       ],
-      author: null,
+      author: "Marco Romelli",
       book_types: ["topo"],
-      activities: [],
+      activities: ["mountain_climbing", "snow_ice_mixed"],
     };
-    expect(formatBookLine(book, "en")).toBe("- [14643] The Vanoise guidebook | Types: topo");
-    expect(formatBookLine(book)).toBe("- [14643] Le topo de la Vanoise | Types: topo");
+    const rest = " | Author: Marco Romelli | Types: topo | Activities: mountain_climbing, snow_ice_mixed";
+    expect(formatBookLine(book, "en")).toBe(`- [373877] Mont Blanc Classic & Plaisir${rest}`);
+    expect(formatBookLine(book, "it")).toBe(`- [373877] Monte Bianco Classico & Plaisir${rest}`);
+    expect(formatBookLine(book)).toBe(`- [373877] Mont Blanc Classique & Plaisir${rest}`);
   });
 
   it("formatOutingLine and formatRecentOutings, area titles included", () => {
+    // Made up (no real document): an outing and its range, each with a fr and a de title.
     const outing = {
-      ...outing1900552,
-      locales: [...outing1900552.locales, { lang: "de", title: "Mont Pourri über den Glacier du Geay" }],
-      areas: [{ ...france, area_type: "range" }],
+      document_id: 1,
+      locales: [
+        { lang: "fr", title: "Sortie" },
+        { lang: "de", title: "Tour" },
+      ],
+      activities: ["skitouring"],
+      areas: [
+        {
+          document_id: 2,
+          area_type: "range",
+          locales: [
+            { lang: "fr", title: "Massif" },
+            { lang: "de", title: "Gebirge" },
+          ],
+        },
+      ],
     };
-    const line =
-      "- [1900552] Mont Pourri über den Glacier du Geay (skitouring) | 2026-04-26 | Conditions: good | " +
-      "Max elevation: 3779m | Elevation gain: 1425m | Ski rating (Toponeige): 4.1 | Labande: AD | " +
-      "Areas: Frankreich [14274] | Author: krok";
 
-    expect(formatOutingLine(outing, "de")).toBe(line);
+    expect(formatOutingLine(outing, "de")).toBe("- [1] Tour (skitouring) | Areas: Gebirge [2]");
     expect(formatRecentOutings({ documents: [outing], total: 1 }, "more", "de")).toEqual([
       "\n## Recent outings (1 of 1)",
-      line,
+      "- [1] Tour (skitouring) | Areas: Gebirge [2]",
     ]);
-    expect(formatOutingLine(outing)).toContain("- [1900552] Mont Pourri : Versant W par le Glacier du Geay (");
-    expect(formatOutingLine(outing)).toContain("Areas: France [14274]");
+    expect(formatOutingLine(outing)).toBe("- [1] Sortie (skitouring) | Areas: Massif [2]");
   });
 
   it("formatTitledLine, formatAreaLine and formatAreasSection", () => {
