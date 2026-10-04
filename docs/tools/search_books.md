@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Find books on Camptocamp.org (guidebooks, history, novels, photo books, technique) by title keyword, optionally narrowed by `book_type` and `activity`. `search_books {query: "vanoise", book_type: "topo", activity: "skitouring"}` finds ski-touring guidebooks for the Vanoise. The query matches titles only: an author name or an ISBN is unreliable, so an empty result does not mean the book does not exist.
+Find books on Camptocamp.org (guidebooks, history, novels, photo books, technique) by title keyword, optionally narrowed by `book_type` and `activity`. `search_books {query: "vanoise", book_type: "topo", activity: "skitouring"}` finds ski-touring guidebooks with "vanoise" in the title. The query matches titles only: an author name or an ISBN is unreliable, so an empty result does not mean the book does not exist.
 
 ## Inputs
 

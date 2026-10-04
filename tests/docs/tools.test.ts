@@ -75,6 +75,14 @@ async function checkPage(tool: Tool, text: string, file: string): Promise<string
 }
 
 const TOOL_LIKE = /^(?:search|get)_[a-z][a-z_]*$/;
+
+/**
+ * Names shaped like our tools that the docs mention on purpose and that are not MCP tools.
+ * Each entry says where it comes from; add one only for a name that is not, and never was, one of our tools.
+ */
+const NOT_OUR_TOOLS = new Set([
+  "get_location", // docs/agent-sdks.md: the local function of the upstream Mistral weather example, removed from ours
+]);
 const STRING = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g;
 
 /** The top-level keys of an object written as in the docs: `{query: "x", "lang": "de"}`, or shorthand `{user_id, lang}`. */
@@ -107,8 +115,10 @@ function argumentKeys(object: string): string[] {
  * Problems with the tools and parameters `text` names (AC14):
  * - an inline `<tool> {key: …}` must name a registered tool and only its parameters;
  * - an inline `search_*` or `get_*` identifier must be a registered tool;
- * - a prefixed name, `camptocamp_<tool>` (Mistral Vibe) or `mcp__camptocamp__<tool>` (Claude Code), anywhere in the
- *   text, fenced blocks included, must name a registered tool.
+ * - a prefixed name, `camptocamp_<search|get>_…` (Mistral Vibe) or `mcp__camptocamp__<x>` (Claude Code), anywhere in
+ *   the text, fenced blocks included, must name a registered tool. Other `camptocamp_` identifiers, such as the
+ *   `camptocamp_agent` variable of an SDK example, are not tool names.
+ * Names in NOT_OUR_TOOLS are skipped.
  */
 function checkToolMentions(text: string, registered: Tool[]): string[] {
   const parameters = new Map(
@@ -117,7 +127,7 @@ function checkToolMentions(text: string, registered: Tool[]): string[] {
   const problems: string[] = [];
   for (const span of inlineCodeSpans(text)) {
     const call = /^([a-z][a-z0-9_]*)\s*(\{[\s\S]*\})$/.exec(span);
-    if (call && (parameters.has(call[1]) || TOOL_LIKE.test(call[1]))) {
+    if (call && !NOT_OUR_TOOLS.has(call[1]) && (parameters.has(call[1]) || TOOL_LIKE.test(call[1]))) {
       const known = parameters.get(call[1]);
       if (known === undefined) {
         problems.push(`\`${span}\`: ${call[1]} is not a registered tool`);
@@ -128,11 +138,19 @@ function checkToolMentions(text: string, registered: Tool[]): string[] {
       }
     }
     for (const [name] of span.matchAll(/(?<![\w./-])(?:search|get)_[a-z][a-z_]*/g)) {
-      if (!parameters.has(name)) problems.push(`\`${span}\`: ${name} is not a registered tool`);
+      if (!parameters.has(name) && !NOT_OUR_TOOLS.has(name)) {
+        problems.push(`\`${span}\`: ${name} is not a registered tool`);
+      }
     }
   }
-  for (const [mention, name] of text.matchAll(/(?<![\w-])(?:mcp__camptocamp__|camptocamp_)([a-z][a-z_]*)/g)) {
-    if (!parameters.has(name)) problems.push(`${mention}: ${name} is not a registered tool`);
+  // Claude Code's mcp__camptocamp__ prefix is ours alone; Vibe's camptocamp_ prefix is only read before a tool name.
+  for (const prefixed of [
+    /(?<![\w-])mcp__camptocamp__([a-z][a-z_]*)/g,
+    /(?<![\w-])camptocamp_((?:search|get)_[a-z_]*)/g,
+  ]) {
+    for (const [mention, name] of text.matchAll(prefixed)) {
+      if (!parameters.has(name)) problems.push(`${mention}: ${name} is not a registered tool`);
+    }
   }
   return [...new Set(problems)];
 }
@@ -258,6 +276,27 @@ describe("tool reference checks fail on bad fixtures", () => {
     ].join("\n");
 
     expect(checkToolMentions(text, tools)).toEqual([]);
+  });
+
+  it("accepts a camptocamp_ identifier that is not shaped like a tool, such as an SDK example's variable", () => {
+    const text = [
+      "```python",
+      "camptocamp_agent = client.beta.agents.create(",
+      ")",
+      "run = client.beta.conversations.start(agent_id=camptocamp_agent.id)",
+      "```",
+      "Keep `camptocamp_agent` and `camptocamp_server` around.",
+    ].join("\n");
+
+    expect(checkToolMentions(text, tools)).toEqual([]);
+  });
+
+  it("accepts a name of the explicit allow-list, such as the upstream example's get_location function", () => {
+    expect(checkToolMentions("The source also registers a local `get_location` function.", tools)).toEqual([]);
+    expect(checkToolMentions("`get_location {city: 1}`", tools)).toEqual([]);
+    expect(checkToolMentions("`get_locations`", tools)).toEqual([
+      "`get_locations`: get_locations is not a registered tool",
+    ]);
   });
 });
 

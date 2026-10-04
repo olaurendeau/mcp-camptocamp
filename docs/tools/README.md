@@ -13,10 +13,10 @@ Each page gives the tool's purpose, its inputs and the tools to call before or a
 
 ## Waypoints
 
-| Tool                                      | What it does                                                                                          |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| [`search_waypoints`](search_waypoints.md) | Search summits, huts, passes, crags and other waypoints by name and/or area, by type; paged.          |
-| [`get_waypoint`](get_waypoint.md)         | One waypoint by ID: altitude, GPS coordinates, hut details, access, areas, routes, books and outings. |
+| Tool                                      | What it does                                                                                                         |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [`search_waypoints`](search_waypoints.md) | Search summits, huts, passes, crags and other waypoints by name and/or area, optionally narrowed to one type; paged. |
+| [`get_waypoint`](get_waypoint.md)         | One waypoint by ID: altitude, GPS coordinates, hut details, access, areas, routes, books and outings.                |
 
 ## Outings
 
