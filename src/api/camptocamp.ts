@@ -50,9 +50,9 @@ export type {
   ArticleDetail,
 } from "./schemas.js";
 
-// Searches send `pl=fr`: one locale per document, fr first, then the API's fallback (en, it, ...).
-// `lang` does nothing and `pl` is ignored on details, so detail requests send no query string.
-const PREFERRED_LANG = "fr";
+// Searches send `pl=<lang>` (default fr): one locale per document, that language first, then the API's
+// fallback (en, it, ...). `lang` does nothing and `pl` is ignored on details, so they send no query string.
+const DEFAULT_LANG = "fr";
 const DEFAULT_LIMIT = 10;
 
 // Options of searchRoutes and searchWaypoints: a keyword, an area, or both.
@@ -60,6 +60,7 @@ interface KeywordOrAreaSearchOptions {
   query?: string;
   area_id?: number;
   limit?: number; // default DEFAULT_LIMIT
+  lang?: string; // sent as pl, default DEFAULT_LANG
 }
 export interface WaypointSearchOptions extends KeywordOrAreaSearchOptions {
   waypoint_type?: string;
@@ -133,7 +134,7 @@ function keywordOrAreaParams(options: KeywordOrAreaSearchOptions): URLSearchPara
   const params = new URLSearchParams();
   if (options.query !== undefined) params.set("q", options.query);
   params.set("limit", String(options.limit ?? DEFAULT_LIMIT));
-  params.set("pl", PREFERRED_LANG);
+  params.set("pl", options.lang ?? DEFAULT_LANG);
   if (options.area_id !== undefined) params.set("a", String(options.area_id));
   return params;
 }
@@ -143,6 +144,7 @@ interface KeywordSearchOptions {
   query: string;
   limit?: number; // default DEFAULT_LIMIT
   offset?: number; // sent only when given
+  lang?: string; // sent as pl, default DEFAULT_LANG
 }
 export interface BookSearchOptions extends KeywordSearchOptions {
   book_type?: string;
@@ -154,7 +156,7 @@ function keywordParams(options: KeywordSearchOptions): URLSearchParams {
   const params = new URLSearchParams({
     q: options.query,
     limit: String(options.limit ?? DEFAULT_LIMIT),
-    pl: PREFERRED_LANG,
+    pl: options.lang ?? DEFAULT_LANG,
   });
   if (options.offset !== undefined) params.set("offset", String(options.offset));
   return params;
@@ -235,6 +237,7 @@ export interface OutingSearchParams {
   height_diff_up?: { min?: number; max?: number };
   limit?: number; // default DEFAULT_LIMIT
   offset?: number; // default 0
+  lang?: string; // sent as pl, default DEFAULT_LANG
 }
 
 export async function searchOutings(params: OutingSearchParams = {}): Promise<OutingListResponse> {
@@ -266,7 +269,7 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
   search.set("sort", "-date_end");
   search.set("limit", String(params.limit ?? DEFAULT_LIMIT));
   search.set("offset", String(params.offset ?? 0));
-  search.set("pl", PREFERRED_LANG);
+  search.set("pl", params.lang ?? DEFAULT_LANG);
   return getJson({ path: "/outings", params: search, schema: outingListResponseSchema });
 }
 

@@ -16,7 +16,7 @@ src/
 ├── api/
 │   ├── http.ts           # getJson: the one fetch (User-Agent, 15 s timeout, 10 MiB cap, error messages, zod parsing)
 │   ├── schemas.ts        # zod response schemas, the one place response types are declared
-│   └── camptocamp.ts     # Camptocamp API v6 client: one function per endpoint, pl=fr on searches
+│   └── camptocamp.ts     # Camptocamp API v6 client: one function per endpoint, pl={lang} (default fr) on searches
 └── tools/
     ├── format.ts         # Shared formatting: pickLocale, joinList, formatHeader, route/waypoint/book/outing lines, recent outings, areas section, dates, isPresent (0 and false are printed)
     ├── inputs.ts         # Shared zod inputs: bounded document IDs, 200-char queries
@@ -155,25 +155,25 @@ Every request goes through `getJson` in `src/api/http.ts` with `User-Agent: mcp-
 
 Lists are parsed item by item (`tolerantArray`, decision D2 on #153): search `documents` (also `recent_outings` and `all_routes`), and every association list and `areas` of the `get_*` documents. An item that fails its schema becomes a `MalformedItem` (`{malformed: true, document_id?}`, the ID kept when it is a positive integer), and `formatListItems` in `src/tools/format.ts` prints it as `- [id] (not shown: Camptocamp sent this item in an unexpected format)` (`formatMalformed`; without the `- ` in the inline participants line), so counts are unchanged. The lists themselves and every top-level field stay strict: a non-array list or a missing `document_id` is still `unexpected response`. The contract test checks that the named lists of route 54085, waypoints 104151 and 37355, outing 1757161, book 14643 and articles 469577 and 623671 have no malformed item.
 
-Locale: searches send `pl=fr`, which returns one locale per document, French when it exists, otherwise another language chosen by Camptocamp. Detail requests send no query string: `pl` is ignored there and `lang` is a no-op everywhere, so `pickLocale` in `src/tools/format.ts` picks one: `fr`, then `en`, `it`, `de`, `es`, `ca`, `eu`, `sl`, `zh`, then any other. This order is decision D1 on #57; only `[it, en]` → `en` (route 675555) was checked live against the search fallback.
+Locale: every search function takes `lang?` and sends `pl={lang}` (default `fr`), which returns one locale per document, in that language when it exists (route 54085 with `de`), otherwise another language chosen by Camptocamp. Detail requests send no query string: `pl` is ignored there and `lang` is a no-op everywhere, so `pickLocale` in `src/tools/format.ts` picks one: `fr`, then `en`, `it`, `de`, `es`, `ca`, `eu`, `sl`, `zh`, then any other. This order is decision D1 on #57; only `[it, en]` → `en` (route 675555) was checked live against the search fallback.
 
-- `GET /routes?limit=10&pl=fr[&q={query}][&a={area_id}][&w={waypoint_id}][&act={activity}][&{rating param}={min},{max}][&hdif={min},{max}][&rtyp={types}][&conf={configurations}][&offset={n}]`
+- `GET /routes?limit=10&pl={lang}[&q={query}][&a={area_id}][&w={waypoint_id}][&act={activity}][&{rating param}={min},{max}][&hdif={min},{max}][&rtyp={types}][&conf={configurations}][&offset={n}]`
   - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.
   - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
 - `GET /routes/{id}`
   - Practical facts read: `height_diff_difficulties`, `height_diff_access`, `orientations`, `durations`, `route_types`, `configuration`, `glacier_gear`, `lift_access`; locale texts: `summary`, `description`, `slope`, `remarks`, `gear`, `route_history`, `external_resources`.
   - `associations`: `waypoints` (the one matching `main_waypoint_id` is marked), `routes`, `books`, `articles`, and `recent_outings {documents, total}` (the latest 10, shaped like `/outings` list items); `images` and `xreports` are not read.
-- `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}][&wtyp={waypoint_type}][&offset={n}]` (at least one of `q` and `a`)
+- `GET /waypoints?limit=10&pl={lang}[&q={query}][&a={area_id}][&wtyp={waypoint_type}][&offset={n}]` (at least one of `q` and `a`)
 - `GET /waypoints/{id}`
   - `associations`: `all_routes {documents, total}` (shaped like `/routes` search results; there is no `routes` key, hut 104151), `books`, and `recent_outings {documents, total}`; `waypoints`, `waypoint_children`, `articles`, `images` and `xreports` are not read.
 - `GET /outings/{id}`
   - No `author` key (only list items carry one). `associations.users` (`document_id`, `name`; locales without title) are the accounts linked to the outing, printed in API order as `**Participants with a Camptocamp account**`; the first is not necessarily the author (outing 1757161).
-- `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&{rating param}={min},{max}][&ocond=excellent,{condition}][&oalt={min},{max}][&odif={min},{max}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]` (ranges as for `/routes`; rating params: only `trat lrat grat erat prat irat frat krat hrat wrat mbur mbdr`, the API ignores the others; `ocond=excellent,{v}` means `{v}` or better)
+- `GET /outings?sort=-date_end&limit=10&offset=0&pl={lang}[&q={query}][&a={area_id}][&act={activity}][&{rating param}={min},{max}][&ocond=excellent,{condition}][&oalt={min},{max}][&odif={min},{max}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]` (ranges as for `/routes`; rating params: only `trat lrat grat erat prat irat frat krat hrat wrat mbur mbdr`, the API ignores the others; `ocond=excellent,{v}` means `{v}` or better)
   - `u` matches the outings the user is listed on (`associations.users`), not only those they wrote. `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
-- `GET /areas?q={query}&limit=10&pl=fr[&atyp={type}][&offset={n}]`
+- `GET /areas?q={query}&limit=10&pl={lang}[&atyp={type}][&offset={n}]`
 - `GET /areas/{id}`
-- `GET /books?q={query}&limit=10&pl=fr[&btyp={book_type}][&act={activity}][&offset={n}]`
+- `GET /books?q={query}&limit=10&pl={lang}[&btyp={book_type}][&act={activity}][&offset={n}]`
 - `GET /books/{id}`
-- `GET /articles?q={query}&limit=10&pl=fr[&offset={n}]`
+- `GET /articles?q={query}&limit=10&pl={lang}[&offset={n}]`
 - `GET /articles/{id}`
