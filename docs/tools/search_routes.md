@@ -44,6 +44,72 @@ Find routes by keyword, area, waypoint, activity, rating, elevation gain, route 
 
 <!-- generated:inputs end -->
 
+## Output format
+
+The output is plain text, in this order:
+
+1. `Found <total> route(s). Showing <n> from offset <offset>:`, where `<total>` counts every match on Camptocamp.
+2. `Filters: …`, which repeats the filters applied, in the order of the inputs: `query "…"`, `area <id>`, `waypoint <id>`, `activity <activity>`, the rating range such as `ski rating (Toponeige) 3.1 → 4.1` (`from 3.1` or `up to 4.1` with one bound), `elevation gain 1000 → 1500m`, `route types loop or traverse`, and `configuration edge or face`. The query is printed between double quotes, with quotes, backslashes and line breaks escaped, so it always stays on one line.
+3. A blank line, then one line per route, in Camptocamp's order:
+
+   ```text
+   - [<id>] <summit> : <title> (<activities>) | Max elevation: <n>m | Elevation gain: <n>m | <ratings>
+   ```
+
+   - `<summit> : <title>` is the route's name as Camptocamp shows it. A route without a summit prefix shows its title alone.
+   - `Max elevation` and `Elevation gain` are left out when Camptocamp has no value for them.
+   - `<ratings>` lists every rating the route has, each labelled with its grading system, in this order: `Ski rating (Toponeige)`, `Ski exposure`, `Labande`, `Global rating`, `Engagement`, `Risk rating`, `Equipment`, `Rock free rating`, `Rock required rating`, `Rock exposure`, `Aid rating`, `Ice rating`, `Mixed rating`, `Via ferrata rating`, `Hiking rating`, `Hiking/MTB exposure`, `Snowshoe rating`, `MTB up rating`, `MTB down rating`. `Labande` prints its ski and global halves as `S4 / AD`, or the only half Camptocamp has.
+   - A route Camptocamp sent in a format the server cannot read is shown as `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`.
+
+4. When more routes follow, a blank line and a footer: `Next page: offset=N`, `Next page: offset=N (limit at most M)` near the end of the 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` See [Paging](../using-with-llms.md#paging).
+
+When nothing matches, the whole output is one line: `No routes found matching <filters>.`
+
+## Example
+
+`search_routes {area_id: 14409, activity: "skitouring", rating_system: "ski_rating", rating_min: "3.1", rating_max: "4.1", height_diff_up_min: 1000, height_diff_up_max: 1500, limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+```text
+Found 54 route(s). Showing 3 from offset 0:
+Filters: area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1, elevation gain 1000 → 1500m
+
+- [1944775] Croix des Verdons / Dent de Burgin : Couloir Ouest (skitouring) | Max elevation: 2650m | Elevation gain: 1240m | Ski rating (Toponeige): 4.1 | Ski exposure: E1 | Labande: PD
+- [1618656] Roc de Burel : Couloir S (skitouring) | Max elevation: 3075m | Elevation gain: 1425m | Ski rating (Toponeige): 4.1 | Labande: S4
+- [1525817] Pointe de Claret et Aiguille de Méan Martin depuis la Femma (skitouring) | Max elevation: 3355m | Elevation gain: 1500m | Ski rating (Toponeige): 3.1 | Ski exposure: E1 | Labande: S3 / AD-
+
+Next page: offset=3
+```
+
+- The 54 routes are the Vanoise ski tours rated 3.1 to 4.1 on the Toponeige scale, with 1,000 to 1,500 m of elevation gain. Both bounds are inclusive.
+- `Roc de Burel : Couloir S` has no `Ski exposure`: Camptocamp gives none for it, so the answer is "not given on Camptocamp", not a guess.
+- The Labande rating of the first route has only its global half (`PD`) and the second only its ski half (`S4`).
+- Each route's description, orientations and waypoints are only in [`get_route`](get_route.md): `get_route {id: 1618656}`.
+
+## Limits
+
+- **At least one filter.** A call without `query`, `area_id`, `waypoint_id`, `activity`, `rating_system`, `height_diff_up_min`/`height_diff_up_max`, `route_types` or `configuration` is refused before any request, with the error shown in [Errors](../using-with-llms.md#errors). A blank `query` does not count. Filters combine with AND; `route_types` and `configuration` match routes having any of the values given.
+- **One rating system per call.** `rating_system` needs `rating_min`, `rating_max` or both, and the bounds need a `rating_system`. A bound outside the system's scale is refused with the valid values, since Camptocamp would ignore it silently. `search_routes {area_id: 14409, rating_system: "ski_rating", rating_min: "3", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  Error: rating_min "3" is not a valid ski_rating value; valid values: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6
+  ```
+
+  A `rating_min` above `rating_max` is refused too. To search two systems, such as a Toponeige and a Labande range, make two calls.
+
+- **Missing values exclude a route.** With a rating filter, routes without a value in that system are left out; with `height_diff_up_min` or `height_diff_up_max`, routes without an elevation gain are left out. A route rated only in Labande never matches a `ski_rating` filter.
+- **Closed lists are checked.** An `activity`, `route_types`, `configuration` or `rating_system` value outside its list is refused with the valid values. Activities and codes are Camptocamp's own and stay in English whatever `lang` is.
+- **Unknown IDs return nothing.** An unknown `area_id` or `waypoint_id` gives no results, not an error. `search_routes {waypoint_id: 999999999, limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  No routes found matching waypoint 999999999.
+  ```
+
+  Take the IDs from [`search_areas`](search_areas.md) and [`search_waypoints`](search_waypoints.md).
+
+- **Paging.** `limit` is 1 to 50, and `offset + limit` cannot exceed 10,000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters rather than paging far.
+- **Language.** `lang` picks the language of route names; a route without a name in that language shows its name in the first language available. Searches print no `**Language**` line: see [Language](../using-with-llms.md#language).
+- **Ratings stay in their system.** The ratings in a result line are those of the route, labelled with their system. Never convert a grade from one system to another, and quote it with its label.
+
 ## Related tools
 
 - [`search_areas`](search_areas.md): find the `area_id` of a mountain range, a département or canton, or a country.
