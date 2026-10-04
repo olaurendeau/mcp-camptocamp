@@ -142,7 +142,7 @@ MCP_TIMEOUT=30000 claude
 claude mcp remove camptocamp --scope user
 ```
 
-Use the scope you added it with. Remove the allow rule from your settings file as well.
+Use the scope you added it with. The Claude Code docs give this form, `claude mcp remove <name> --scope <scope>`, in [Configuration warnings](https://code.claude.com/docs/en/mcp#configuration-warnings), to remove a server from one scope when it is defined in several. Remove the allow rule from your settings file as well.
 
 ## Troubleshooting
 
