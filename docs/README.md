@@ -18,9 +18,8 @@ Until your client has its own page here, use the [Claude Code command](getting-s
 ## Guides
 
 - [Agent SDKs](agent-sdks.md): start the server from your own agent code with the OpenAI Agents SDK (Python and JS), the Mistral Python SDK or google-genai (Python and JS).
+- [Using the tools with an LLM](using-with-llms.md): which tools to chain for a region, a summit altitude, a hut, recent conditions or guidebooks; what each output line means (URL, Language, user-written text, paging, missing data, errors); and a real June ski-tour example.
 - [System prompt](system-prompt.md): a prompt to paste into your agent, so the model quotes Camptocamp, cites it and says when a value is missing.
-
-Other guides on using the tools with an LLM are listed here as they are written.
 
 ## Tool reference
 
