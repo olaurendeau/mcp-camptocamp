@@ -109,9 +109,9 @@ Then start Claude Desktop again. If npx still fails, check that npm is installed
 
 ## Claude Code warns that a tool's output is large
 
-**Symptom:** Claude Code warns about the size of a tool's output, or cuts it.
+**Symptom:** Claude Code warns about the size of a tool's output, or replaces the output in the conversation with a message that names a file.
 
-**Cause:** Claude Code warns when an MCP tool's output exceeds 10,000 tokens, and by default caps it at 25,000 tokens.
+**Cause:** Claude Code warns when an MCP tool's output exceeds 10,000 tokens, and limits output to 25,000 tokens by default. When a text result exceeds the limit, Claude Code saves it to a file and puts a message naming the file in the conversation instead; Claude reads the file when it needs the content ([Claude Code docs](https://code.claude.com/docs/en/mcp#mcp-output-limits-and-warnings)).
 
 **Fix:** ask for fewer results per call (the search tools take a `limit`), or raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable, for example `MAX_MCP_OUTPUT_TOKENS=50000 claude`. The warning threshold cannot be changed. See [Claude Code's limits](clients/claude-code.md#limits).
 
