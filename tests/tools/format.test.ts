@@ -20,6 +20,7 @@ import {
   formatMalformed,
   formatListItems,
   formatLanguageLine,
+  formatOtherLanguagesLine,
 } from "../../src/tools/format.js";
 import type { AreaSearchResult } from "../../src/api/camptocamp.js";
 
@@ -231,6 +232,93 @@ describe("formatLanguageLine", () => {
 
   it("prints no line without locales", () => {
     expect(formatLanguageLine([], "de")).toEqual([]);
+  });
+});
+
+// AC1.6 on #210 (D1): the free-text sections the shown locale lacks and other locales have.
+describe("formatOtherLanguagesLine", () => {
+  const sections = [
+    ["summary", "Summary"],
+    ["description", "Description"],
+    ["gear", "Gear"],
+  ] as const;
+
+  // Shaped like route 54085 of GET /routes/54085 (2026-10-05): fr has no gear, de, en and it have no summary. The
+  // texts are placeholders, not Camptocamp's.
+  const pourri = [
+    { lang: "fr", summary: "Grande course", description: "Approche par Le Miroir", gear: null },
+    { lang: "de", summary: null, description: "Zustieg von Le Miroir", gear: "Pickel, Steigeisen" },
+    { lang: "en", summary: null, description: "Approach from Le Miroir", gear: "Ice axe, crampons" },
+    { lang: "it", summary: null, description: "Accesso da Le Miroir", gear: "Piccozza, ramponi" },
+  ];
+
+  it("names each field the shown locale lacks, with the languages that have it, in API order", () => {
+    expect(formatOtherLanguagesLine(pourri, pourri[0], sections)).toEqual([
+      "**Text in other languages**: gear (de, en, it)",
+    ]);
+    expect(formatOtherLanguagesLine(pourri, pourri[2], sections)).toEqual([
+      "**Text in other languages**: summary (fr)",
+    ]);
+  });
+
+  it("lists the fields in section order and the languages in locale order, whatever the key order", () => {
+    const locales = [
+      { lang: "it", gear: "Piccozza", summary: "Corsa" },
+      { lang: "en", description: "" },
+      { lang: "de", gear: "Pickel", description: "Zustieg" },
+    ];
+    expect(formatOtherLanguagesLine(locales, locales[1], sections)).toEqual([
+      "**Text in other languages**: summary (it), description (de), gear (it, de)",
+    ]);
+  });
+
+  it.each([
+    ["missing", {}],
+    ["null", { gear: null }],
+    ["empty", { gear: "" }],
+    ["whitespace-only", { gear: " \n\t " }],
+  ])("counts a %s field as having no text, in the shown locale and in the others", (_case, empty) => {
+    const shown = { lang: "fr", ...empty };
+    const other = { lang: "de", ...empty };
+    const withText = { lang: "en", gear: "Piolet" };
+    expect(formatOtherLanguagesLine([shown, other, withText], shown, sections)).toEqual([
+      "**Text in other languages**: gear (en)",
+    ]);
+  });
+
+  it("does not list a field the shown locale has text for", () => {
+    const locales = [
+      { lang: "fr", gear: "Piolet" },
+      { lang: "de", gear: "Pickel" },
+    ];
+    expect(formatOtherLanguagesLine(locales, locales[0], sections)).toEqual([]);
+  });
+
+  it("does not list a field no other locale has text for", () => {
+    const locales = [
+      { lang: "fr", summary: null, gear: "" },
+      { lang: "de", summary: "  ", description: null },
+    ];
+    expect(formatOtherLanguagesLine(locales, locales[0], sections)).toEqual([]);
+  });
+
+  it("compares with the locale shown after a fallback, not the requested one", () => {
+    // Shaped like route 675555 asked in fr (placeholder texts): no fr locale, so en is shown, and it has every
+    // section it, the only other locale, has.
+    const resegone = [
+      { lang: "it", summary: null, description: "Dal parcheggio", gear: null },
+      { lang: "en", summary: "Ferrata", description: "From the car park", gear: "Via ferrata kit" },
+    ];
+    const shown = pickLocale(resegone, "fr");
+    expect(shown?.lang).toBe("en");
+    expect(formatOtherLanguagesLine(resegone, shown, sections)).toEqual([]);
+    expect(formatOtherLanguagesLine(resegone, pickLocale(resegone, "it"), sections)).toEqual([
+      "**Text in other languages**: summary (en), gear (en)",
+    ]);
+  });
+
+  it("gives no line without locales", () => {
+    expect(formatOtherLanguagesLine([], undefined, sections)).toEqual([]);
   });
 });
 

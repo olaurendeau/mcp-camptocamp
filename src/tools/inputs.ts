@@ -44,10 +44,15 @@ export const LANG_NOTE =
   `lang (default fr) picks the language of titles and texts; when a document has no text in it, the first ` +
   `available of ${LANG_ORDER.join(", ")} is used. Labels and codes stay in English.`;
 
-/** The tool-description sentence on the Language line of the get_* tools (decision D3 on #153). */
+/**
+ * The tool-description sentences on the Language line (decision D3 on #153) and the Text in other languages line
+ * (D1 on #210) of the get_* tools.
+ */
 export const DETAIL_LANG_NOTE =
-  "When the document has no text in the requested language, the line after the URL says which one is shown and " +
-  "which exist, e.g. '**Language**: en (no de version; available: it, en)'.";
+  "After the URL, '**Language**: en (no de version; available: it, en)' says the requested language is missing " +
+  "and which exist, and '**Text in other languages**: gear (de, en)' lists sections written only in other " +
+  "languages: call again with one of those lang values to read them. Language versions are written separately " +
+  "and may differ.";
 
 /** Results to skip in a search, for paging; handlers check offset + limit with `assertResultWindow`. */
 export function searchOffset() {

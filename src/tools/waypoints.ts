@@ -16,18 +16,19 @@ import {
   formatRecentOutings,
   formatListItems,
   formatLanguageLine,
+  formatOtherLanguagesLine,
 } from "./format.js";
 import { formatUserTexts, USER_TEXT_NOTE, type TextSection } from "./text.js";
 import { CUSTODIANSHIPS, WAYPOINT_TYPES, enumValue } from "./enums.js";
 import type { Lang } from "./enums.js";
 
-// The free-text sections get_waypoint prints, in print order.
+// The free-text sections get_waypoint prints, in print order; a field name the locale lacks fails the typecheck.
 const WAYPOINT_TEXT = [
   ["summary", "Summary"],
   ["description", "Description"],
   ["access", "Access"],
   ["access_period", "Access period"],
-] as const satisfies readonly TextSection<string>[];
+] as const satisfies readonly TextSection<keyof WaypointDetail["locales"][number]>[];
 
 export const searchWaypointsSchema = z.object({
   query: searchQuery("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')", {
@@ -102,6 +103,7 @@ function formatWaypointDetail(waypoint: WaypointDetail, lang?: Lang): string {
 
   lines.push(...formatHeader(pickTitle(waypoint.locales, lang), waypoint.document_id, "waypoints"));
   lines.push(...formatLanguageLine(waypoint.locales, lang));
+  lines.push(...formatOtherLanguagesLine(waypoint.locales, locale, WAYPOINT_TEXT));
   lines.push(`\n**Type**: ${waypoint.waypoint_type}`);
 
   // A virtual waypoint's elevation and position are placeholders (see isVirtualWaypoint).
@@ -203,11 +205,11 @@ export const waypointToolDefinitions = [
     name: "get_waypoint",
     title: "Get waypoint details",
     description:
-      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude and GPS coordinates. " +
+      "Get a Camptocamp.org waypoint by ID, with its altitude and GPS coordinates. " +
       VIRTUAL_WAYPOINT_NOTE +
-      " It also gives capacity (for huts, gîtes and camp sites: places outside the wardened period, then places when wardened; for a bivouac: its number of places), custodianship, phones and website, summary, description, access, access period (free text, as written), the areas it belongs to (range, admin_limits, country), then its routes (at most 50, in search_routes format; a 'More: search_routes with waypoint_id=N' line follows when there are more), the books that cover it, and its most recent outings with their total ('More: search_outings with waypoint_id=N' lists them all). " +
+      " It also gives capacity (for huts, gîtes and camp sites: places outside the wardened period, then places when wardened; for a bivouac: its number of places), custodianship, phones and website, summary, description, access, access period (free text, as written), the areas it belongs to (range, admin_limits, country), then its routes (at most 50, in search_routes format; 'More: search_routes with waypoint_id=N' lists them all), the books that cover it, and its most recent outings with their total ('More: search_outings with waypoint_id=N' lists them all). " +
       CUSTODIANSHIP_NOTE +
-      " Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      " The second line is the document's camptocamp.org URL, to cite as the source. " +
       `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${USER_TEXT_NOTE}`,
     inputSchema: getWaypointSchema,
     handler: handleGetWaypoint,

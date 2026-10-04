@@ -334,20 +334,21 @@ describe("handleGetArea", () => {
 });
 
 describe("get_area lang", () => {
-  // Area 14274 of GET /areas/14274 (2026-10-04): nine locales, zh first; only fr has a description.
+  // Area 14274 of GET /areas/14274 (2026-10-05): nine locales, zh first; only fr has a description (cut to its
+  // first two lines), every other text is null.
   const france: AreaDetail = {
     document_id: 14274,
     area_type: "country",
     locales: [
-      { lang: "zh", title: "法国", summary: null, description: "" },
-      { lang: "sl", title: "Francija", summary: null, description: "" },
+      { lang: "zh", title: "法国", summary: null, description: null },
+      { lang: "sl", title: "Francija", summary: null, description: null },
       { lang: "fr", title: "France", summary: null, description: "## Ski de randonnée\n### Alpes" },
-      { lang: "ca", title: "França", summary: null, description: "" },
-      { lang: "de", title: "Frankreich", summary: null, description: "" },
-      { lang: "en", title: "France", summary: null, description: "" },
-      { lang: "es", title: "Francia", summary: null, description: "" },
-      { lang: "eu", title: "France", summary: null, description: "" },
-      { lang: "it", title: "Francia", summary: null, description: "" },
+      { lang: "ca", title: "França", summary: null, description: null },
+      { lang: "de", title: "Frankreich", summary: null, description: null },
+      { lang: "en", title: "France", summary: null, description: null },
+      { lang: "es", title: "Francia", summary: null, description: null },
+      { lang: "eu", title: "France", summary: null, description: null },
+      { lang: "it", title: "Francia", summary: null, description: null },
     ],
   };
 
@@ -356,12 +357,45 @@ describe("get_area lang", () => {
 
     const result = await handleGetArea({ id: 14274, lang: "zh" });
 
-    expect(result.split("\n").slice(0, 4)).toEqual([
+    expect(result.split("\n").slice(0, 5)).toEqual([
       "# 法国 (ID: 14274)",
       "**URL**: https://www.camptocamp.org/areas/14274",
+      "**Text in other languages**: description (fr)",
       "",
       "**Type**: country",
     ]);
+  });
+
+  it("names the description area 14274 has only in fr, and prints no other text (AC1.1)", async () => {
+    mockGetArea.mockResolvedValueOnce(france);
+
+    const result = await handleGetArea({ id: 14274, lang: "de" });
+
+    expect(result.split("\n")).toEqual([
+      "# Frankreich (ID: 14274)",
+      "**URL**: https://www.camptocamp.org/areas/14274",
+      "**Text in other languages**: description (fr)",
+      "",
+      "**Type**: country",
+    ]);
+  });
+
+  it("prints no Text line on a search result (AC1.9)", async () => {
+    mockSearchAreas.mockResolvedValueOnce({ documents: [{ ...france, available_langs: null }], total: 1 });
+
+    const result = await search({ query: "Frankreich", lang: "de" });
+
+    expect(result).toContain("- [14274] Frankreich (country)");
+    expect(result).not.toContain("Text in other languages");
+  });
+
+  it("prints the fr description of area 14274 with no Text line (AC1.2)", async () => {
+    mockGetArea.mockResolvedValueOnce(france);
+
+    const result = await handleGetArea({ id: 14274 });
+
+    expect(result).not.toContain("Text in other languages");
+    expect(result).toContain("## Description\n[begin user-written text: description]\n#### Ski de randonnée");
   });
 
   it("names the language shown after the URL line when the requested one is missing", async () => {
