@@ -17,6 +17,7 @@ src/
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
     ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
+    ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
     ├── areas.ts          # Tools: search_areas, get_area
     ├── books.ts          # Tools: search_books, get_book
     └── articles.ts       # Tools: search_articles, get_article
@@ -29,6 +30,7 @@ tests/
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
     ├── outings.test.ts     # Tool handler unit tests
+    ├── paging.test.ts      # Shared search paging unit tests
     ├── areas.test.ts       # Tool handler unit tests
     ├── books.test.ts       # Tool handler unit tests
     └── articles.test.ts    # Tool handler unit tests
@@ -89,7 +91,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                         |
 | `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                            |
 | `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes)                    |
-| `search_outings`      | Search outings by keyword, area, activity, date range, route or waypoint, most recent first       |
+| `search_outings`      | Search outings by keyword, area, activity, dates, route or waypoint, newest first; `offset` pages |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`           |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                |
 | `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable        |

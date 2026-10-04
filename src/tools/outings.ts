@@ -1,13 +1,8 @@
 import { z } from "zod";
-import { documentId, searchQuery } from "./inputs.js";
+import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { assertResultWindow, formatSearchPage } from "./paging.js";
 import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
-import type {
-  OutingSearchResponse,
-  OutingDetail,
-  OutingListItem,
-  OutingListResponse,
-  OutingSearchParams,
-} from "../api/camptocamp.js";
+import type { OutingSearchResponse, OutingDetail, OutingListItem, OutingListResponse } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, formatHeader, formatTitledLine } from "./format.js";
 
 export const searchUserOutingsSchema = z.object({
@@ -45,9 +40,6 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, DATE_MESSAGE)
   .refine(isRealDate, DATE_MESSAGE);
 
-// Camptocamp refuses any search where offset + limit goes past this many results.
-const MAX_RESULT_WINDOW = 10000;
-
 export const searchOutingsSchema = z.object({
   query: searchQuery("Keyword matched against outing titles (e.g. 'cosmiques')", { allowBlank: true }).optional(),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14409 for Vanoise)").optional(),
@@ -66,13 +58,7 @@ export const searchOutingsSchema = z.object({
   route_id: documentId("Camptocamp route ID from search_routes").optional(),
   waypoint_id: documentId("Camptocamp waypoint ID from search_waypoints").optional(),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
-  offset: z
-    .number()
-    .int()
-    .min(0)
-    .optional()
-    .default(0)
-    .describe("Number of results to skip, for paging (offset + limit ≤ 10,000)"),
+  offset: searchOffset(),
 });
 
 export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
@@ -172,7 +158,7 @@ function isPresent<T>(value: T | null | undefined | ""): value is T {
   return value != null && value !== "";
 }
 
-function describeFilters(params: OutingSearchParams): string {
+function describeFilters(params: SearchOutingsInput): string[] {
   const filters: string[] = [];
   if (params.query !== undefined) filters.push(`query "${params.query}"`);
   if (params.area_id !== undefined) filters.push(`area ${params.area_id}`);
@@ -186,7 +172,7 @@ function describeFilters(params: OutingSearchParams): string {
   }
   if (params.route_id !== undefined) filters.push(`route ${params.route_id}`);
   if (params.waypoint_id !== undefined) filters.push(`waypoint ${params.waypoint_id}`);
-  return filters.join(", ");
+  return filters;
 }
 
 function formatOutingLine(outing: OutingListItem): string {
@@ -217,35 +203,28 @@ function formatOutingLine(outing: OutingListItem): string {
   return [head, ...parts].join(" | ");
 }
 
-function formatOutingList(response: OutingListResponse, params: OutingSearchParams): string {
-  const filters = describeFilters(params);
-  if (response.total === 0) {
-    return filters ? `No outings found matching ${filters}.` : "No outings found.";
-  }
-
-  const lines: string[] = [
-    `Found ${response.total} outing(s), most recent first. Showing ${response.documents.length} from offset ${params.offset ?? 0}:`,
-  ];
-  if (filters) lines.push(`Filters: ${filters}`);
-  lines.push("");
-  lines.push(...response.documents.map(formatOutingLine));
-  return lines.join("\n");
+function formatOutingList(response: OutingListResponse, params: SearchOutingsInput): string {
+  return formatSearchPage({
+    kind: "outing",
+    total: response.total,
+    offset: params.offset,
+    limit: params.limit,
+    lines: response.documents.map(formatOutingLine),
+    filters: describeFilters(params),
+    order: ", most recent first",
+  });
 }
 
 // The SDK has already validated `input` against searchOutingsSchema and applied its defaults.
 export async function handleSearchOutings(input: SearchOutingsInput): Promise<string> {
   const { query, ...rest } = input;
   // A blank query counts as missing: the API treats `q=` like no `q` and returns every outing.
-  const params: OutingSearchParams = query?.trim() ? { query, ...rest } : rest;
+  const params: SearchOutingsInput = query?.trim() ? { query, ...rest } : rest;
 
   if (params.date_from !== undefined && params.date_to !== undefined && params.date_from > params.date_to) {
     throw new Error(`date_from (${params.date_from}) must be on or before date_to (${params.date_to}).`);
   }
-  if (rest.offset + rest.limit > MAX_RESULT_WINDOW) {
-    throw new Error(
-      `offset + limit must not exceed ${MAX_RESULT_WINDOW}: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.`,
-    );
-  }
+  assertResultWindow(params.offset, params.limit);
 
   const response = await searchOutings(params);
   return formatOutingList(response, params);
@@ -282,7 +261,7 @@ export const outingToolDefinitions = [
     name: "search_outings",
     title: "Search outings",
     description:
-      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), route_id (from search_routes), waypoint_id (from search_waypoints). Each result shows ID, title, activities, dates, condition rating, difficulty ratings, max elevation, elevation gain, mountain ranges and author. Use offset to page (offset + limit ≤ 10,000). An unknown area/route/waypoint ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text.",
+      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), route_id (from search_routes), waypoint_id (from search_waypoints). Each result shows ID, title, activities, dates, condition rating, difficulty ratings, max elevation, elevation gain, mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow, or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text.",
     inputSchema: searchOutingsSchema,
     handler: handleSearchOutings,
   },
