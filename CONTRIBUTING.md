@@ -28,6 +28,11 @@ Tout changement arrive sur `main` par une pull request qui passe la CI et une re
 
 Une PR qui dépasse 1000 lignes se découpe : d'abord le refactoring préparatoire, puis la fonctionnalité, puis la doc.
 
+### Suivi des dépendances
+
+- **Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) propose chaque lundi les mises à jour npm, GitHub Actions et Docker. Les montées mineures et correctives npm sont groupées (une PR pour la production, une pour le dev) ; chaque montée majeure npm arrive seule et reste une décision de l'humain. Les mises à jour de sécurité arrivent sans délai, une PR chacune. Une PR Dependabot suit le même cycle que les autres : checks requis, revue agent, merge par le coordinateur.
+- **Audit hebdomadaire** ([`.github/workflows/audit.yml`](.github/workflows/audit.yml), lundi et à la demande, jamais requis) : échoue sur toute vulnérabilité _moderate_ ou plus en production. L'audit complet (dépendances de dev comprises) est seulement informatif tant que vitest 2 traîne des alertes connues ([#138](https://github.com/olaurendeau/mcp-camptocamp/issues/138)) ; il deviendra bloquant (seuil _high_) avec cette montée de version.
+
 ## Équipe d'agents
 
 Dans ce repo, la session Claude Code est le **coordinateur** ([`coordinator`](.claude/agents/coordinator.md), activé par `.claude/settings.json`). C'est à lui que l'humain s'adresse. Il planifie, pose les questions, distribue le travail et merge.
