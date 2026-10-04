@@ -103,7 +103,7 @@ function formatArticleDetail(article: ArticleDetail): string {
 }
 
 export async function handleSearchArticles(input: SearchArticlesInput): Promise<string> {
-  const response = await searchArticles(input.query, input.limit);
+  const response = await searchArticles(input);
   return formatArticleSearchResult(response);
 }
 

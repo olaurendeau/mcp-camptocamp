@@ -94,7 +94,7 @@ function formatBookDetail(book: BookDetail): string {
 }
 
 export async function handleSearchBooks(input: SearchBooksInput): Promise<string> {
-  const response = await searchBooks(input.query, input.limit);
+  const response = await searchBooks(input);
   return formatBookSearchResult(response);
 }
 

@@ -154,10 +154,10 @@ describe("handleSearchRoutes with area_id", () => {
 
     await handleSearchRoutes({ query: "couloir", limit: 10, area_id: 14403 });
 
-    expect(mockSearchRoutes).toHaveBeenCalledWith("couloir", 10, undefined, 14403);
+    expect(mockSearchRoutes).toHaveBeenCalledWith({ query: "couloir", limit: 10, area_id: 14403 });
   });
 
-  it("passes an undefined area to the API and keeps today's messages without area_id", async () => {
+  it("passes no area to the API and keeps today's messages without area_id", async () => {
     mockSearchRoutes.mockResolvedValueOnce({
       total: 12,
       documents: [
@@ -173,7 +173,7 @@ describe("handleSearchRoutes with area_id", () => {
 
     const result = await handleSearchRoutes({ query: "x", limit: 10 });
 
-    expect(mockSearchRoutes).toHaveBeenCalledWith("x", 10, undefined, undefined);
+    expect(mockSearchRoutes).toHaveBeenCalledWith({ query: "x", limit: 10 });
     expect(result.split("\n")[0]).toBe("Found 12 route(s). Showing 1:");
 
     mockSearchRoutes.mockResolvedValueOnce({ total: 0, documents: [] });
@@ -215,7 +215,7 @@ describe("handleSearchRoutes with area_id", () => {
     expect(result).toBe("No routes found in area 14403.");
   });
 
-  it("searches by area_id alone, passing query as undefined", async () => {
+  it("searches by area_id alone, without a query", async () => {
     mockSearchRoutes.mockResolvedValueOnce({
       total: 294,
       documents: [
@@ -231,7 +231,7 @@ describe("handleSearchRoutes with area_id", () => {
 
     const result = await handleSearchRoutes({ area_id: 14403, limit: 10 });
 
-    expect(mockSearchRoutes).toHaveBeenCalledWith(undefined, 10, undefined, 14403);
+    expect(mockSearchRoutes).toHaveBeenCalledWith({ limit: 10, area_id: 14403 });
     expect(result).toContain("in area 14403");
   });
 
@@ -251,7 +251,7 @@ describe("handleSearchRoutes with area_id", () => {
 
     await handleSearchRoutes({ query: "  ", limit: 10, area_id: 14403 });
 
-    expect(mockSearchRoutes).toHaveBeenCalledWith(undefined, 10, undefined, 14403);
+    expect(mockSearchRoutes).toHaveBeenCalledWith({ limit: 10, area_id: 14403 });
   });
 });
 

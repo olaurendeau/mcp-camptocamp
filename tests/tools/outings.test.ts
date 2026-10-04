@@ -46,6 +46,7 @@ describe("handleSearchUserOutings", () => {
 
     const result = await handleSearchUserOutings({ user_id: 430052, limit: 10 });
 
+    expect(mockSearchUserOutings).toHaveBeenCalledWith({ user_id: 430052, limit: 10 });
     expect(result).toContain("Found 2 outing(s) for user 430052");
     expect(result).toContain("[1] Sortie en Vanoise");
     expect(result).toContain("2026-07-01");

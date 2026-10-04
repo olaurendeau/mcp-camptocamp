@@ -137,7 +137,7 @@ describe("handleSearchArticles", () => {
 
     const result = await handleSearchArticles({ query: "crampons", limit: 10 });
 
-    expect(mockSearchArticles).toHaveBeenCalledWith("crampons", 10);
+    expect(mockSearchArticles).toHaveBeenCalledWith({ query: "crampons", limit: 10 });
     expect(result.startsWith("Found 3 article(s). Showing 3:\n")).toBe(true);
   });
 

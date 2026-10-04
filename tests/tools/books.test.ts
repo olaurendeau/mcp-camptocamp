@@ -148,7 +148,7 @@ describe("handleSearchBooks", () => {
 
     const result = await handleSearchBooks({ query: "mont blanc", limit: 2 });
 
-    expect(mockSearchBooks).toHaveBeenCalledWith("mont blanc", 2);
+    expect(mockSearchBooks).toHaveBeenCalledWith({ query: "mont blanc", limit: 2 });
     expect(result.startsWith("Found 79 book(s). Showing 2:")).toBe(true);
     expect(result).toContain(
       "- [373877] Mont Blanc Classique & Plaisir | Author: Marco Romelli | Types: topo | Activities: mountain_climbing, snow_ice_mixed",

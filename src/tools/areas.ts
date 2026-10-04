@@ -49,7 +49,7 @@ function formatAreaDetail(area: AreaDetail): string {
 }
 
 export async function handleSearchAreas(input: SearchAreasInput): Promise<string> {
-  const response = await searchAreas(input.query, input.limit, undefined, input.area_type);
+  const response = await searchAreas(input);
   return formatAreaSearchResult(response);
 }
 

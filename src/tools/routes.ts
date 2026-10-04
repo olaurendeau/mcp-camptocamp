@@ -77,7 +77,7 @@ export async function handleSearchRoutes(input: SearchRoutesInput): Promise<stri
   if (query === undefined && input.area_id === undefined) {
     throw new Error("search_routes needs a query, an area_id, or both. Use search_areas to find an area_id.");
   }
-  const response = await searchRoutes(query, input.limit, undefined, input.area_id);
+  const response = await searchRoutes({ query, limit: input.limit, area_id: input.area_id });
   return formatRouteSearchResult(response, input.area_id);
 }
 
