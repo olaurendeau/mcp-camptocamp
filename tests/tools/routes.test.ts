@@ -8,7 +8,6 @@ import {
 import { USER_TEXT_NOTE } from "../../src/tools/text.js";
 import type { z } from "zod";
 import * as api from "../../src/api/camptocamp.js";
-import type { Lang } from "../../src/api/camptocamp.js";
 import { routeDetailSchema, routeSearchResponseSchema } from "../../src/api/schemas.js";
 import { ROUTE_RATING_SYSTEMS } from "../../src/tools/ratings.js";
 import { throughSchema } from "./through-schema.js";
@@ -2016,16 +2015,10 @@ describe("search_routes lang", () => {
     locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
   };
 
-  // The automock empties LANGS, so lang is added after parsing (tests/server/input-validation.test.ts checks
-  // the real schema).
-  function searchIn(lang: Lang, input: z.input<typeof searchRoutesSchema> = {}): Promise<string> {
-    return handleSearchRoutes({ ...searchRoutesSchema.parse(input), lang });
-  }
-
   it("sends lang de and prints the de title (AC5.2)", async () => {
     mockSearchRoutes.mockResolvedValueOnce({ total: 1, documents: [geayDe] });
 
-    const result = await searchIn("de", { query: "Glacier du Geay" });
+    const result = await search({ query: "Glacier du Geay", lang: "de" });
 
     expect(mockSearchRoutes).toHaveBeenCalledWith({ query: "Glacier du Geay", limit: 10, offset: 0, lang: "de" });
     expect(result.split("\n")).toEqual([
@@ -2046,7 +2039,7 @@ describe("search_routes lang", () => {
   });
 
   it("does not count lang as a filter", async () => {
-    await expect(searchIn("de")).rejects.toThrow("search_routes needs at least one filter");
+    await expect(search({ lang: "de" })).rejects.toThrow("search_routes needs at least one filter");
     expect(mockSearchRoutes).not.toHaveBeenCalled();
   });
 });

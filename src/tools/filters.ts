@@ -1,7 +1,7 @@
 // Rating and range filters shared by search_routes and search_outings: their inputs, the checks the API
 // does not make (R7 of #58: it silently ignores an off-scale bound), and their text in the Filters line.
 import { z } from "zod";
-import type { RouteRatingField } from "../api/camptocamp.js";
+import type { RouteRatingField } from "../api/values.js";
 import { ROUTE_RATING_SYSTEMS } from "./ratings.js";
 import { quote } from "./paging.js";
 

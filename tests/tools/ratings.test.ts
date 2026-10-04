@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RATING_DISPLAY, ROUTE_RATING_SYSTEMS, formatRatingParts, formatRatingLines } from "../../src/tools/ratings.js";
-import { ROUTE_RATING_FIELDS } from "../../src/api/camptocamp.js";
+import { ROUTE_RATING_FIELDS } from "../../src/api/values.js";
 import type { RatingFields } from "../../src/api/schemas.js";
 import { BARE_RATING } from "./bare-rating.js";
 
