@@ -65,7 +65,14 @@ describe("integer ID inputs", () => {
 
       expect(result.isError).toBe(true);
       const content = result.content as Array<{ type: string; text: string }>;
-      expect(content[0].text).toContain(field);
+      // The SDK reports the zod issues as JSON after "Invalid arguments for tool <name>: "
+      const prefix = `Input validation error: Invalid arguments for tool ${tool}: `;
+      const text = content[0].text;
+      expect(text).toContain(prefix);
+      const issues: unknown = JSON.parse(text.slice(text.indexOf(prefix) + prefix.length));
+      expect(issues).toEqual([
+        expect.objectContaining({ code: "too_big", maximum: Number.MAX_SAFE_INTEGER, path: [field] }),
+      ]);
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
