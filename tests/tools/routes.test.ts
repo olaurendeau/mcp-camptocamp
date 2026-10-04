@@ -1396,56 +1396,57 @@ describe("get_route associations", () => {
     expect(result).not.toContain("undefined");
   });
 
+  // Trimmed from the live GET /routes/944120 response (2026-10-04): a route with articles but no book,
+  // sibling route or outing, and a virtual waypoint at elevation 0.
+  const route944120 = {
+    document_id: 944120,
+    locales: [{ lang: "fr", title: "La dura dura", title_prefix: "Oliana" }],
+    activities: ["rock_climbing"],
+    main_waypoint_id: 189454,
+    associations: {
+      articles: [
+        {
+          document_id: 405598,
+          locales: [
+            { lang: "it", title: "Aperture 2013", summary: null },
+            { lang: "fr", title: "Chroniques - Ouvertures 2013", summary: null },
+          ],
+          categories: ["topoguide_supplements", "tags"],
+          article_type: "collab",
+          type: "c",
+        },
+        {
+          document_id: 947724,
+          locales: [{ lang: "fr", title: "Les voies 9b et au-delà", summary: "Historique des voies de 9b." }],
+          categories: ["topoguide_supplements"],
+          article_type: "collab",
+          type: "c",
+        },
+      ],
+      books: [],
+      routes: [],
+      waypoints: [
+        {
+          document_id: 189454,
+          locales: [{ lang: "fr", title: "Oliana" }],
+          waypoint_type: "climbing_outdoor",
+          elevation: 500,
+        },
+        {
+          document_id: 1947492,
+          locales: [
+            { lang: "en", title: "First Ascents in 2013" },
+            { lang: "fr", title: "Ouvertures 2013" },
+          ],
+          waypoint_type: "virtual",
+          elevation: 0,
+        },
+      ],
+      recent_outings: { documents: [], total: 0 },
+    },
+  };
+
   it("lists the articles of route 944120 and leaves out its empty books, routes and recent outings", async () => {
-    // Trimmed from the live GET /routes/944120 response (2026-10-04): a route with articles but no book,
-    // sibling route or outing, and a virtual waypoint at elevation 0.
-    const route944120 = {
-      document_id: 944120,
-      locales: [{ lang: "fr", title: "La dura dura", title_prefix: "Oliana" }],
-      activities: ["rock_climbing"],
-      main_waypoint_id: 189454,
-      associations: {
-        articles: [
-          {
-            document_id: 405598,
-            locales: [
-              { lang: "it", title: "Aperture 2013", summary: null },
-              { lang: "fr", title: "Chroniques - Ouvertures 2013", summary: null },
-            ],
-            categories: ["topoguide_supplements", "tags"],
-            article_type: "collab",
-            type: "c",
-          },
-          {
-            document_id: 947724,
-            locales: [{ lang: "fr", title: "Les voies 9b et au-delà", summary: "Historique des voies de 9b." }],
-            categories: ["topoguide_supplements"],
-            article_type: "collab",
-            type: "c",
-          },
-        ],
-        books: [],
-        routes: [],
-        waypoints: [
-          {
-            document_id: 189454,
-            locales: [{ lang: "fr", title: "Oliana" }],
-            waypoint_type: "climbing_outdoor",
-            elevation: 500,
-          },
-          {
-            document_id: 1947492,
-            locales: [
-              { lang: "en", title: "First Ascents in 2013" },
-              { lang: "fr", title: "Ouvertures 2013" },
-            ],
-            waypoint_type: "virtual",
-            elevation: 0,
-          },
-        ],
-        recent_outings: { documents: [], total: 0 },
-      },
-    };
     mockGetRoute.mockResolvedValueOnce(route944120);
 
     const result = await handleGetRoute({ id: 944120 });
@@ -1456,11 +1457,28 @@ describe("get_route associations", () => {
     ]);
     expect(section(result, "## Associated waypoints")).toEqual([
       "- [189454] Oliana (climbing_outdoor) | 500m | main waypoint",
-      "- [1947492] Ouvertures 2013 (virtual) | 0m",
+      "- [1947492] Ouvertures 2013 (virtual)",
     ]);
     expect(result).not.toContain("## Associated books");
     expect(result).not.toContain("## Associated routes");
     expect(result).not.toContain("## Recent outings");
+  });
+
+  it("prints no elevation for a virtual waypoint, even a non-zero one", async () => {
+    // Derived: the 944120 fixture with the virtual waypoint's placeholder elevation set to 7999.
+    const [oliana, virtual] = route944120.associations.waypoints;
+    mockGetRoute.mockResolvedValueOnce({
+      ...route944120,
+      associations: { ...route944120.associations, waypoints: [oliana, { ...virtual, elevation: 7999 }] },
+    });
+
+    const result = await handleGetRoute({ id: 944120 });
+
+    expect(section(result, "## Associated waypoints")).toEqual([
+      "- [189454] Oliana (climbing_outdoor) | 500m | main waypoint",
+      "- [1947492] Ouvertures 2013 (virtual)",
+    ]);
+    expect(result).not.toContain("7999m");
   });
 
   it.each([

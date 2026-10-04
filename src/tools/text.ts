@@ -30,7 +30,16 @@ const INTERNAL_LINK = /\[\[(\w+)\/(\d+)(?:\/[^|[\]]*)?\|([^[\]]+)\]\]/g;
 
 // A marker copied into the text would close the section early; "[" → "(" keeps it readable. It is
 // searched for in a folded copy of the text, so that lookalikes rendering like a marker match too.
-const FAKE_MARKER = /\[(?=\s*(?:begin|end)\s+user[\s_-]*written\s+text)/gi;
+// Each letter of a marker word also matches any non-ASCII letter (D6 on #153: no confusables table),
+// so a Cyrillic "е" or a Greek "Ε" counts as an "e"; a false positive only turns a "[" into "(".
+// Words are fixed-length and each separator class excludes letters: the scan stays linear.
+const NON_ASCII_LETTER = String.raw`(?![\x00-\x7F])\p{L}`;
+const markerWord = (word: string): string => Array.from(word, (letter) => `(?:${letter}|${NON_ASCII_LETTER})`).join("");
+const FAKE_MARKER = new RegExp(
+  String.raw`\[(?=\s*(?:${markerWord("begin")}|${markerWord("end")})\s+${markerWord("user")}[\s_-]*` +
+    String.raw`${markerWord("written")}\s+${markerWord("text")})`,
+  "giu",
+);
 // Invisible characters: format characters (zero-width space and joiners, word joiner, BOM, soft
 // hyphen…), the combining grapheme joiner and the variation selectors.
 const INVISIBLE_CHARACTER = /^[\p{Cf}\u034F\uFE00-\uFE0F]$/u;
