@@ -118,6 +118,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "minimum": 1,
         "type": "integer",
       },
+      "offset": {
+        "default": 0,
+        "description": "Number of results to skip, for paging (offset + limit ≤ 10,000)",
+        "minimum": 0,
+        "type": "integer",
+      },
       "query": {
         "description": "Area name in any language (e.g. 'Écrins', 'Valais', 'Wallis')",
         "maxLength": 200,
@@ -140,6 +146,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "minimum": 1,
         "type": "integer",
       },
+      "offset": {
+        "default": 0,
+        "description": "Number of results to skip, for paging (offset + limit ≤ 10,000)",
+        "minimum": 0,
+        "type": "integer",
+      },
       "query": {
         "description": "Search query (e.g. 'crampons', 'avalanche', 'rappel')",
         "maxLength": 200,
@@ -160,6 +172,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "description": "Maximum number of results",
         "maximum": 50,
         "minimum": 1,
+        "type": "integer",
+      },
+      "offset": {
+        "default": 0,
+        "description": "Number of results to skip, for paging (offset + limit ≤ 10,000)",
+        "minimum": 0,
         "type": "integer",
       },
       "query": {
@@ -322,6 +340,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "description": "Maximum number of results",
         "maximum": 50,
         "minimum": 1,
+        "type": "integer",
+      },
+      "offset": {
+        "default": 0,
+        "description": "Number of results to skip, for paging (offset + limit ≤ 10,000)",
+        "minimum": 0,
         "type": "integer",
       },
       "query": {

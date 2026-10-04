@@ -92,21 +92,21 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 ## MCP Tools
 
-| Tool                  | Description                                                                                          |
-| --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Search by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, gain, ratings |
-| `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas) |
-| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
-| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
-| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings        |
-| `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings) |
-| `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged |
-| `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`              |
-| `get_area`            | Get area detail by ID (type, summary, description)                                                   |
-| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable           |
-| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)    |
-| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type          |
-| `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)           |
+| Tool                  | Description                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `search_routes`       | Search by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, gain, ratings             |
+| `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas)             |
+| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`; paged with `offset`                         |
+| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                                        |
+| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings                    |
+| `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings)             |
+| `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged             |
+| `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
+| `get_area`            | Get area detail by ID (type, summary, description)                                                               |
+| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable; paged with `offset`  |
+| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)                |
+| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type; paged with `offset` |
+| `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)                       |
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 
@@ -120,16 +120,16 @@ Base URL: `https://api.camptocamp.org`
   - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.
   - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
 - `GET /routes/{id}?lang=fr`
-- `GET /waypoints?q={query}&limit=10&lang=fr`
-- `GET /waypoints?a={area_id}&limit=10&lang=fr` (combinable with `q`)
+- `GET /waypoints?q={query}&limit=10&lang=fr[&offset={n}]`
+- `GET /waypoints?a={area_id}&limit=10&lang=fr[&offset={n}]` (combinable with `q`)
 - `GET /waypoints/{id}?lang=fr`
 - `GET /outings?u={user_id}&limit=10&lang=fr`
 - `GET /outings/{id}?lang=fr`
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]`
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
-- `GET /areas?q={query}&limit=10&lang=fr[&atyp={type}]`
+- `GET /areas?q={query}&limit=10&lang=fr[&offset={n}][&atyp={type}]`
 - `GET /areas/{id}?lang=fr`
-- `GET /books?q={query}&limit=10&lang=fr`
+- `GET /books?q={query}&limit=10&lang=fr[&offset={n}]`
 - `GET /books/{id}?lang=fr`
-- `GET /articles?q={query}&limit=10&lang=fr`
+- `GET /articles?q={query}&limit=10&lang=fr[&offset={n}]`
 - `GET /articles/{id}?lang=fr`

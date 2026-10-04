@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { documentId, searchQuery } from "./inputs.js";
+import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
 import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
-import type { WaypointSearchResponse, WaypointDetail } from "../api/camptocamp.js";
+import type { WaypointDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, isPresent, formatHeader, formatWaypointLine, formatAreasSection } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
@@ -10,6 +11,7 @@ export const searchWaypointsSchema = z.object({
     allowBlank: true,
   }).optional(),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
+  offset: searchOffset(),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)").optional(),
 });
 
@@ -19,18 +21,6 @@ export const getWaypointSchema = z.object({
 
 export type SearchWaypointsInput = z.infer<typeof searchWaypointsSchema>;
 export type GetWaypointInput = z.infer<typeof getWaypointSchema>;
-
-function formatWaypointSearchResult(response: WaypointSearchResponse, areaId?: number): string {
-  const scope = areaId !== undefined ? ` in area ${areaId}` : "";
-  if (response.documents.length === 0) {
-    return `No waypoints found${scope}.`;
-  }
-
-  const lines: string[] = [`Found ${response.total} waypoint(s)${scope}. Showing ${response.documents.length}:\n`];
-
-  lines.push(...response.documents.map(formatWaypointLine));
-  return lines.join("\n");
-}
 
 // geometry.geom is a GeoJSON Point serialized as a string, in Web Mercator (EPSG:3857)
 function parseCoordinates(geom?: string | null): { lat: number; lng: number } | undefined {
@@ -76,8 +66,21 @@ export async function handleSearchWaypoints(input: SearchWaypointsInput): Promis
   if (query === undefined && input.area_id === undefined) {
     throw new Error("search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.");
   }
-  const response = await searchWaypoints({ query, limit: input.limit, area_id: input.area_id });
-  return formatWaypointSearchResult(response, input.area_id);
+  const { limit, offset, area_id } = input;
+  assertResultWindow(offset, limit);
+
+  const response = await searchWaypoints({ query, limit, offset, area_id });
+  const filters: string[] = [];
+  if (query !== undefined) filters.push(`query "${query}"`);
+  if (area_id !== undefined) filters.push(`area ${area_id}`);
+  return formatSearchPage({
+    kind: "waypoint",
+    total: response.total,
+    offset,
+    limit,
+    lines: response.documents.map((waypoint) => formatWaypointLine(waypoint)),
+    filters,
+  });
 }
 
 export async function handleGetWaypoint(input: GetWaypointInput): Promise<string> {
@@ -90,7 +93,8 @@ export const waypointToolDefinitions = [
     name: "search_waypoints",
     title: "Search waypoints",
     description:
-      "Search for waypoints (summits, shelters, huts, bivouacs) on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching waypoints with basic info (ID, title, type, elevation).",
+      "Search for waypoints (summits, shelters, huts, bivouacs) on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching waypoints with basic info (ID, title, type, elevation), after a header giving the total, the offset and the filters. " +
+      PAGING_NOTE,
     inputSchema: searchWaypointsSchema,
     handler: handleSearchWaypoints,
   },

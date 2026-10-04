@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { documentId, searchQuery } from "./inputs.js";
+import { documentId, searchOffset, searchQuery } from "./inputs.js";
+import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
 import { searchBooks, getBook } from "../api/camptocamp.js";
-import type { BookSearchResponse, BookDetail } from "../api/camptocamp.js";
+import type { BookSearchResult, BookDetail } from "../api/camptocamp.js";
 import {
   pickLocale,
   pickTitle,
@@ -16,6 +17,7 @@ import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 export const searchBooksSchema = z.object({
   query: searchQuery("Search query matched against book titles (e.g. 'Vallot', 'Mont Blanc')", { allowBlank: false }),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
+  offset: searchOffset(),
 });
 
 export const getBookSchema = z.object({
@@ -25,25 +27,14 @@ export const getBookSchema = z.object({
 export type SearchBooksInput = z.infer<typeof searchBooksSchema>;
 export type GetBookInput = z.infer<typeof getBookSchema>;
 
-function formatBookSearchResult(response: BookSearchResponse): string {
-  if (response.documents.length === 0) {
-    return "No books found.";
-  }
-
-  const lines: string[] = [`Found ${response.total} book(s). Showing ${response.documents.length}:\n`];
-
-  for (const book of response.documents) {
-    const title = pickTitle(book.locales);
-    const types = joinList(book.book_types);
-    const activities = joinList(book.activities);
-    const parts = [`- [${book.document_id}] ${title}`];
-    if (book.author) parts.push(`Author: ${book.author}`);
-    if (types) parts.push(`Types: ${types}`);
-    if (activities) parts.push(`Activities: ${activities}`);
-    lines.push(parts.join(" | "));
-  }
-
-  return lines.join("\n");
+function formatBookSearchLine(book: BookSearchResult): string {
+  const types = joinList(book.book_types);
+  const activities = joinList(book.activities);
+  const parts = [`- [${book.document_id}] ${pickTitle(book.locales)}`];
+  if (book.author) parts.push(`Author: ${book.author}`);
+  if (types) parts.push(`Types: ${types}`);
+  if (activities) parts.push(`Activities: ${activities}`);
+  return parts.join(" | ");
 }
 
 function formatBookDetail(book: BookDetail): string {
@@ -90,8 +81,18 @@ function formatBookDetail(book: BookDetail): string {
 }
 
 export async function handleSearchBooks(input: SearchBooksInput): Promise<string> {
+  const { query, limit, offset } = input;
+  assertResultWindow(offset, limit);
+
   const response = await searchBooks(input);
-  return formatBookSearchResult(response);
+  return formatSearchPage({
+    kind: "book",
+    total: response.total,
+    offset,
+    limit,
+    lines: response.documents.map(formatBookSearchLine),
+    filters: [`query "${query}"`],
+  });
 }
 
 export async function handleGetBook(input: GetBookInput): Promise<string> {
@@ -104,7 +105,8 @@ export const bookToolDefinitions = [
     name: "search_books",
     title: "Search books",
     description:
-      "Search books (guidebooks/topos, history, novels, photo books, technique) on Camptocamp.org by title keyword. The query matches book TITLES only: searching by author name or ISBN is unreliable and can return unrelated books or nothing, so an empty result does not mean the book does not exist. Returns ID, title, author, book types and activities; use get_book for editor, date, ISBN and covered routes/waypoints.",
+      "Search books (guidebooks/topos, history, novels, photo books, technique) on Camptocamp.org by title keyword. The query matches book TITLES only: searching by author name or ISBN is unreliable and can return unrelated books or nothing, so an empty result does not mean the book does not exist. Returns ID, title, author, book types and activities, after a header giving the total, the offset and the filters; use get_book for editor, date, ISBN and covered routes/waypoints. " +
+      PAGING_NOTE,
     inputSchema: searchBooksSchema,
     handler: handleSearchBooks,
   },

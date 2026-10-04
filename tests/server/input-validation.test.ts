@@ -284,6 +284,54 @@ describe("cross-field rules", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  // AC9.4: the window rule is shared by every paged search.
+  it.each(["search_waypoints", "search_areas", "search_books", "search_articles"])(
+    "%s refuses offset + limit above 10,000 without calling Camptocamp",
+    async (tool) => {
+      const fetchMock = stubFetch();
+      const client = await connect();
+
+      const result = await client.callTool({ name: tool, arguments: { query: "mont blanc", offset: 9995, limit: 10 } });
+
+      expect(result.isError).toBe(true);
+      expect(resultText(result)).toBe(
+        "Error: offset + limit must not exceed 10000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.",
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["search_waypoints", "search_areas", "search_books", "search_articles"])(
+    "%s sends offset and limit through MCP, offset 0 by default",
+    async (tool) => {
+      const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH), jsonResponse(EMPTY_SEARCH));
+      const client = await connect();
+
+      await client.callTool({ name: tool, arguments: { query: "pourri", offset: 9990, limit: 10 } });
+      await client.callTool({ name: tool, arguments: { query: "pourri" } });
+
+      const [paged, first] = fetchMock.mock.calls.map((call) => new URL(String(call[0])).searchParams);
+      expect(paged.get("offset")).toBe("9990");
+      expect(paged.get("limit")).toBe("10");
+      expect(first.get("offset")).toBe("0");
+    },
+  );
+
+  it.each(["search_waypoints", "search_areas", "search_books", "search_articles"])(
+    "%s rejects a negative offset naming the field without calling Camptocamp",
+    async (tool) => {
+      const fetchMock = stubFetch();
+      const client = await connect();
+
+      const result = await client.callTool({ name: tool, arguments: { query: "pourri", offset: -1 } });
+
+      expect(result.isError).toBe(true);
+      expect(resultText(result)).toContain(`Invalid arguments for tool ${tool}`);
+      expect(resultText(result)).toContain('"offset"');
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
   it.each<[string, Record<string, unknown>]>([
     ["offset + limit of exactly 10,000", { offset: 9990, limit: 10 }],
     ["equal date_from and date_to", { date_from: "2026-08-10", date_to: "2026-08-10" }],
