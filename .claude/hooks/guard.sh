@@ -4,7 +4,7 @@
 # - writing the agent-review status  → pr-reviewer only
 # - version bump (npm version)       → developer only, with --no-git-tag-version
 # - version tags (git tag/push vX.Y) → coordinator only, one named tag at a time
-# - push --tags/--follow-tags, moving or deleting a version tag → nobody
+# - bulk tag push (--tags/--follow-tags/--mirror/glob), moving or deleting a version tag → nobody
 # - manual publication               → nobody (publish.yml publishes from the tag)
 # The human decides when to release and which version; agents only carry it out.
 # A guardrail for agents, not a security boundary: the human and obfuscated commands bypass it.
@@ -42,20 +42,30 @@ segments=$(perl -0777 -pe '
   s/&&|\|\||[;|\n]/\n/g;
 ' <<<"$raw")
 
-publish='(npm|pnpm|yarn)[[:space:]]+publish'
-publish+='|make[[:space:]]+publish([[:space:]]|$)'
+# Global options may sit between the program and its subcommand (git -C <path> push, git -c k=v tag,
+# npm --prefix . version, make -C . publish), and their value may be quoted.
+value='("[^"]*"|'\''[^'\'']*'\''|[^-[:space:]][^[:space:]]*)'
+git='git([[:space:]]+((-C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix)[[:space:]]+'"$value"'|-[^[:space:]]*))*[[:space:]]+'
+pkg='(npm|pnpm|yarn)([[:space:]]+-[^[:space:]]*([[:space:]]+'"$value"')?)*[[:space:]]+'
+
+publish="${pkg}publish"
+publish+='|make[[:space:]](.*[[:space:]])?publish([[:space:]]|$)'
 publish+='|mcp-publisher[[:space:]]+publish'
 publish+='|gh[[:space:]].*release[[:space:]]+(create|upload|edit|delete)'
-bump='(npm|pnpm|yarn)[[:space:]]+version'
+bump="${pkg}version"
 no_git_tag='[[:space:]]--no-git-tag-version([[:space:]"'\'']|$)'
 git_tag='[[:space:]]--git-tag-version|--no-git-tag-version[[:space:]]+["'\'']?(true|false)(["'\''[:space:]]|$)'
-tag_create='git[[:space:]]+tag[[:space:]].*v[0-9]'
-tag_push='git[[:space:]]+push[[:space:]].*(refs/tags/|[[:space:]:]["'\'']?v[0-9]+\.[0-9])'
-tag_list='git[[:space:]]+tag[[:space:]]+(-l|--list)([[:space:]]|$)'
-tag_bulk='git[[:space:]]+push[[:space:]].*(--tags|--follow-tags)([[:space:]]|$)'
+tag_create="${git}"'tag[[:space:]].*v[0-9]'
+# A + before the tag (+v1.0.4, '+v1.0.4', +refs/tags/…) force-moves it: tag_push matches it, push_force refuses it.
+tag_push="${git}"'push[[:space:]].*(refs/tags/|[[:space:]:]["'\'']?\+?["'\'']?v[0-9]+\.[0-9])'
+# Only list-mode options may precede -l, so `git tag -a -l v1.1.0` stays a creation.
+tag_list="${git}"'tag([[:space:]]+(-n[0-9]*|-i|--ignore-case|--(sort|format|column|no-column|color|contains|no-contains|merged|no-merged|points-at)(=[^[:space:]]*)?))*[[:space:]]+(-l|--list)([[:space:]]|$)'
+# --mirror force-pushes every ref, a glob refspec (refs/tags/*) every matching one, push.followTags is --follow-tags.
+tag_bulk="${git}"'push[[:space:]](.*(--tags|--follow-tags|--mirror)([[:space:]]|$)|.*\*)'
+tag_bulk+='|git[[:space:]].*[pP][uU][sS][hH]\.[fF][oO][lL][lL][oO][wW][tT][aA][gG][sS]'
 tag_force='[[:space:]](-[a-zA-Z]*[fd][a-zA-Z]*|--force|--delete)([[:space:]]|$)'
 push_force='[[:space:]](-[a-zA-Z]*[fd][a-zA-Z]*|--force|--force-with-lease|--force-if-includes|--delete)([[:space:]=]|$)'
-push_force+='|[[:space:]]["'\'']?:'
+push_force+='|[[:space:]]["'\'']?[:+]'
 merge='gh[[:space:]].*pr[[:space:]]+merge'
 api_merge='pulls/[^[:space:]/]+/merge'
 write='[[:space:]](-f|-F|--field|--raw-field|--input)([[:space:]]|=)|(-X|--method)[[:space:]=]*(POST|PUT|PATCH)'
@@ -78,11 +88,11 @@ while IFS= read -r seg; do
   fi
 
   if has "$seg" "$tag_bulk"; then
-    deny "Push one named tag (git push origin vX.Y.Z), never --tags or --follow-tags: worktrees share tag refs, so a bulk push can publish tags nobody asked for."
+    deny "Push one named tag (git push origin vX.Y.Z), never --tags, --follow-tags, --mirror, a glob refspec or push.followTags: worktrees share tag refs, so a bulk push can publish tags nobody asked for."
   fi
 
   if { has "$seg" "$tag_create" && has "$seg" "$tag_force"; } || { has "$seg" "$tag_push" && has "$seg" "$push_force"; }; then
-    deny "No agent moves or deletes a version tag (tag -f/-d, forced push, deletion push): re-pushing a tag republishes an already-released version through publish.yml. Report it to the human."
+    deny "No agent moves or deletes a version tag (tag -f/-d, forced or +refspec push, deletion push): re-pushing a tag republishes an already-released version through publish.yml. Report it to the human."
   fi
 
   if [ "$agent" != "coordinator" ] && { has "$seg" "$tag_create" || has "$seg" "$tag_push"; } && ! has "$seg" "$tag_list"; then
