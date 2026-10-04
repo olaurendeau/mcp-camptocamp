@@ -112,7 +112,7 @@ function formatOutingDetail(outing: OutingDetail): string {
   const locale = pickLocale(outing.locales);
   const lines: string[] = [];
 
-  lines.push(formatHeader(locale?.title ?? "Untitled", outing.document_id));
+  lines.push(formatHeader(pickTitle(outing.locales), outing.document_id));
 
   if (outing.author) {
     lines.push(`**Author**: ${outing.author.name} (user ID: ${outing.author.user_id})`);

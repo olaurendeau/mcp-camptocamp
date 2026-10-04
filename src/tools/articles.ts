@@ -49,7 +49,7 @@ function formatArticleSearchResult(response: ArticleSearchResponse): string {
 
 function formatArticleDetail(article: ArticleDetail): string {
   const locale = pickLocale(article.locales);
-  const lines: string[] = [formatHeader(locale?.title ?? "Untitled", article.document_id)];
+  const lines: string[] = [formatHeader(pickTitle(article.locales), article.document_id)];
 
   // A collab article has many editors, so its creator is not labelled as the author (#11, D3).
   const authorLabel = article.article_type === "personal" ? "Author" : "Created by";

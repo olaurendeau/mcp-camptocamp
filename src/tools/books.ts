@@ -47,7 +47,7 @@ function formatBookSearchResult(response: BookSearchResponse): string {
 
 function formatBookDetail(book: BookDetail): string {
   const locale = pickLocale(book.locales);
-  const lines: string[] = [formatHeader(locale?.title ?? "Untitled", book.document_id)];
+  const lines: string[] = [formatHeader(pickTitle(book.locales), book.document_id)];
 
   const fields: Array<[string, string | number | null | undefined]> = [
     ["Author", book.author],

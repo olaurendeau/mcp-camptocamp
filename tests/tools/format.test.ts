@@ -47,11 +47,44 @@ describe("pickLocale", () => {
     expect(pickLocale(valaisCanton.locales)).toEqual({ lang: "fr", title: "Valais" });
   });
 
-  it("falls back to the first locale when there is no fr", () => {
-    // GET /routes?q=Dente del Resegone returns 675555 with [it, en] locales on its detail.
+  it("falls back to en before it, as the pl=fr search does", () => {
+    // Only the detail GET /routes/675555 returns [it, en]; GET /routes?q=Dente del Resegone&pl=fr
+    // returns 675555 with a single en locale, so the detail must pick en too.
     const locales = [
-      { lang: "it", title: "Dente del Resegone" },
-      { lang: "en", title: "Resegone Tooth" },
+      { lang: "it", title: "Via Ferrata Gamma 2" },
+      { lang: "en", title: "Via ferrata Gamma 2 - al Dente del Resegone" },
+    ];
+    expect(pickLocale(locales)).toBe(locales[1]);
+  });
+
+  it("falls back to it before de", () => {
+    const locales = [
+      { lang: "de", title: "Bergamasker Alpen" },
+      { lang: "it", title: "Orobie" },
+    ];
+    expect(pickLocale(locales)).toBe(locales[1]);
+  });
+
+  it("falls back along fr, en, it, de, es, ca, eu, sl, zh, whatever the API order", () => {
+    const order = ["fr", "en", "it", "de", "es", "ca", "eu", "sl", "zh"];
+    for (let i = 0; i < order.length; i++) {
+      const locales = [...order.slice(i)].reverse().map((lang) => ({ lang, title: lang }));
+      expect(pickLocale(locales)?.lang).toBe(order[i]);
+    }
+  });
+
+  it("prefers a listed language over an unlisted one", () => {
+    const locales = [
+      { lang: "xx", title: "Unlisted" },
+      { lang: "zh", title: "列出" },
+    ];
+    expect(pickLocale(locales)).toBe(locales[1]);
+  });
+
+  it("falls back to the first locale when no language is listed", () => {
+    const locales = [
+      { lang: "xx", title: "First" },
+      { lang: "yy", title: "Second" },
     ];
     expect(pickLocale(locales)).toBe(locales[0]);
   });

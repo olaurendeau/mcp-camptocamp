@@ -57,7 +57,7 @@ function formatWaypointDetail(waypoint: WaypointDetail): string {
   const locale = pickLocale(waypoint.locales);
   const lines: string[] = [];
 
-  lines.push(formatHeader(locale?.title ?? "Untitled", waypoint.document_id));
+  lines.push(formatHeader(pickTitle(waypoint.locales), waypoint.document_id));
   lines.push(`\n**Type**: ${waypoint.waypoint_type}`);
 
   if (waypoint.elevation) lines.push(`**Elevation**: ${waypoint.elevation}m`);
