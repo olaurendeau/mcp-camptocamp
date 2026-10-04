@@ -10,40 +10,59 @@ This project provides an MCP (Model Context Protocol) server that exposes the [C
 
 ```
 src/
-├── index.ts              # MCP server entry point, tool registration, stdio transport
+├── index.ts              # Entry point: stdio bootstrap only (createServer() + StdioServerTransport)
+├── server.ts             # createServer(): McpServer with instructions, version, registerTool for the 13 tools
+├── version.ts            # VERSION read from package.json, reported to MCP clients and in the User-Agent
 ├── api/
-│   └── camptocamp.ts     # Camptocamp API v6 client (fetch wrapper, typed responses)
+│   ├── http.ts           # getJson: the one fetch (User-Agent, 15 s timeout, 10 MiB cap, error messages, zod parsing)
+│   ├── schemas.ts        # zod response schemas, the one place response types are declared
+│   └── camptocamp.ts     # Camptocamp API v6 client: one function per endpoint, pl=fr on searches
 └── tools/
-    ├── format.ts         # Shared formatting helpers: locales, headers, route/waypoint/book/outing lines, recent outings, dates, isPresent (0 and false are printed)
+    ├── format.ts         # Shared formatting: pickLocale, joinList, formatHeader, route/waypoint/book/outing lines, recent outings, areas section, dates, isPresent (0 and false are printed)
+    ├── inputs.ts         # Shared zod inputs: bounded document IDs, 200-char queries
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
     ├── enums.ts          # Camptocamp's closed filter value lists (activities, route types, configurations)
+    ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
+    ├── text.ts           # formatUserText: rewrites image tags and internal links, delimits, demotes and caps user-written text
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
     ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
-    ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
     ├── areas.ts          # Tools: search_areas, get_area
     ├── books.ts          # Tools: search_books, get_book
-    ├── articles.ts       # Tools: search_articles, get_article
-    └── text.ts           # formatUserText: delimits, demotes and caps user-written text
+    └── articles.ts       # Tools: search_articles, get_article
 tests/
 ├── api/
-│   └── camptocamp.test.ts  # Unit tests with mocked fetch
+│   ├── camptocamp.test.ts  # API client unit tests with mocked fetch (URLs, parameters)
+│   ├── http.test.ts        # getJson: errors, timeout, size cap, User-Agent, malformed responses
+│   └── schemas.test.ts     # Response schemas against real-shaped fixtures (null and missing fields)
+├── server/                 # MCP-layer tests: SDK Client + InMemoryTransport against createServer(), fetch mocked
+│   ├── helpers.ts          # connect(), stubFetch(), jsonResponse()
+│   ├── registration.test.ts      # Tool list, titles, annotations, input schemas (snapshot), instructions, call results
+│   ├── input-validation.test.ts  # Invalid inputs rejected before any request
+│   ├── errors.test.ts            # Upstream failures returned as isError
+│   └── version.test.ts           # Reported version equals package.json
+├── contract/
+│   └── api.contract.test.ts  # Live Camptocamp API contract tests (npm run test:contract only)
 ├── hooks/
 │   └── guard.test.sh       # Tests for the agent guard hook (.claude/hooks/guard.sh), run on the host
 └── tools/
+    ├── through-schema.ts   # Test helper: parses mocked API fixtures through the zod schemas
+    ├── bare-rating.ts      # Test helper: BARE_RATING, a bare "Rating:" label that must never be printed
     ├── format.test.ts      # Shared formatting helper unit tests
     ├── ratings.test.ts     # Rating label order, Labande joining and rating scales
+    ├── paging.test.ts      # Shared search paging unit tests
+    ├── text.test.ts        # formatUserText unit tests
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
     ├── outings.test.ts     # Tool handler unit tests
-    ├── paging.test.ts      # Shared search paging unit tests
     ├── areas.test.ts       # Tool handler unit tests
     ├── books.test.ts       # Tool handler unit tests
-    ├── articles.test.ts    # Tool handler unit tests
-    └── text.test.ts        # formatUserText unit tests
+    └── articles.test.ts    # Tool handler unit tests
+vitest.config.ts            # npm test / coverage: excludes tests/contract/ and the src/index.ts bootstrap
+vitest.contract.config.ts   # npm run test:contract: only tests/contract/**/*.contract.test.ts, no coverage
 ```
 
-The tool handlers in `src/tools/` are pure functions (no SDK coupling) — they take typed inputs and return formatted strings, making them easy to test in isolation.
+The tool handlers in `src/tools/` are pure functions (no SDK coupling) — they take typed inputs and return formatted strings, making them easy to test in isolation. Each tool file also exports its tool definitions (name, title, description, input schema, handler), which `src/server.ts` registers with `registerTool`.
 
 ## Docker Commands
 
@@ -68,6 +87,11 @@ docker compose run --rm dev npm run test:watch
 # Build production image
 docker compose build mcp
 ```
+
+The contract tests also run every Monday through the `Contract` workflow (`.github/workflows/contract.yml`, schedule and manual dispatch only, never a required check):
+
+- GitHub disables scheduled workflows after 60 days without repository activity, so a missing weekly run is not a pass. GitHub refuses manual runs of a disabled workflow, so re-enable it first (`gh workflow enable contract.yml` or the Actions tab), then run it by hand with `gh workflow run contract.yml`.
+- Failures of scheduled runs are notified to the user who last modified the cron line (after a squash merge, the author of that commit on `main`), or, once the workflow has been re-enabled, to the user who re-enabled it.
 
 ## Workflow
 
@@ -121,21 +145,24 @@ Free-text locale fields written by Camptocamp users (descriptions, summaries, re
 
 Base URL: `https://api.camptocamp.org`
 
+Every request goes through `getJson` in `src/api/http.ts` with `User-Agent: mcp-camptocamp/<version> (+https://github.com/olaurendeau/mcp-camptocamp)`, a 15 s timeout and a 10 MiB body cap; every 200 body is parsed with the zod schemas of `src/api/schemas.ts`.
+
+Locale: searches send `pl=fr`, which returns one locale per document, French when it exists, otherwise another language chosen by Camptocamp. Detail requests send no query string: `pl` is ignored there and `lang` is a no-op everywhere, so `pickLocale` in `src/tools/format.ts` picks one: `fr`, then `en`, `it`, `de`, `es`, `ca`, `eu`, `sl`, `zh`, then any other. This order is decision D1 on #57; only `[it, en]` → `en` (route 675555) was checked live against the search fallback.
+
 - `GET /routes?limit=10&pl=fr[&q={query}][&a={area_id}][&w={waypoint_id}][&act={activity}][&{rating param}={min},{max}][&hdif={min},{max}][&rtyp={types}][&conf={configurations}][&offset={n}]`
   - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.
   - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
-- `GET /routes/{id}?lang=fr`
+- `GET /routes/{id}`
   - `associations`: `waypoints` (the one matching `main_waypoint_id` is marked), `routes`, `books`, `articles`, and `recent_outings {documents, total}` (the latest 10, shaped like `/outings` list items); `images` and `xreports` are not read.
-- `GET /waypoints?q={query}&limit=10&lang=fr`
-- `GET /waypoints?a={area_id}&limit=10&lang=fr` (combinable with `q`)
-- `GET /waypoints/{id}?lang=fr`
-- `GET /outings?u={user_id}&limit=10&lang=fr`
-- `GET /outings/{id}?lang=fr`
+- `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}]` (at least one of `q` and `a`)
+- `GET /waypoints/{id}`
+- `GET /outings?u={user_id}&limit=10&pl=fr`
+- `GET /outings/{id}`
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]`
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
-- `GET /areas?q={query}&limit=10&lang=fr[&atyp={type}]`
-- `GET /areas/{id}?lang=fr`
-- `GET /books?q={query}&limit=10&lang=fr`
-- `GET /books/{id}?lang=fr`
-- `GET /articles?q={query}&limit=10&lang=fr`
-- `GET /articles/{id}?lang=fr`
+- `GET /areas?q={query}&limit=10&pl=fr[&atyp={type}]`
+- `GET /areas/{id}`
+- `GET /books?q={query}&limit=10&pl=fr`
+- `GET /books/{id}`
+- `GET /articles?q={query}&limit=10&pl=fr`
+- `GET /articles/{id}`
