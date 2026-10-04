@@ -153,35 +153,17 @@ export function checkLinks(file: string, text: string): string[] {
   });
 }
 
-/** `source` without its `//` and `/* *\/` comments; comment markers inside JSON strings are kept. */
+/** `source` without its `//` and `/* *\/` comments: strings are matched first, so the markers inside them stay. */
 function stripJsonComments(source: string): string {
-  let output = "";
-  let index = 0;
-  while (index < source.length) {
-    const char = source[index];
-    if (char === '"') {
-      const end = /^"(?:[^"\\\n]|\\.)*"?/.exec(source.slice(index))?.[0] ?? char;
-      output += end;
-      index += end.length;
-    } else if (source.startsWith("//", index)) {
-      const end = source.indexOf("\n", index);
-      index = end === -1 ? source.length : end;
-    } else if (source.startsWith("/*", index)) {
-      const end = source.indexOf("*/", index + 2);
-      output += " ";
-      index = end === -1 ? source.length : end + 2;
-    } else {
-      output += char;
-      index += 1;
-    }
-  }
-  return output;
+  return source.replace(
+    /("(?:[^"\\\n]|\\.)*")|\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/g,
+    (_match, string?: string) => string ?? " ",
+  );
 }
 
+/** A json or jsonc block with its parsed `value`, or the parse `error`. */
 export interface JsonBlock extends FencedBlock {
-  /** The parsed value, when the block parses. */
   value?: unknown;
-  /** The parse error, when it does not. */
   error?: string;
 }
 
@@ -220,9 +202,9 @@ function mcpServersIn(value: unknown): unknown[] {
 
 /** Problems with the `mcpServers` objects of the json and jsonc blocks of `text`: another server name, another command. */
 export function checkMcpServers(text: string): string[] {
-  // Blocks that do not parse are reported by checkJsonBlocks.
-  return jsonBlocks(text).flatMap((block) => {
-    return mcpServersIn(block.value).flatMap((servers) => {
+  // Blocks that do not parse have no value: checkJsonBlocks reports them.
+  return jsonBlocks(text).flatMap((block) =>
+    mcpServersIn(block.value).flatMap((servers) => {
       const where = `mcpServers at line ${block.line}`;
       const names = typeof servers === "object" && servers !== null ? Object.keys(servers) : [];
       if (names.length !== 1 || names[0] !== "camptocamp") {
@@ -234,8 +216,8 @@ export function checkMcpServers(text: string): string[] {
       return npx || docker
         ? []
         : [`${where}: camptocamp must run npx ${NPX_ARGS.join(" ")} or docker ${DOCKER_ARGS.join(" ")}`];
-    });
-  });
+    }),
+  );
 }
 
 const ALLOWED_NAMES = new Set([
@@ -257,10 +239,7 @@ export function checkNames(text: string): string[] {
     .map((token) => `unexpected name "${token}"`);
 }
 
-/**
- * A Node.js version mention: `Node 22`, `Node.js v22`, `Node >= 22`, `node@22`, `node:22-alpine`,
- * `[Node.js](url) 22`, `Node.js versions 18 and 20`, `Node 22 or 24`… Group 1 is an optional "older " before it.
- */
+// A version mention (Node 22, Node >= 22, node@22, [Node.js](url) 22, Node.js versions 18 and 20…), maybe after "older ".
 const NODE_VERSION =
   /\b(older\s+)?node(?:\.js)?(?:\]\([^)]*\))?(?:\s+versions?)?(?:\s*>=?\s*|\s+v?|@|:)(\d+(?:\s*(?:,|and|or)\s*\d+)*)/gi;
 /** The one phrase allowed to name versions other than the minimum, all below it: a statement about unsupported ones. */

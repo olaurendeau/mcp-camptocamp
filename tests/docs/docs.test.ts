@@ -133,14 +133,11 @@ describe("docs checks fail on bad fixtures", () => {
     expect(checkLinks(page, "[gone](no-such-page.md)")).toEqual(["no-such-page.md: no such file"]);
   });
 
-  it("an absolute link path", () => {
-    expect(checkLinks(page, "[root](/docs/README.md)")).toEqual([
+  it("an absolute link path, or a link that leaves the repository", () => {
+    expect(checkLinks(page, "[root](/docs/README.md) [out](../../outside.md)")).toEqual([
       "/docs/README.md: use a relative link, not a path from the site root",
+      "../../outside.md: points outside the repository",
     ]);
-  });
-
-  it("a link that leaves the repository", () => {
-    expect(checkLinks(page, "[out](../../outside.md)")).toEqual(["../../outside.md: points outside the repository"]);
   });
 
   it("an anchor that is not a heading of the target page", () => {
@@ -163,20 +160,23 @@ describe("docs checks fail on bad fixtures", () => {
     expect(checkLinks(page, text)).toEqual([]);
   });
 
-  it("an invalid json block", () => {
-    const problems = checkJsonBlocks(["text", fence + "json", '{"a": 1,}', fence].join("\n"));
+  it("an invalid json, JSON or jsonc block", () => {
+    const blocks = [
+      fence + "json",
+      '{"a": 1,}',
+      fence,
+      fence + "JSON",
+      "{a: 1}",
+      fence,
+      fence + "jsonc",
+      '{"a" // 1',
+      fence,
+    ];
+    const problems = checkJsonBlocks(["text", ...blocks].join("\n"));
 
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toMatch(/^json block at line 3: /);
-  });
-
-  it("an invalid JSON or jsonc block, whatever the case of its language", () => {
-    const text = [fence + "JSON", "{a: 1}", fence, fence + "jsonc", '{"a": 1 // one', "", fence].join("\n");
-    const problems = checkJsonBlocks(text);
-
-    expect(problems).toHaveLength(2);
-    expect(problems[0]).toMatch(/^json block at line 2: /);
-    expect(problems[1]).toMatch(/^json block at line 5: /);
+    expect(problems.map((problem) => problem.replace(/: .*/, ""))).toEqual(
+      [3, 6, 9].map((n) => `json block at line ${n}`),
+    );
   });
 
   it("parses a jsonc block once its comments are removed, but not comments inside strings", () => {
@@ -199,38 +199,22 @@ describe("docs checks fail on bad fixtures", () => {
     ]);
   });
 
-  it("checks mcpServers in jsonc and upper-case JSON blocks too", () => {
-    const jsonc = ["// comment", JSON.stringify({ mcpServers: { other: { command: "npx", args: [] } } })].join("\n");
+  it("an mcpServers block with another server name or a wrong image tag, in json, jsonc or JSON blocks", () => {
+    const args = ["-y", "@olaurendeau/mcp-camptocamp"];
+    const json = JSON.stringify({ mcpServers: { "camptocamp-server": { command: "npx", args } } });
+    const jsonc = ["// comment", JSON.stringify({ mcpServers: { other: { command: "npx", args } } })].join("\n");
+    const image = "ghcr.io/olaurendeau/mcp-camptocamp:1.3.0";
     const upper = JSON.stringify({
-      mcpServers: { camptocamp: { command: "npx", args: ["@olaurendeau/mcp-camptocamp"] } },
+      mcpServers: { camptocamp: { command: "docker", args: ["run", "--rm", "-i", image] } },
     });
-    const text = [fence + "jsonc", jsonc, fence, fence + "JSON", upper, fence].join("\n");
+    const text = [json, jsonc, upper].map((block, n) =>
+      [fence + ["json", "jsonc", "JSON"][n], block, fence].join("\n"),
+    );
 
-    expect(checkMcpServers(text)).toEqual([
-      'mcpServers at line 2: expected the single key "camptocamp", got "other"',
-      "mcpServers at line 6: camptocamp must run npx -y @olaurendeau/mcp-camptocamp or docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest",
-    ]);
-  });
-
-  it("an mcpServers block with another server name", () => {
-    const block = {
-      mcpServers: { "camptocamp-server": { command: "npx", args: ["-y", "@olaurendeau/mcp-camptocamp"] } },
-    };
-
-    expect(checkMcpServers([fence + "json", JSON.stringify(block), fence].join("\n"))).toEqual([
+    expect(checkMcpServers(text.join("\n"))).toEqual([
       'mcpServers at line 2: expected the single key "camptocamp", got "camptocamp-server"',
-    ]);
-  });
-
-  it("an mcpServers block with a wrong image tag", () => {
-    const block = {
-      mcpServers: {
-        camptocamp: { command: "docker", args: ["run", "--rm", "-i", "ghcr.io/olaurendeau/mcp-camptocamp:1.3.0"] },
-      },
-    };
-
-    expect(checkMcpServers([fence + "json", JSON.stringify(block), fence].join("\n"))).toEqual([
-      "mcpServers at line 2: camptocamp must run npx -y @olaurendeau/mcp-camptocamp or docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest",
+      'mcpServers at line 5: expected the single key "camptocamp", got "other"',
+      "mcpServers at line 9: camptocamp must run npx -y @olaurendeau/mcp-camptocamp or docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest",
     ]);
   });
 
@@ -271,34 +255,29 @@ describe("docs checks fail on bad fixtures", () => {
     expect(checkNames(text)).toEqual([]);
   });
 
-  it("a Node version other than engines.node", () => {
-    expect(checkNodeVersion("Install Node 20 or later.", ">=22")).toEqual([
-      'Node 20: engines.node in package.json is ">=22"',
-    ]);
-    expect(checkNodeVersion("Install Node.js 18.", ">=22")).toEqual([
-      'Node.js 18: engines.node in package.json is ">=22"',
-    ]);
-    expect(checkNodeVersion("Install Node.js 22 or later; check with `node --version`.", ">=22")).toEqual([]);
-  });
-
-  it("every other way of naming a Node version", () => {
+  it("a Node version other than engines.node, however it is named", () => {
     const text = [
-      "Needs Node >= 20, node@20, Node>=20 or Node v20.",
+      "Install Node 20 or later, Node.js 18, Node >= 20, node@20, Node>=20 or Node v20.",
       "Tested on Node.js versions 18 and 20, Node.js version 24, Node 22 or 24, node:20-alpine.",
       "Install [Node.js](https://nodejs.org/en/download) 20 or later.",
     ].join("\n");
+    const problems = checkNodeVersion(text, ">=22");
 
-    expect(checkNodeVersion(text, ">=22")).toEqual([
-      'Node >= 20: engines.node in package.json is ">=22"',
-      'node@20: engines.node in package.json is ">=22"',
-      'Node>=20: engines.node in package.json is ">=22"',
-      'Node v20: engines.node in package.json is ">=22"',
-      'Node.js versions 18 and 20: engines.node in package.json is ">=22"',
-      'Node.js version 24: engines.node in package.json is ">=22"',
-      'Node 22 or 24: engines.node in package.json is ">=22"',
-      'node:20: engines.node in package.json is ">=22"',
-      'Node.js](https://nodejs.org/en/download) 20: engines.node in package.json is ">=22"',
+    expect(problems[0]).toBe('Node 20: engines.node in package.json is ">=22"');
+    expect(problems.map((problem) => problem.replace(/: engines\.node .*/, ""))).toEqual([
+      "Node 20",
+      "Node.js 18",
+      "Node >= 20",
+      "node@20",
+      "Node>=20",
+      "Node v20",
+      "Node.js versions 18 and 20",
+      "Node.js version 24",
+      "Node 22 or 24",
+      "node:20",
+      "Node.js](https://nodejs.org/en/download) 20",
     ]);
+    expect(checkNodeVersion("Install Node.js 22 or later; check with `node --version`.", ">=22")).toEqual([]);
   });
 
   it('accepts versions below the minimum after the phrase "older Node.js versions", and only those', () => {
