@@ -15,7 +15,8 @@ src/
 │   └── camptocamp.ts     # Camptocamp API v6 client (fetch wrapper, typed responses)
 └── tools/
     ├── format.ts         # Shared formatting helpers: locales, headers, document lines, dates, isPresent (0 and false are printed)
-    ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY), shared by every route/outing line
+    ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY) and rating scales (ROUTE_RATING_SYSTEMS)
+    ├── enums.ts          # Camptocamp's closed filter value lists (activities, route types, configurations)
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
     ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
@@ -31,7 +32,7 @@ tests/
 │   └── guard.test.sh       # Tests for the agent guard hook (.claude/hooks/guard.sh), run on the host
 └── tools/
     ├── format.test.ts      # Shared formatting helper unit tests
-    ├── ratings.test.ts     # Rating label order and Labande joining
+    ├── ratings.test.ts     # Rating label order, Labande joining and rating scales
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
     ├── outings.test.ts     # Tool handler unit tests
@@ -94,7 +95,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 | Tool                  | Description                                                                                          |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Search by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, gain, ratings |
+| `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`  |
 | `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas) |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
 | `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
@@ -107,6 +108,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)    |
 | `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type          |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)           |
+
+`search_routes` needs at least one filter (D5 on #58); any one is enough. Rating bounds are checked against the scale of `rating_system` (`ROUTE_RATING_SYSTEMS` in `src/tools/ratings.ts`) and list values against `src/tools/enums.ts` before any request, since Camptocamp silently ignores an unknown value (R7).
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 
