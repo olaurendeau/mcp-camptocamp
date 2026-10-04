@@ -3,7 +3,8 @@
 // detail, association) can be passed.
 import type { AreaSummary, Locale, RouteAssociation, TitledAssociation, WaypointAssociation } from "../api/schemas.js";
 
-// The API's own fallback order for `pl=fr` (route 675555 has [it, en] and a `pl=fr` search returns en).
+// Locale fallback order after fr. Only [it, en] → en was observed live (route 675555 has [it, en] and a
+// `pl=fr` search returns en); the rest of the order is decision D1 on #57.
 const LANG_ORDER = ["fr", "en", "it", "de", "es", "ca", "eu", "sl", "zh"];
 
 // Detail endpoints return every locale in no useful order (book 373877: it, fr, en; article 716039:
@@ -28,11 +29,17 @@ export function formatHeader(title: string, documentId: number): string {
   return `# ${title} (ID: ${documentId})`;
 }
 
+// A route's name as Camptocamp shows it: "<summit> : <title>". Both parts are trimmed, so a blank
+// title_prefix (route 1678194 has "") never leaves a dangling " : ".
+export function formatRouteName(locale?: RouteAssociation["locales"][number]): string {
+  if (!locale) return "Untitled";
+  const title = locale.title.trim();
+  const prefix = locale.title_prefix?.trim();
+  return prefix ? `${prefix} : ${title}` : title;
+}
+
 export function formatRouteLine(route: RouteAssociation): string {
-  const title = pickTitle(route.locales);
-  const prefix = pickLocale(route.locales)?.title_prefix;
-  const name = prefix ? `${prefix} : ${title}` : title;
-  return `- [${route.document_id}] ${name}`;
+  return `- [${route.document_id}] ${formatRouteName(pickLocale(route.locales))}`;
 }
 
 export function formatWaypointLine(waypoint: WaypointAssociation): string {

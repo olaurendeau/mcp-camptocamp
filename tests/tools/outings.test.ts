@@ -220,6 +220,50 @@ describe("handleGetOuting", () => {
     expect(result).not.toContain("## Associated routes");
   });
 
+  it("prints the summit name on associated route lines", async () => {
+    // Trimmed from the live GET /outings/1880674 response (2026-10-04): texts and untyped fields (snow,
+    // frequentation, hut_status…) left out; the route association reduced to its locales' lang, title
+    // and title_prefix. Route 1678194, with a blank title_prefix, is added to check the trimming.
+    mockGetOuting.mockResolvedValueOnce({
+      document_id: 1880674,
+      locales: [{ lang: "fr", title: "Mont Pourri : Versant W par le Glacier du Geay" }],
+      activities: ["skitouring"],
+      date_start: "2026-03-07",
+      date_end: "2026-03-08",
+      elevation_max: 3779,
+      elevation_min: 2370,
+      height_diff_up: 1600,
+      height_diff_down: null,
+      condition_rating: "good",
+      participant_count: 2,
+      associations: {
+        routes: [
+          {
+            document_id: 54085,
+            locales: [
+              { lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" },
+              { lang: "de", title: "Voie normale du Glacier du Geay", title_prefix: "Mont Pourri" },
+              { lang: "en", title: "Normal route from Glacier du Geay", title_prefix: "Mont Pourri" },
+              { lang: "it", title: "Voie normale du Glacier du Geay", title_prefix: "Mont Pourri" },
+            ],
+          },
+          {
+            document_id: 1678194,
+            locales: [{ lang: "fr", title: "Tour du Mont Pourri en 5 jours", title_prefix: "   " }],
+          },
+        ],
+      },
+    });
+
+    const result = await handleGetOuting({ id: 1880674 });
+
+    const lines = result.split("\n");
+    expect(lines.slice(lines.indexOf("## Associated routes") + 1)).toEqual([
+      "- [54085] Mont Pourri : Versant W par le Glacier du Geay",
+      "- [1678194] Tour du Mont Pourri en 5 jours",
+    ]);
+  });
+
   it("propagates API errors", async () => {
     mockGetOuting.mockRejectedValueOnce(new Error("Camptocamp API error: 404"));
 

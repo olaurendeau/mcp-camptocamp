@@ -14,7 +14,11 @@ import {
   getBook,
   searchArticles,
   getArticle,
+  ROUTE_RATING_FIELDS,
+  ROUTE_RATING_PARAMS,
+  type RouteRatingField,
 } from "../../src/api/camptocamp.js";
+import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -99,6 +103,42 @@ describe("getRoute", () => {
 
     expect(result.document_id).toBe(456);
     expect(result.global_rating).toBe("TD");
+  });
+
+  it("keeps the route's title_prefix through the response schema", async () => {
+    // Trimmed from the live GET /routes/54085 response (2026-10-04): the fr locale only, its texts cut
+    // to their first line; ratings, orientations, associations, maps and areas left out.
+    const mockData = {
+      document_id: 54085,
+      version: 6,
+      locales: [
+        {
+          version: 29,
+          lang: "fr",
+          title: "Versant W par le Glacier du Geay",
+          summary: "Le Mont Pourri est le second sommet de la Vanoise et comporte un système glaciaire important.",
+          description: "[img=192710 right]Mont Pourri, itinéraire 1[/img]",
+          title_prefix: "Mont Pourri",
+          topic_id: null,
+        },
+      ],
+      quality: "medium",
+      main_waypoint_id: 37916,
+      activities: ["skitouring"],
+      elevation_min: 2370,
+      elevation_max: 3779,
+      height_diff_up: 1425,
+      height_diff_down: null,
+      durations: ["1"],
+      protected: false,
+      type: "r",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = routeDetailSchema.parse(await getRoute(54085));
+
+    expect(result.locales[0].title_prefix).toBe("Mont Pourri");
+    expect(result.locales[0].title).toBe("Versant W par le Glacier du Geay");
   });
 
   it("throws on non-OK response", async () => {
@@ -244,6 +284,82 @@ describe("getOuting", () => {
     expect(result.document_id).toBe(1915495);
     expect(result.global_rating).toBe("TD");
     expect(result.locales[0].weather).toBe("Beau");
+  });
+
+  it("keeps an associated route's title_prefix through the response schema", async () => {
+    // Trimmed from the live GET /outings/1880674 response (2026-10-04): locale texts cut, other texts, snow and hut
+    // fields, geometry, areas and the users, images, articles and xreports associations left out; the
+    // route association keeps its fr and en locales and drops geometry and areas.
+    const mockData = {
+      document_id: 1880674,
+      version: 2,
+      locales: [
+        {
+          version: 3,
+          lang: "fr",
+          title: "Mont Pourri : Versant W par le Glacier du Geay",
+          description: "Super sortie sauvage sans passer par la station des Arcs !",
+          summary: null,
+          weather: "Grand beau, sans vent",
+          topic_id: null,
+        },
+      ],
+      quality: "fine",
+      activities: ["skitouring"],
+      condition_rating: "good",
+      date_end: "2026-03-08",
+      date_start: "2026-03-07",
+      elevation_max: 3779,
+      elevation_min: 2370,
+      height_diff_down: null,
+      height_diff_up: 1600,
+      participant_count: 2,
+      ski_rating: "4.1",
+      labande_global_rating: "AD",
+      associations: {
+        routes: [
+          {
+            document_id: 54085,
+            version: 6,
+            locales: [
+              {
+                version: 29,
+                lang: "fr",
+                title: "Versant W par le Glacier du Geay",
+                summary:
+                  "Le Mont Pourri est le second sommet de la Vanoise et comporte un système glaciaire important.",
+                title_prefix: "Mont Pourri",
+              },
+              {
+                version: 2,
+                lang: "en",
+                title: "Normal route from Glacier du Geay",
+                summary: null,
+                title_prefix: "Mont Pourri",
+              },
+            ],
+            quality: "medium",
+            activities: ["skitouring"],
+            elevation_min: 2370,
+            elevation_max: 3779,
+            ski_rating: "4.1",
+            available_langs: ["fr", "de", "en", "it"],
+            protected: false,
+            type: "r",
+          },
+        ],
+      },
+      protected: false,
+      type: "o",
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = outingDetailSchema.parse(await getOuting(1880674));
+
+    const route = result.associations?.routes?.[0];
+    expect(route?.document_id).toBe(54085);
+    expect(route?.locales[0].title_prefix).toBe("Mont Pourri");
+    expect(route?.locales[1].title_prefix).toBe("Mont Pourri");
   });
 
   it("throws on non-OK response", async () => {
@@ -463,6 +579,127 @@ describe("area filter on searchRoutes and searchWaypoints", () => {
       });
     });
   }
+});
+
+// S4: route filters. Rating params come from c2corg v6_api's route search mapping; each param was
+// checked live against the field it filters (e.g. `srat=S5` returns routes with labande_ski_rating S5).
+describe("searchRoutes filters", () => {
+  function calledParams(call = 0): URLSearchParams {
+    return new URL(mockFetch.mock.calls[call][0] as string).searchParams;
+  }
+
+  beforeEach(() => {
+    mockFetch.mockImplementation(() => Promise.resolve(makeResponse({ documents: [], total: 0 })));
+  });
+
+  it("sends activity, rating and elevation gain filters together", async () => {
+    await searchRoutes({
+      area_id: 14403,
+      activity: "skitouring",
+      rating: { system: "ski_rating", min: "3.1", max: "4.1" },
+      height_diff_up: { min: 1000, max: 1500 },
+    });
+
+    const params = calledParams();
+    expect(params.get("a")).toBe("14403");
+    expect(params.get("act")).toBe("skitouring");
+    expect(params.get("trat")).toBe("3.1,4.1");
+    expect(params.get("hdif")).toBe("1000,1500");
+    expect(params.get("pl")).toBe("fr");
+  });
+
+  it("sends min alone for an open upper bound", async () => {
+    await searchRoutes({ rating: { system: "global_rating", min: "AD" }, height_diff_up: { min: 1000 } });
+
+    expect(calledParams().get("grat")).toBe("AD");
+    expect(calledParams().get("hdif")).toBe("1000");
+  });
+
+  it("sends ,max for an open lower bound", async () => {
+    await searchRoutes({ rating: { system: "global_rating", max: "PD" }, height_diff_up: { max: 1500 } });
+
+    expect(calledParams().get("grat")).toBe(",PD");
+    expect(calledParams().get("hdif")).toBe(",1500");
+  });
+
+  it("sends no range parameter when neither bound is given", async () => {
+    await searchRoutes({ query: "gamma", rating: { system: "ski_rating" }, height_diff_up: {} });
+
+    expect(calledParams().has("trat")).toBe(false);
+    expect(calledParams().has("hdif")).toBe(false);
+  });
+
+  const ratingParams: Array<[RouteRatingField, string]> = [
+    ["ski_rating", "trat"],
+    ["global_rating", "grat"],
+    ["labande_global_rating", "lrat"],
+    ["labande_ski_rating", "srat"],
+    ["ski_exposition", "sexpo"],
+    ["engagement_rating", "erat"],
+    ["risk_rating", "orrat"],
+    ["equipment_rating", "prat"],
+    ["ice_rating", "irat"],
+    ["mixed_rating", "mrat"],
+    ["exposition_rock_rating", "rexpo"],
+    ["rock_free_rating", "frat"],
+    ["rock_required_rating", "rrat"],
+    ["aid_rating", "arat"],
+    ["via_ferrata_rating", "krat"],
+    ["hiking_rating", "hrat"],
+    ["hiking_mtb_exposition", "hexpo"],
+    ["snowshoe_rating", "wrat"],
+    ["mtb_up_rating", "mbur"],
+    ["mtb_down_rating", "mbdr"],
+  ];
+
+  it("covers the 20 rating systems, each with its own parameter", () => {
+    expect([...ROUTE_RATING_FIELDS].sort()).toEqual(ratingParams.map(([field]) => field).sort());
+    expect(new Set(Object.values(ROUTE_RATING_PARAMS)).size).toBe(20);
+  });
+
+  it.each(ratingParams)("maps %s to %s", async (system, param) => {
+    expect(ROUTE_RATING_PARAMS[system]).toBe(param);
+
+    await searchRoutes({ rating: { system, min: "X", max: "Y" } });
+
+    expect(calledParams().get(param)).toBe("X,Y");
+  });
+
+  it("joins configurations and route types with commas", async () => {
+    await searchRoutes({ configuration: ["edge", "face"], route_types: ["traverse"] });
+
+    expect(calledParams().get("conf")).toBe("edge,face");
+    expect(calledParams().get("rtyp")).toBe("traverse");
+  });
+
+  it("sends no conf or rtyp for empty lists", async () => {
+    await searchRoutes({ query: "gamma", configuration: [], route_types: [] });
+
+    expect(calledParams().has("conf")).toBe(false);
+    expect(calledParams().has("rtyp")).toBe(false);
+  });
+
+  it("sends a waypoint with an activity", async () => {
+    await searchRoutes({ waypoint_id: 37916, activity: "skitouring" });
+
+    expect(calledParams().get("w")).toBe("37916");
+    expect(calledParams().get("act")).toBe("skitouring");
+    expect(calledParams().get("pl")).toBe("fr");
+  });
+
+  it("sends the offset when given, including 0", async () => {
+    await searchRoutes({ area_id: 14403, offset: 20 });
+    await searchRoutes({ area_id: 14403, offset: 0 });
+
+    expect(calledParams(0).get("offset")).toBe("20");
+    expect(calledParams(1).get("offset")).toBe("0");
+  });
+
+  it("keeps the URL unchanged when no new filter is given", async () => {
+    await searchRoutes({ query: "gamma", area_id: 14403 });
+
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/routes?q=gamma&limit=10&pl=fr&a=14403`);
+  });
 });
 
 describe("areas on route details", () => {

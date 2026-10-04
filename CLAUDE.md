@@ -81,28 +81,29 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 ## MCP Tools
 
-| Tool                  | Description                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Search routes by keyword and/or `area_id`; returns ID, title, activities, elevation, rating       |
-| `get_route`           | Get full route detail by ID (description, ratings, elevation data, gear, areas)                   |
-| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                               |
-| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                         |
-| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                            |
-| `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes)                    |
-| `search_outings`      | Search outings by keyword, area, activity, date range, route or waypoint, most recent first       |
-| `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`           |
-| `get_area`            | Get area detail by ID (type, summary, description)                                                |
-| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable        |
-| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles) |
-| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type       |
-| `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)        |
+| Tool                  | Description                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------- |
+| `search_routes`       | Search routes by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, rating |
+| `get_route`           | Get full route detail by ID (summit : title, description, ratings, elevation data, gear, areas)      |
+| `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
+| `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
+| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                               |
+| `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes with summit names)     |
+| `search_outings`      | Search outings by keyword, area, activity, date range, route or waypoint, most recent first          |
+| `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`              |
+| `get_area`            | Get area detail by ID (type, summary, description)                                                   |
+| `search_books`        | Search books (guidebooks, history, novels) by title only; author/ISBN search is unreliable           |
+| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)    |
+| `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type          |
+| `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)           |
 
 ## Camptocamp API v6
 
 Base URL: `https://api.camptocamp.org`
 
-- `GET /routes?q={query}&limit=10&lang=fr`
-- `GET /routes?a={area_id}&limit=10&lang=fr` (combinable with `q`)
+- `GET /routes?limit=10&pl=fr[&q={query}][&a={area_id}][&w={waypoint_id}][&act={activity}][&{rating param}={min},{max}][&hdif={min},{max}][&rtyp={types}][&conf={configurations}][&offset={n}]`
+  - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.
+  - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
 - `GET /routes/{id}?lang=fr`
 - `GET /waypoints?q={query}&limit=10&lang=fr`
 - `GET /waypoints?a={area_id}&limit=10&lang=fr` (combinable with `q`)
