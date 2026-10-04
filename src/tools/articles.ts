@@ -16,7 +16,7 @@ import {
 } from "./format.js";
 import { ACTIVITIES, ARTICLE_CATEGORIES, ARTICLE_TYPES, enumValue } from "./enums.js";
 import type { Lang } from "./enums.js";
-import { formatUserText, USER_TEXT_NOTE } from "./text.js";
+import { formatUserTexts, SUMMARY_AND_DESCRIPTION, USER_TEXT_NOTE } from "./text.js";
 
 export const searchArticlesSchema = z.object({
   query: searchQuery("Search query (e.g. 'crampons', 'avalanche', 'rappel'); optional when a filter is given", {
@@ -79,8 +79,7 @@ function formatArticleDetail(article: ArticleDetail, lang?: Lang): string {
     lines.push("", ...labelled);
   }
 
-  lines.push(...formatUserText("summary", "Summary", locale?.summary));
-  lines.push(...formatUserText("description", "Description", locale?.description));
+  lines.push(...formatUserTexts(locale, SUMMARY_AND_DESCRIPTION));
 
   const associations = article.associations;
 

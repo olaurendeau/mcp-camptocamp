@@ -22,7 +22,17 @@ import {
 import { isMalformed } from "../api/schemas.js";
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { describeRange, heightDiffUp, rangeFilter, ratingBound, ratingFilter, ratingScales } from "./filters.js";
-import { formatUserText, USER_TEXT_NOTE } from "./text.js";
+import { formatUserTexts, USER_TEXT_NOTE, type TextSection } from "./text.js";
+
+// The free-text sections get_outing prints, in print order.
+const OUTING_TEXT = [
+  ["description", "Description"],
+  ["route_description", "Route description"],
+  ["conditions", "Conditions"],
+  ["weather", "Weather"],
+  ["timing", "Timing"],
+  ["participants", "Participants"],
+] as const satisfies readonly TextSection<string>[];
 
 export const getOutingSchema = z.object({
   id: documentId("Outing ID from Camptocamp"),
@@ -167,12 +177,7 @@ function formatOutingDetail(outing: OutingDetail, lang?: Lang): string {
   if (isPresent(outing.height_diff_up)) lines.push(`**Elevation gain**: ${outing.height_diff_up}m`);
   if (isPresent(outing.height_diff_down)) lines.push(`**Elevation loss**: ${outing.height_diff_down}m`);
 
-  lines.push(...formatUserText("description", "Description", locale?.description));
-  lines.push(...formatUserText("route_description", "Route description", locale?.route_description));
-  lines.push(...formatUserText("conditions", "Conditions", locale?.conditions));
-  lines.push(...formatUserText("weather", "Weather", locale?.weather));
-  lines.push(...formatUserText("timing", "Timing", locale?.timing));
-  lines.push(...formatUserText("participants", "Participants", locale?.participants));
+  lines.push(...formatUserTexts(locale, OUTING_TEXT));
 
   const routes = outing.associations?.routes;
   if (routes && routes.length > 0) {
