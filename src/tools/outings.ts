@@ -65,6 +65,13 @@ function maxElevation(bound: string) {
     .describe(`${bound} max elevation reached in metres, inclusive (outings without a max elevation are excluded)`);
 }
 
+// On both bounds of each pair, moved from the search_outings description to keep it under 2048 characters (#211).
+const DATE_RANGE_NOTE =
+  "An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.";
+const PERIOD_LIMITS_NOTE =
+  "A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; " +
+  "Camptocamp's period filter can miss outings on the first or last day of the range.";
+
 export const searchOutingsSchema = z.object({
   query: searchQuery("Keyword matched against outing titles (e.g. 'cosmiques')", { allowBlank: true }).optional(),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14409 for Vanoise)").optional(),
@@ -93,16 +100,20 @@ export const searchOutingsSchema = z.object({
   height_diff_up_max: heightDiffUp("Highest", "outings"),
   date_from: isoDate()
     .optional()
-    .describe("Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it"),
+    .describe(`Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it. ${DATE_RANGE_NOTE}`),
   date_to: isoDate()
     .optional()
-    .describe("Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it"),
+    .describe(`Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it. ${DATE_RANGE_NOTE}`),
   period_start: periodDay()
     .optional()
-    .describe("First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01)"),
+    .describe(
+      `First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). ${PERIOD_LIMITS_NOTE}`,
+    ),
   period_end: periodDay()
     .optional()
-    .describe("Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30)"),
+    .describe(
+      `Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). ${PERIOD_LIMITS_NOTE}`,
+    ),
   route_id: documentId("Camptocamp route ID from search_routes").optional(),
   waypoint_id: documentId("Camptocamp waypoint ID from search_waypoints").optional(),
   user_id: documentId(
@@ -316,7 +327,7 @@ export const outingToolDefinitions = [
     name: "search_outings",
     title: "Search outings",
     description:
-      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, rating_system with rating_min and/or rating_max (one of 12 grading systems per call, inclusive bounds checked against its scale), condition_at_least (excellent, good, average, poor or awful: that value or better), max_elevation_min / max_elevation_max and height_diff_up_min / height_diff_up_max (metres, inclusive) — the ratings and conditions the outing's author reported for that day, with the max elevation and elevation gain they reported; outings without a value for a chosen filter are excluded —, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), period_start / period_end (MM-DD, both together; the same days in every year, e.g. 06-01 → 06-30 for all Junes; combine with date_from / date_to to limit the years; a period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range), route_id (from search_routes), waypoint_id (from search_waypoints), user_id (a Camptocamp user ID: outings this user is listed on as a participant, not only those they wrote). Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow — or 'Next page: offset=N (limit at most M)' near the window's end, where limit must be lowered to M — or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint/user ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text. " +
+      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, rating_system with rating_min and/or rating_max (one of 12 grading systems per call, inclusive bounds checked against its scale), condition_at_least (that value or better), max_elevation_min / max_elevation_max and height_diff_up_min / height_diff_up_max (metres, inclusive) — the ratings and conditions the outing's author reported for that day, with the max elevation and elevation gain they reported; outings without a value for a chosen filter are excluded —, date_from / date_to (YYYY-MM-DD), period_start / period_end (MM-DD, both together; the same days in every year, e.g. 06-01 → 06-30 for all Junes; combine with date_from / date_to to limit the years), route_id (from search_routes), waypoint_id (from search_waypoints), user_id (outings this user is listed on as a participant, not only those they wrote). Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow — or 'Next page: offset=N (limit at most M)' near the window's end, where limit must be lowered to M — or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint/user ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text. " +
       LANG_NOTE,
     inputSchema: searchOutingsSchema,
     handler: handleSearchOutings,
