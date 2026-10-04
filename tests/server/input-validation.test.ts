@@ -46,6 +46,27 @@ const ID_FIELDS: IdField[] = [
 
 const CASES = ID_FIELDS.map((f) => [`${f.tool} ${f.field}`, f] as const);
 
+type Client = Awaited<ReturnType<typeof connect>>;
+type ToolResult = Awaited<ReturnType<Client["callTool"]>>;
+
+/** Text of a tool result, which the server always returns as one text block. */
+function resultText(result: ToolResult): string {
+  const content = result.content as Array<{ type: string; text: string }>;
+  return content[0].text;
+}
+
+/**
+ * The zod issues of an SDK input validation error for `tool`, one "<message> at <path>" line each
+ * (array items read `field[1]`), as an MCP client sees them.
+ */
+function validationIssues(result: ToolResult, tool: string): string[] {
+  expect(result.isError).toBe(true);
+  const text = resultText(result);
+  const prefix = `MCP error -32602: Input validation error: Invalid arguments for tool ${tool}: `;
+  expect(text.startsWith(prefix), text).toBe(true);
+  return text.slice(prefix.length).split("\n");
+}
+
 describe("integer ID inputs", () => {
   it.each(CASES)("%s accepts a real Camptocamp ID", async (_label, { tool, args, response }) => {
     const fetchMock = stubFetch(jsonResponse(response));
@@ -65,15 +86,8 @@ describe("integer ID inputs", () => {
 
       const result = await client.callTool({ name: tool, arguments: args(unsafeId) });
 
-      expect(result.isError).toBe(true);
-      const content = result.content as Array<{ type: string; text: string }>;
-      // The SDK reports the zod issues as JSON after "Invalid arguments for tool <name>: "
-      const prefix = `Input validation error: Invalid arguments for tool ${tool}: `;
-      const text = content[0].text;
-      expect(text).toContain(prefix);
-      const issues: unknown = JSON.parse(text.slice(text.indexOf(prefix) + prefix.length));
-      expect(issues).toEqual([
-        expect.objectContaining({ code: "too_big", maximum: Number.MAX_SAFE_INTEGER, path: [field] }),
+      expect(validationIssues(result, tool)).toEqual([
+        `Number must be less than or equal to ${String(Number.MAX_SAFE_INTEGER)} at ${field}`,
       ]);
       expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -86,14 +100,6 @@ const MAX_QUERY_LENGTH = 200;
 const ROUTES_FILTER_MESSAGE =
   "Error: search_routes needs at least one filter: query, area_id, waypoint_id, activity, rating_system, " +
   "height_diff_up_min/max, route_types or configuration. Use search_areas to find an area_id.";
-
-type Client = Awaited<ReturnType<typeof connect>>;
-
-/** Text of a tool result, which the server always returns as one text block. */
-function resultText(result: Awaited<ReturnType<Client["callTool"]>>): string {
-  const content = result.content as Array<{ type: string; text: string }>;
-  return content[0].text;
-}
 
 // Every search tool with a free-text `query`.
 const QUERY_TOOLS = [
@@ -122,11 +128,9 @@ describe("search query inputs", () => {
 
     const result = await client.callTool({ name: tool, arguments: { query: "a".repeat(MAX_QUERY_LENGTH + 1) } });
 
-    expect(result.isError).toBe(true);
-    const text = resultText(result);
-    expect(text).toContain(`Invalid arguments for tool ${tool}`);
-    expect(text).toContain('"query"');
-    expect(text).toContain(`"maximum": ${String(MAX_QUERY_LENGTH)}`);
+    expect(validationIssues(result, tool)).toEqual([
+      `String must contain at most ${String(MAX_QUERY_LENGTH)} character(s) at query`,
+    ]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -138,11 +142,7 @@ describe("search query inputs", () => {
 
       const result = await client.callTool({ name: tool, arguments: { query } });
 
-      expect(result.isError).toBe(true);
-      const text = resultText(result);
-      expect(text).toContain(`Invalid arguments for tool ${tool}`);
-      expect(text).toContain('"query"');
-      expect(text).toContain("must not be blank");
+      expect(validationIssues(result, tool)).toEqual(["must not be blank at query"]);
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
@@ -202,32 +202,26 @@ describe("search_outings field inputs", () => {
 
     const result = await client.callTool({ name: "search_outings", arguments: args });
 
-    expect(result.isError).toBe(true);
-    const text = resultText(result);
-    expect(text).toContain("Invalid arguments for tool search_outings");
-    expect(text).toContain(`"${field}"`);
-    expect(text).toContain(message);
+    // A malformed value fails both the format regex and the real-date refine, so the same line can appear twice.
+    expect(new Set(validationIssues(result, "search_outings"))).toEqual(new Set([`${message} at ${field}`]));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each<[string, Record<string, unknown>, string]>([
-    ["limit 0", { limit: 0 }, "limit"],
-    ["limit 51", { limit: 51 }, "limit"],
-    ["a negative offset", { offset: -1 }, "offset"],
-    ["a non-integer offset", { offset: 1.5 }, "offset"],
-    ["a negative route_id", { route_id: -1 }, "route_id"],
-    ["a non-integer area_id", { area_id: 1.5 }, "area_id"],
-    ["a negative user_id", { user_id: -1 }, "user_id"],
-  ])("rejects %s naming the field without calling Camptocamp", async (_label, args, field) => {
+    ["limit 0", { limit: 0 }, "Number must be greater than or equal to 1 at limit"],
+    ["limit 51", { limit: 51 }, "Number must be less than or equal to 50 at limit"],
+    ["a negative offset", { offset: -1 }, "Number must be greater than or equal to 0 at offset"],
+    ["a non-integer offset", { offset: 1.5 }, "Expected integer, received float at offset"],
+    ["a negative route_id", { route_id: -1 }, "Number must be greater than 0 at route_id"],
+    ["a non-integer area_id", { area_id: 1.5 }, "Expected integer, received float at area_id"],
+    ["a negative user_id", { user_id: -1 }, "Number must be greater than 0 at user_id"],
+  ])("rejects %s naming the field without calling Camptocamp", async (_label, args, issue) => {
     const fetchMock = stubFetch();
     const client = await connect();
 
     const result = await client.callTool({ name: "search_outings", arguments: args });
 
-    expect(result.isError).toBe(true);
-    const text = resultText(result);
-    expect(text).toContain("Invalid arguments for tool search_outings");
-    expect(text).toContain(`"${field}"`);
+    expect(validationIssues(result, "search_outings")).toEqual([issue]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -348,9 +342,7 @@ describe("cross-field rules", () => {
 
       const result = await client.callTool({ name: tool, arguments: { query: "pourri", offset: -1 } });
 
-      expect(result.isError).toBe(true);
-      expect(resultText(result)).toContain(`Invalid arguments for tool ${tool}`);
-      expect(resultText(result)).toContain('"offset"');
+      expect(validationIssues(result, tool)).toEqual(["Number must be greater than or equal to 0 at offset"]);
       expect(fetchMock).not.toHaveBeenCalled();
     },
   );
@@ -391,39 +383,43 @@ describe("search_routes field inputs", () => {
     [
       "an unknown configuration",
       { area_id: 14409, configuration: ["edge", "arete"] },
-      "configuration",
+      "configuration[1]",
       "must be one of: edge, pillar, face, corridor, goulotte, glacier",
     ],
     [
       "an unknown route type",
       { area_id: 14409, route_types: ["one_way"] },
-      "route_types",
+      "route_types[0]",
       "must be one of: return_same_way, loop, loop_hut, traverse, raid, expedition",
     ],
     [
       "an unknown rating system",
       { rating_system: "rating", rating_min: "AD" },
       "rating_system",
-      "must be one of: ski_rating, ski_exposition, labande_ski_rating, labande_global_rating, global_rating, ",
+      "must be one of: ski_rating, ski_exposition, labande_ski_rating, labande_global_rating, global_rating, " +
+        "engagement_rating, risk_rating, equipment_rating, rock_free_rating, rock_required_rating, " +
+        "exposition_rock_rating, aid_rating, ice_rating, mixed_rating, via_ferrata_rating, hiking_rating, " +
+        "hiking_mtb_exposition, snowshoe_rating, mtb_up_rating, mtb_down_rating",
     ],
     [
       "a rating bound over 8 characters",
       { rating_system: "global_rating", rating_min: "AD".repeat(5) },
       "rating_min",
-      '"maximum": 8',
+      "String must contain at most 8 character(s)",
     ],
-    ["a negative elevation gain", { height_diff_up_min: -1 }, "height_diff_up_min", "too_small"],
-  ])("rejects %s without calling Camptocamp", async (_label, args, field, message) => {
+    [
+      "a negative elevation gain",
+      { height_diff_up_min: -1 },
+      "height_diff_up_min",
+      "Number must be greater than or equal to 0",
+    ],
+  ])("rejects %s without calling Camptocamp", async (_label, args, path, message) => {
     const fetchMock = stubFetch();
     const client = await connect();
 
     const result = await client.callTool({ name: "search_routes", arguments: args });
 
-    expect(result.isError).toBe(true);
-    const text = resultText(result);
-    expect(text).toContain("Invalid arguments for tool search_routes");
-    expect(text).toContain(`"${field}"`);
-    expect(text).toContain(message);
+    expect(validationIssues(result, "search_routes")).toEqual([`${message} at ${path}`]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -485,11 +481,7 @@ describe("search_waypoints and search_books type inputs", () => {
 
     const result = await client.callTool({ name: tool, arguments: args });
 
-    expect(result.isError).toBe(true);
-    const text = resultText(result);
-    expect(text).toContain(`Invalid arguments for tool ${tool}`);
-    expect(text).toContain(`"${field}"`);
-    expect(text).toContain(message);
+    expect(validationIssues(result, tool)).toEqual([`${message} at ${field}`]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
