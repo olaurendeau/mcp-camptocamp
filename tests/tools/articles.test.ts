@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { z } from "zod";
 import {
   handleSearchArticles,
   handleGetArticle,
@@ -24,6 +25,11 @@ function expectNoPlaceholder(text: string) {
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+/** Calls the handler as the MCP server does: with input parsed by the tool schema, defaults applied. */
+function search(input: z.input<typeof searchArticlesSchema>): Promise<string> {
+  return handleSearchArticles(searchArticlesSchema.parse(input));
+}
 
 // Every fixture below copies a live Camptocamp response, minus, at any depth, the fields no tool reads:
 // `version`, `protected`, `type`, `available_langs` and `topic_id`. Detail fixtures other than 193302 also drop
@@ -134,24 +140,59 @@ const VALANGHE_SEARCH = {
   total: 1,
 };
 
+// AC9.1, AC9.4: R6 paging.
+describe("search_articles paging", () => {
+  it("sends the offset and prints no next page on the last page", async () => {
+    // The live GET /articles?q=crampons&limit=2&offset=2&pl=fr response (2026-10-04): the last of 3 articles.
+    mockSearchArticles.mockResolvedValueOnce({ documents: [CRAMPONS_SEARCH.documents[2]], total: 3 });
+
+    const result = await search({ query: "crampons", offset: 2, limit: 2 });
+
+    expect(mockSearchArticles).toHaveBeenCalledWith({ query: "crampons", limit: 2, offset: 2 });
+    expect(result.split("\n")).toEqual([
+      "Found 3 article(s). Showing 1 from offset 2:",
+      'Filters: query "crampons"',
+      "",
+      "- [665710] Affuter et mettre ses vieux crampons à neuf | Type: personal | Categories: gear | Activities: snow_ice_mixed, ice_climbing",
+    ]);
+  });
+
+  it("points to the next page when more articles follow", async () => {
+    mockSearchArticles.mockResolvedValueOnce(RAPPEL_SEARCH);
+
+    const result = await search({ query: "rappel", limit: 3 });
+
+    expect(result.split("\n").slice(-2)).toEqual(["", "Next page: offset=3"]);
+  });
+
+  it("refuses offset + limit above 10,000 without calling the API", async () => {
+    await expect(search({ query: "mont blanc", offset: 9995, limit: 10 })).rejects.toThrow(
+      "offset + limit must not exceed 10000: Camptocamp only returns the first 10,000 results of a search. Narrow the filters instead.",
+    );
+    expect(mockSearchArticles).not.toHaveBeenCalled();
+  });
+});
+
 describe("handleSearchArticles", () => {
-  it("forwards query and limit and prints the total header", async () => {
+  it("forwards query, limit and offset and prints the total header", async () => {
     mockSearchArticles.mockResolvedValueOnce(CRAMPONS_SEARCH);
 
-    const result = await handleSearchArticles({ query: "crampons", limit: 10 });
+    const result = await search({ query: "crampons", limit: 10 });
 
-    expect(mockSearchArticles).toHaveBeenCalledWith({ query: "crampons", limit: 10 });
-    expect(result.startsWith("Found 3 article(s). Showing 3:\n")).toBe(true);
+    expect(mockSearchArticles).toHaveBeenCalledWith({ query: "crampons", limit: 10, offset: 0 });
+    expect(result.startsWith('Found 3 article(s). Showing 3 from offset 0:\nFilters: query "crampons"\n\n')).toBe(true);
   });
 
   it("writes one line per article with the raw type, categories and activities", async () => {
     mockSearchArticles.mockResolvedValueOnce(CRAMPONS_SEARCH);
 
-    const result = await handleSearchArticles({ query: "crampons", limit: 10 });
+    const result = await search({ query: "crampons", limit: 10 });
 
     expect(result).toBe(
       [
-        "Found 3 article(s). Showing 3:\n",
+        "Found 3 article(s). Showing 3 from offset 0:",
+        'Filters: query "crampons"',
+        "",
         "- [226838] Les crampons | Type: collab | Categories: gear | Activities: mountain_climbing, snow_ice_mixed, hiking, snowshoeing, skitouring, ice_climbing",
         "- [314504] Chaussures avec crampons intégrés (article à completer) | Type: collab | Categories: gear | Activities: rock_climbing, snow_ice_mixed, ice_climbing",
         "- [665710] Affuter et mettre ses vieux crampons à neuf | Type: personal | Categories: gear | Activities: snow_ice_mixed, ice_climbing",
@@ -162,7 +203,7 @@ describe("handleSearchArticles", () => {
   it("prints a topoguide_supplements category unchanged and falls back to the only locale", async () => {
     mockSearchArticles.mockResolvedValueOnce(LESS_DIFFICULT_SEARCH);
 
-    const result = await handleSearchArticles({ query: "Less difficult alpine routes", limit: 10 });
+    const result = await search({ query: "Less difficult alpine routes", limit: 10 });
 
     expect(result).toContain(
       "- [302774] Less difficult alpine routes in the Mont Blanc region | Type: collab | Categories: topoguide_supplements | Activities: mountain_climbing, snow_ice_mixed",
@@ -172,7 +213,7 @@ describe("handleSearchArticles", () => {
   it("takes the fr title even when fr is not the first locale", async () => {
     mockSearchArticles.mockResolvedValueOnce(RAPPEL_SEARCH);
 
-    const result = await handleSearchArticles({ query: "rappel", limit: 10 });
+    const result = await search({ query: "rappel", limit: 10 });
 
     expect(result).toContain("- [716039] Descendre en rappel (source Petzl) | Type: personal");
     expect(result).toContain("- [713810] Descendre en rappel sur abalakov (source Petzl) | Type: personal");
@@ -181,30 +222,30 @@ describe("handleSearchArticles", () => {
 
   it("falls back to the it title, then to Untitled", async () => {
     mockSearchArticles.mockResolvedValueOnce(VALANGHE_SEARCH);
-    expect(await handleSearchArticles({ query: "Valanghe in video", limit: 10 })).toContain(
+    expect(await search({ query: "Valanghe in video", limit: 10 })).toContain(
       "- [110093] Valanghe in video | Type: collab",
     );
 
     // Derived: no fetched article has empty locales; this is the 110093 document with `locales` emptied.
     const noLocale = { ...VALANGHE_SEARCH.documents[0], locales: [] };
     mockSearchArticles.mockResolvedValueOnce({ documents: [noLocale], total: 1 });
-    expect(await handleSearchArticles({ query: "Valanghe in video", limit: 10 })).toContain("- [110093] Untitled |");
+    expect(await search({ query: "Valanghe in video", limit: 10 })).toContain("- [110093] Untitled |");
   });
 
   it("leaves out null activities and empty categories", async () => {
     mockSearchArticles.mockResolvedValueOnce(RAPPEL_SEARCH);
 
-    const live = await handleSearchArticles({ query: "rappel", limit: 10 });
+    const live = await search({ query: "rappel", limit: 10 });
 
-    expect(live.endsWith("\n- [193302] Du lointain nous nous rappellons | Type: personal | Categories: stories")).toBe(
-      true,
+    expect(live.split("\n")).toContain(
+      "- [193302] Du lointain nous nous rappellons | Type: personal | Categories: stories",
     );
     expectNoPlaceholder(live);
 
     // Derived: no fetched article has empty categories; this is the 193302 document with `categories: []`.
     const noCategories = { ...RAPPEL_SEARCH.documents[2], categories: [] };
     mockSearchArticles.mockResolvedValueOnce({ documents: [noCategories], total: 1 });
-    const derived = await handleSearchArticles({ query: "rappel", limit: 10 });
+    const derived = await search({ query: "rappel", limit: 10 });
 
     expect(derived).toContain("- [193302] Du lointain nous nous rappellons | Type: personal");
     expect(derived).not.toContain("Categories");
@@ -212,11 +253,11 @@ describe("handleSearchArticles", () => {
     expectNoPlaceholder(derived);
   });
 
-  it("returns exactly 'No articles found.' for an empty result", async () => {
+  it("returns exactly 'No articles found matching <filters>.' for an empty result", async () => {
     // The live GET /articles?q=zzzqqqxxx&limit=10&lang=fr response (2026-10-03).
     mockSearchArticles.mockResolvedValueOnce({ documents: [], total: 0 });
 
-    expect(await handleSearchArticles({ query: "zzzqqqxxx", limit: 10 })).toBe("No articles found.");
+    expect(await search({ query: "zzzqqqxxx", limit: 10 })).toBe('No articles found matching query "zzzqqqxxx".');
   });
 });
 
@@ -237,7 +278,7 @@ describe("article tool definitions", () => {
   });
 
   it("bounds limit to 1-50 with a default of 10", () => {
-    expect(searchArticlesSchema.parse({ query: "crampons" })).toEqual({ query: "crampons", limit: 10 });
+    expect(searchArticlesSchema.parse({ query: "crampons" })).toEqual({ query: "crampons", limit: 10, offset: 0 });
     expect(searchArticlesSchema.safeParse({ query: "crampons", limit: 0 }).success).toBe(false);
     expect(searchArticlesSchema.safeParse({ query: "crampons", limit: 51 }).success).toBe(false);
     expect(searchArticlesSchema.safeParse({ limit: 10 }).success).toBe(false);
