@@ -15,12 +15,12 @@ import { outingDetailSchema, outingListResponseSchema } from "../../src/api/sche
 import { throughSchema } from "./through-schema.js";
 import { BARE_RATING } from "./bare-rating.js";
 
-// Not an automock: it would empty OUTING_RATING_FIELDS, from which the search_outings schema is built.
-vi.mock("../../src/api/camptocamp.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof api>()),
-  getOuting: vi.fn(),
-  searchOutings: vi.fn(),
-}));
+// Not an automock: it would empty the value lists the search_outings schema is built from. Only those lists are
+// real; the API calls are mocks, and any other export is missing, so no test can reach Camptocamp.
+vi.mock("../../src/api/camptocamp.js", async (importOriginal) => {
+  const { OUTING_RATING_FIELDS, CONDITION_RATINGS } = await importOriginal<typeof api>();
+  return { OUTING_RATING_FIELDS, CONDITION_RATINGS, getOuting: vi.fn(), searchOutings: vi.fn() };
+});
 
 const mockGetOuting = throughSchema(vi.mocked(api.getOuting), outingDetailSchema);
 const mockSearchOutings = throughSchema(vi.mocked(api.searchOutings), outingListResponseSchema);

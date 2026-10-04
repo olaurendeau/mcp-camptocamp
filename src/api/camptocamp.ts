@@ -1,5 +1,4 @@
 import { getJson } from "./http.js";
-import type { ConditionRating } from "../tools/enums.js";
 import type {
   RouteSearchResponse,
   RouteDetail,
@@ -112,6 +111,10 @@ export const OUTING_RATING_FIELDS = [
   "mtb_down_rating",
 ] as const satisfies readonly RouteRatingField[];
 export type OutingRatingField = (typeof OUTING_RATING_FIELDS)[number];
+
+// Outing conditions, best first (v6_common condition_ratings); `ocond` takes a range of them.
+export const CONDITION_RATINGS = ["excellent", "good", "average", "poor", "awful"] as const;
+export type ConditionRating = (typeof CONDITION_RATINGS)[number];
 
 export interface RouteSearchOptions extends KeywordOrAreaSearchOptions {
   waypoint_id?: number;

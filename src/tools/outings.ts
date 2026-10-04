@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
-import { ACTIVITIES, CONDITION_RATINGS, enumValue } from "./enums.js";
-import { OUTING_RATING_FIELDS, getOuting, searchOutings } from "../api/camptocamp.js";
+import { ACTIVITIES, enumValue } from "./enums.js";
+import { CONDITION_RATINGS, OUTING_RATING_FIELDS, getOuting, searchOutings } from "../api/camptocamp.js";
 import type { OutingDetail, OutingListResponse, OutingSearchParams } from "../api/camptocamp.js";
 import {
   pickLocale,

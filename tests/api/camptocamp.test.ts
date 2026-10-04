@@ -17,11 +17,11 @@ import {
   ROUTE_RATING_PARAMS,
   OUTING_RATING_FIELDS,
   type OutingRatingField,
+  type ConditionRating,
   type RouteRatingField,
 } from "../../src/api/camptocamp.js";
 import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
 import { wellFormed } from "./well-formed.js";
-import type { ConditionRating } from "../../src/tools/enums.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
