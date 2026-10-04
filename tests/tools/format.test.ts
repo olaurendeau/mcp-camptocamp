@@ -1,6 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import {
   isPresent,
+  isVirtualWaypoint,
   formatDateRange,
   pickLocale,
   pickTitle,
@@ -374,6 +375,40 @@ describe("formatWaypointLine", () => {
     expect(formatWaypointLine(montPourri, { main: false })).toBe("- [37916] Mont Pourri (summit) | 3779m");
     expect(formatWaypointLine({ ...montPourri, elevation: null }, { main: true })).toBe(
       "- [37916] Mont Pourri (summit) | main waypoint",
+    );
+  });
+});
+
+// Waypoint 1947492 as listed in GET /routes/944120?lang=fr (2026-10-04): a virtual waypoint (a grouping of
+// routes) with the placeholder elevation 0.
+const ouvertures2013 = {
+  document_id: 1947492,
+  locales: [
+    { lang: "en", title: "First Ascents in 2013" },
+    { lang: "fr", title: "Ouvertures 2013" },
+  ],
+  waypoint_type: "virtual",
+  elevation: 0,
+};
+
+describe("isVirtualWaypoint", () => {
+  it("is true only for the virtual waypoint type", () => {
+    expect(isVirtualWaypoint(ouvertures2013)).toBe(true);
+    expect(isVirtualWaypoint({ ...ouvertures2013, waypoint_type: "access" })).toBe(false);
+    expect(isVirtualWaypoint({ ...ouvertures2013, waypoint_type: "summit" })).toBe(false);
+  });
+});
+
+describe("formatWaypointLine for a virtual waypoint", () => {
+  it("prints no elevation, whatever the API sends", () => {
+    expect(formatWaypointLine(ouvertures2013)).toBe("- [1947492] Ouvertures 2013 (virtual)");
+    // Derived: a non-zero placeholder must not leak either.
+    expect(formatWaypointLine({ ...ouvertures2013, elevation: 7999 })).toBe("- [1947492] Ouvertures 2013 (virtual)");
+  });
+
+  it("still marks a virtual main waypoint", () => {
+    expect(formatWaypointLine({ ...ouvertures2013, elevation: 7999 }, { main: true })).toBe(
+      "- [1947492] Ouvertures 2013 (virtual) | main waypoint",
     );
   });
 });

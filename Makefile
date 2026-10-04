@@ -42,7 +42,7 @@ typecheck: ci ## Vérifie les types TypeScript
 format: ci ## Formate le code avec Prettier
 	$(RUN) npm run format
 
-check: ci ## Lance le job checks de la CI (format, lint, types, couverture, build, tests du hook)
+check: ci ## Mêmes étapes que les jobs CI checks (node 22) et checks (node 24), agrégés par checks : format, lint, types, couverture, build, tests du hook
 	$(RUN) npm run check
 	tests/hooks/guard.test.sh
 
