@@ -133,14 +133,31 @@ The period matches June of every year: here 2026 and 2025. `get_outing {id: 1912
   | 2021 | 1358       | 1313              | 1357              |
   | 2024 | 1519       | 1456              | 1518              |
 
-  A period that starts on `01-01` or ends on `12-31` cannot be widened past the new year. Use `date_from` and `date_to` for those days instead, one year per call.
+  A period ending on `12-31` cannot be widened past it, and widening a period to start on `01-01` runs into the next limit.
 
-- **An outing spanning the new year matches no period.** Outing 1362640, from 2020-12-17 to 2021-10-28, is never returned by a period search. `date_from` and `date_to` do return it.
-- **A period cannot wrap around the new year.** `period_end` must be on or after `period_start`; for 20 December to 10 January, make two calls. `search_outings {area_id: 14409, activity: "skitouring", period_start: "12-20", period_end: "01-10", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+- **A period starting on `01-01` returns almost nothing.** Measured on the live API on 2026-10-05, with no other filter:
+
+  | Period            | Outings found |
+  | ----------------- | ------------- |
+  | `01-01` → `01-31` | 0             |
+  | `01-02` → `01-31` | 29297         |
+  | `01-01` → `12-31` | 4             |
+  | `12-20` → `12-31` | 10098         |
+
+  A period ending on `12-31` works normally. For early January, start the period on `01-02` and accept that 1 January is left out, or use `date_from` and `date_to` instead, one year per call. An empty result for a period starting on `01-01` does not mean there are no reports.
+
+- **An outing spanning the new year matches no period.** Outing 1362640, from 2020-12-17 to 2021-10-28, was returned by no period tested. `date_from` and `date_to` do return it.
+- **A period cannot wrap around the new year.** `period_end` must be on or after `period_start`. `search_outings {area_id: 14409, activity: "skitouring", period_start: "12-20", period_end: "01-10", limit: 3}`, captured from v1.3.0 on 2026-10-05:
 
   ```text
   Error: period cannot wrap around the new year; make two calls (12-20 → 12-31 and 01-01 → 01-10)
   ```
+
+  The second call this error suggests starts on `01-01`, so it hits the limit above. Make the second call start on `01-02`, or use `date_from` and `date_to` for those January days. For this Vanoise ski-touring search, measured on 2026-10-05:
+  - `12-20` → `12-31` found 79 outings;
+  - `01-01` → `01-10` found none;
+  - `01-02` → `01-10` found 45;
+  - `date_from: "2025-01-01"` with `date_to: "2025-01-10"` and no period found 3, for January 2025 only.
 
 - **A period needs both days.** `search_outings {period_start: "06-01", limit: 3}`, captured from v1.3.0 on 2026-10-05:
 
