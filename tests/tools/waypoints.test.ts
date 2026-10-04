@@ -102,8 +102,10 @@ describe("handleGetWaypoint", () => {
 
     const result = await handleGetWaypoint({ id: 38591 });
 
-    expect(result).toContain("Barre des Écrins");
-    expect(result).toContain("ID: 38591");
+    expect(result.split("\n").slice(0, 2)).toEqual([
+      "# Barre des Écrins (ID: 38591)",
+      "**URL**: https://www.camptocamp.org/waypoints/38591",
+    ]);
     expect(result).toContain("summit");
     expect(result).toContain("4102m");
     expect(result).toContain("**Coordinates**: 44.92215, 6.35952");

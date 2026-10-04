@@ -127,8 +127,11 @@ describe("handleGetOuting", () => {
 
     const result = await handleGetOuting({ id: 42 });
 
-    expect(result).toContain("Traversée des Drus");
-    expect(result).toContain("ID: 42");
+    expect(result.split("\n").slice(0, 3)).toEqual([
+      "# Traversée des Drus (ID: 42)",
+      "**URL**: https://www.camptocamp.org/outings/42",
+      "**Author**: o.laurendeau (user ID: 430052)",
+    ]);
     expect(result).toContain("**Author**: o.laurendeau (user ID: 430052)");
     expect(result).toContain("**Date**: 2026-07-06\n");
     expect(result).toContain("**Participants**: 2");

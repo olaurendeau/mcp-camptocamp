@@ -104,8 +104,11 @@ describe("handleGetRoute", () => {
 
     const result = await handleGetRoute({ id: 42 });
 
+    expect(result.split("\n").slice(0, 2)).toEqual([
+      "# Arête des Cosmiques (ID: 42)",
+      "**URL**: https://www.camptocamp.org/routes/42",
+    ]);
     expect(result).toContain("Arête des Cosmiques");
-    expect(result).toContain("ID: 42");
     expect(result).not.toContain("undefined");
     expect(result).toContain("TD");
     expect(result).toContain("5c");
@@ -454,6 +457,7 @@ describe("handleGetRoute with the API's null fields", () => {
     expect(result).toBe(
       [
         "# Martine is on the rock (ID: 53914)",
+        "**URL**: https://www.camptocamp.org/routes/53914",
         "",
         "**Activities**: rock_climbing",
         "**Global rating**: TD",

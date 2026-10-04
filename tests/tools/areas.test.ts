@@ -188,7 +188,10 @@ describe("handleGetArea", () => {
     const result = await handleGetArea({ id: 14403 });
 
     expect(mockGetArea).toHaveBeenCalledWith(14403);
-    expect(result).toContain("# Écrins (ID: 14403)");
+    expect(result.split("\n").slice(0, 2)).toEqual([
+      "# Écrins (ID: 14403)",
+      "**URL**: https://www.camptocamp.org/areas/14403",
+    ]);
     expect(result).toContain("**Type**: range");
     expect(result).toContain(`## Summary\n${ecrinsSummary}`);
     expect(result).toContain(`## Description\n${ecrinsDescription}`);
