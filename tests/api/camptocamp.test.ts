@@ -644,6 +644,150 @@ describe("getWaypoint", () => {
     expect(result.locales[0].access_period).toBeNull();
   });
 
+  it("keeps all_routes, books and recent_outings through the response schema", async () => {
+    // Trimmed from the live GET /waypoints/37355?lang=fr response (2026-10-04): one item per list, without
+    // geometry, areas and texts; the other associations as the API sends them, with images and articles emptied.
+    const mockData = {
+      document_id: 37355,
+      locales: [{ lang: "fr", title: "Mont Blanc" }],
+      waypoint_type: "summit",
+      elevation: 4805,
+      associations: {
+        waypoints: [],
+        waypoint_children: [],
+        routes: [],
+        articles: [],
+        images: [],
+        xreports: [],
+        all_routes: {
+          total: 39,
+          documents: [
+            {
+              document_id: 1893205,
+              version: 1,
+              locales: [
+                { version: 2, lang: "fr", title: "Himalamiage ", summary: null, title_prefix: "Pointe Louis Amédée" },
+              ],
+              quality: "medium",
+              activities: ["snow_ice_mixed", "mountain_climbing"],
+              elevation_min: null,
+              elevation_max: 4806,
+              height_diff_up: 1600,
+              durations: [],
+              height_diff_difficulties: 800,
+              orientations: ["E"],
+              global_rating: "ED-",
+              engagement_rating: "IV",
+              risk_rating: null,
+              ice_rating: "4+",
+              mixed_rating: "M4+",
+              rock_required_rating: "5c",
+              aid_rating: "A1",
+              public_transportation_rating: "unknown service",
+              available_langs: ["fr"],
+              protected: false,
+              type: "r",
+            },
+          ],
+        },
+        books: [
+          {
+            document_id: 176597,
+            version: 2,
+            locales: [{ version: 3, lang: "fr", title: "Mont Blanc 4808 m - 5 Voies Pour Le Sommet", summary: null }],
+            quality: "medium",
+            author: "François Damilano",
+            activities: ["snow_ice_mixed"],
+            book_types: ["topo"],
+            available_langs: ["fr"],
+            protected: false,
+            type: "b",
+          },
+        ],
+        recent_outings: {
+          total: 1743,
+          documents: [
+            {
+              document_id: 1955437,
+              version: 1,
+              locales: [{ version: 1, lang: "fr", title: "Mont Blanc : Arête des Bosses", summary: null }],
+              quality: "fine",
+              activities: ["snow_ice_mixed"],
+              condition_rating: "excellent",
+              date_end: "2026-09-28",
+              date_start: "2026-09-28",
+              elevation_max: 4810,
+              height_diff_up: 1000,
+              public_transport: false,
+              global_rating: "PD-",
+              engagement_rating: "III",
+              areas: [{ document_id: 14410, locales: [{ lang: "fr", title: "Mont-Blanc" }], area_type: "range" }],
+              author: { name: "Nicolas 38500", user_id: 1677883 },
+              type: "o",
+              img_count: 0,
+            },
+          ],
+        },
+      },
+    };
+    mockFetch.mockResolvedValueOnce(makeResponse(mockData));
+
+    const result = await getWaypoint(37355);
+
+    expect(result.associations).toEqual({
+      all_routes: {
+        total: 39,
+        documents: [
+          {
+            document_id: 1893205,
+            locales: [{ lang: "fr", title: "Himalamiage ", title_prefix: "Pointe Louis Amédée" }],
+            activities: ["snow_ice_mixed", "mountain_climbing"],
+            elevation_max: 4806,
+            height_diff_up: 1600,
+            height_diff_difficulties: 800,
+            global_rating: "ED-",
+            engagement_rating: "IV",
+            risk_rating: null,
+            ice_rating: "4+",
+            mixed_rating: "M4+",
+            rock_required_rating: "5c",
+            aid_rating: "A1",
+          },
+        ],
+      },
+      books: [
+        {
+          document_id: 176597,
+          locales: [{ lang: "fr", title: "Mont Blanc 4808 m - 5 Voies Pour Le Sommet", summary: null }],
+          quality: "medium",
+          author: "François Damilano",
+          activities: ["snow_ice_mixed"],
+          book_types: ["topo"],
+          available_langs: ["fr"],
+        },
+      ],
+      recent_outings: {
+        total: 1743,
+        documents: [
+          {
+            document_id: 1955437,
+            locales: [{ lang: "fr", title: "Mont Blanc : Arête des Bosses" }],
+            activities: ["snow_ice_mixed"],
+            condition_rating: "excellent",
+            date_end: "2026-09-28",
+            date_start: "2026-09-28",
+            elevation_max: 4810,
+            height_diff_up: 1000,
+            global_rating: "PD-",
+            engagement_rating: "III",
+            areas: [{ document_id: 14410, locales: [{ lang: "fr", title: "Mont-Blanc" }], area_type: "range" }],
+            author: { name: "Nicolas 38500", user_id: 1677883 },
+          },
+        ],
+      },
+    });
+  });
+
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 404));
 
