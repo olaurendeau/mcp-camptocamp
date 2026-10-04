@@ -244,6 +244,48 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
     "$schema": "http://json-schema.org/draft-07/schema#",
     "additionalProperties": false,
     "properties": {
+      "activity": {
+        "description": "Activity covered by the article, one of: skitouring, snow_ice_mixed, mountain_climbing, rock_climbing, ice_climbing, hiking, snowshoeing, paragliding, mountain_biking, via_ferrata, slacklining",
+        "enum": [
+          "skitouring",
+          "snow_ice_mixed",
+          "mountain_climbing",
+          "rock_climbing",
+          "ice_climbing",
+          "hiking",
+          "snowshoeing",
+          "paragliding",
+          "mountain_biking",
+          "via_ferrata",
+          "slacklining",
+        ],
+        "type": "string",
+      },
+      "article_type": {
+        "description": "Article type, one of: collab, personal",
+        "enum": [
+          "collab",
+          "personal",
+        ],
+        "type": "string",
+      },
+      "category": {
+        "description": "Article category, one of: mountain_environment, gear, technical, topoguide_supplements, soft_mobility, expeditions, stories, c2c_meetings, tags, site_info, association",
+        "enum": [
+          "mountain_environment",
+          "gear",
+          "technical",
+          "topoguide_supplements",
+          "soft_mobility",
+          "expeditions",
+          "stories",
+          "c2c_meetings",
+          "tags",
+          "site_info",
+          "association",
+        ],
+        "type": "string",
+      },
       "lang": {
         "description": "Language of titles and texts, one of: fr, en, de, it, es, ca, eu, sl, zh (default fr)",
         "enum": [
@@ -273,14 +315,11 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "integer",
       },
       "query": {
-        "description": "Search query (e.g. 'crampons', 'avalanche', 'rappel')",
+        "description": "Search query (e.g. 'crampons', 'avalanche', 'rappel'); optional when a filter is given",
         "maxLength": 200,
         "type": "string",
       },
     },
-    "required": [
-      "query",
-    ],
     "type": "object",
   },
   "search_books": {
