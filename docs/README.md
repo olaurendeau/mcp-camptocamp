@@ -11,6 +11,8 @@ The server runs on your machine and talks to its client over stdio. A client tha
 
 ## Clients
 
+- [ChatGPT desktop app and Codex](clients/chatgpt-desktop-and-codex.md): the ChatGPT desktop app, Codex CLI and the Codex IDE extension, which share one configuration. ChatGPT on the web cannot use this server.
+
 Until your client has its own page here, use the [Claude Code command](getting-started.md#claude-code) or the [configuration for other MCP clients](getting-started.md#other-mcp-clients).
 
 ## Guides
