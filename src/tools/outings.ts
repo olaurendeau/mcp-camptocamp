@@ -3,7 +3,8 @@ import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage } from "./paging.js";
 import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
 import type { OutingSearchResponse, OutingDetail, OutingListItem, OutingListResponse } from "../api/camptocamp.js";
-import { pickLocale, pickTitle, formatHeader, formatRouteLine } from "./format.js";
+import { pickLocale, pickTitle, formatHeader, formatAssociatedRouteLine } from "./format.js";
+import { formatRatingLines, formatRatingParts } from "./ratings.js";
 
 export const searchUserOutingsSchema = z.object({
   user_id: documentId("Camptocamp user ID (e.g. 430052 for username o.laurendeau)"),
@@ -86,9 +87,11 @@ function formatOutingSearchResult(response: OutingSearchResponse, userId: number
     const date = formatDateRange(outing.date_start, outing.date_end);
     const datePart = date ? ` | ${date}` : "";
     const elevation = outing.elevation_max ? ` | Max elevation: ${outing.elevation_max}m` : "";
-    const rating = outing.global_rating ? ` | Rating: ${outing.global_rating}` : "";
+    const ratings = formatRatingParts(outing)
+      .map((part) => ` | ${part}`)
+      .join("");
 
-    lines.push(`- [${outing.document_id}] ${title} (${activities})${datePart}${elevation}${rating}`);
+    lines.push(`- [${outing.document_id}] ${title} (${activities})${datePart}${elevation}${ratings}`);
   }
 
   return lines.join("\n");
@@ -110,11 +113,7 @@ function formatOutingDetail(outing: OutingDetail): string {
   if (date) lines.push(`**Date**: ${date}`);
   if (outing.participant_count) lines.push(`**Participants**: ${outing.participant_count}`);
 
-  if (outing.global_rating) lines.push(`**Global rating**: ${outing.global_rating}`);
-  if (outing.hiking_rating) lines.push(`**Hiking rating**: ${outing.hiking_rating}`);
-  if (outing.rock_free_rating) lines.push(`**Rock free rating**: ${outing.rock_free_rating}`);
-  if (outing.engagement_rating) lines.push(`**Engagement**: ${outing.engagement_rating}`);
-  if (outing.equipment_rating) lines.push(`**Equipment**: ${outing.equipment_rating}`);
+  lines.push(...formatRatingLines(outing));
   if (outing.condition_rating) lines.push(`**Conditions**: ${outing.condition_rating}`);
 
   if (outing.elevation_max) lines.push(`**Max elevation**: ${outing.elevation_max}m`);
@@ -148,7 +147,7 @@ function formatOutingDetail(outing: OutingDetail): string {
 
   const routes = outing.associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...routes.map(formatRouteLine));
+    lines.push("\n## Associated routes", ...routes.map(formatAssociatedRouteLine));
   }
 
   return lines.join("\n");
@@ -185,13 +184,7 @@ function formatOutingLine(outing: OutingListItem): string {
   push("Conditions: ", outing.condition_rating);
   push("Max elevation: ", outing.elevation_max, "m");
   push("Elevation gain: ", outing.height_diff_up, "m");
-  push("Global rating: ", outing.global_rating);
-  push("Ski rating: ", outing.ski_rating);
-  push("Labande: ", outing.labande_global_rating);
-  push("Rock free rating: ", outing.rock_free_rating);
-  push("Ice rating: ", outing.ice_rating);
-  push("Hiking rating: ", outing.hiking_rating);
-  push("Snowshoe rating: ", outing.snowshoe_rating);
+  parts.push(...formatRatingParts(outing));
 
   const ranges = (outing.areas ?? []).filter((area) => area.area_type === "range");
   if (ranges.length > 0) {
@@ -245,7 +238,7 @@ export const outingToolDefinitions = [
     name: "search_user_outings",
     title: "List a user's outings",
     description:
-      "List outings (trip reports) published by a Camptocamp user. Returns outings with ID, title, activities, date, elevation, and rating. Use the user_id from the Camptocamp profile URL (e.g. u=430052).",
+      "List outings (trip reports) published by a Camptocamp user. Returns outings with ID, title, activities, date, max elevation, and every rating labelled by its grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD'). Use the user_id from the Camptocamp profile URL (e.g. u=430052).",
     inputSchema: searchUserOutingsSchema,
     handler: handleSearchUserOutings,
   },
@@ -253,7 +246,7 @@ export const outingToolDefinitions = [
     name: "get_outing",
     title: "Get outing details",
     description:
-      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including description, conditions, weather, participants, and associated routes (named '<summit> : <route title>'). The second line is the document's camptocamp.org URL, to cite as the source.",
+      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including every rating labelled by its grading system (e.g. 'Ski rating (Toponeige)', 'Labande', 'Global rating'), description, conditions, weather, participants, and associated routes (named '<summit> : <route title>', followed by their ratings). The second line is the document's camptocamp.org URL, to cite as the source.",
     inputSchema: getOutingSchema,
     handler: handleGetOuting,
   },
@@ -261,7 +254,7 @@ export const outingToolDefinitions = [
     name: "search_outings",
     title: "Search outings",
     description:
-      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), route_id (from search_routes), waypoint_id (from search_waypoints). Each result shows ID, title, activities, dates, condition rating, difficulty ratings, max elevation, elevation gain, mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow, or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text.",
+      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, date_from / date_to (YYYY-MM-DD; an outing matches if its date range overlaps the requested range — give one bound only for 'since' / 'until'), route_id (from search_routes), waypoint_id (from search_waypoints). Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow, or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text.",
     inputSchema: searchOutingsSchema,
     handler: handleSearchOutings,
   },
