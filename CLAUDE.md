@@ -123,16 +123,16 @@ Base URL: `https://api.camptocamp.org`
   - Ranges: `min,max`, `min` alone (min and up) or `,max` (up to max); lists are comma-separated.
   - Rating params: `trat` ski, `grat` global, `lrat` Labande global, `srat` Labande ski, `sexpo` ski exposure, `erat` engagement, `orrat` risk, `prat` equipment, `irat` ice, `mrat` mixed, `rexpo` rock exposure, `frat` rock free, `rrat` rock required, `arat` aid, `krat` via ferrata, `hrat` hiking, `hexpo` hiking/MTB exposure, `wrat` snowshoe, `mbur` MTB up, `mbdr` MTB down.
 - `GET /routes/{id}?lang=fr`
-- `GET /waypoints?q={query}&limit=10&lang=fr[&offset={n}]`
-- `GET /waypoints?a={area_id}&limit=10&lang=fr[&offset={n}]` (combinable with `q`)
+- `GET /waypoints?q={query}&limit=10&pl=fr[&offset={n}]`
+- `GET /waypoints?a={area_id}&limit=10&pl=fr[&offset={n}]` (combinable with `q`)
 - `GET /waypoints/{id}?lang=fr`
 - `GET /outings?u={user_id}&limit=10&lang=fr`
 - `GET /outings/{id}?lang=fr`
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]`
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
-- `GET /areas?q={query}&limit=10&lang=fr[&offset={n}][&atyp={type}]`
+- `GET /areas?q={query}&limit=10&pl=fr[&offset={n}][&atyp={type}]`
 - `GET /areas/{id}?lang=fr`
-- `GET /books?q={query}&limit=10&lang=fr[&offset={n}]`
+- `GET /books?q={query}&limit=10&pl=fr[&offset={n}]`
 - `GET /books/{id}?lang=fr`
-- `GET /articles?q={query}&limit=10&lang=fr[&offset={n}]`
+- `GET /articles?q={query}&limit=10&pl=fr[&offset={n}]`
 - `GET /articles/{id}?lang=fr`
