@@ -7,6 +7,7 @@ import type {
   OutingListResponse,
   OutingSearchParams,
 } from "../api/camptocamp.js";
+import { pickLocale, pickTitle, formatHeader, formatTitledLine } from "./format.js";
 
 export const searchUserOutingsSchema = z.object({
   user_id: z.number().int().positive().describe("Camptocamp user ID (e.g. 430052 for username o.laurendeau)"),
@@ -98,8 +99,7 @@ function formatOutingSearchResult(response: OutingSearchResponse, userId: number
   ];
 
   for (const outing of response.documents) {
-    const locale = outing.locales.find((l) => l.lang === "fr") ?? outing.locales[0];
-    const title = locale?.title ?? "Untitled";
+    const title = pickTitle(outing.locales);
     const activities = outing.activities.join(", ");
     const date = formatDateRange(outing.date_start, outing.date_end);
     const datePart = date ? ` | ${date}` : "";
@@ -113,10 +113,10 @@ function formatOutingSearchResult(response: OutingSearchResponse, userId: number
 }
 
 function formatOutingDetail(outing: OutingDetail): string {
-  const locale = outing.locales.find((l) => l.lang === "fr") ?? outing.locales[0];
+  const locale = pickLocale(outing.locales);
   const lines: string[] = [];
 
-  lines.push(`# ${locale?.title ?? "Untitled"} (ID: ${outing.document_id})`);
+  lines.push(formatHeader(locale?.title ?? "Untitled", outing.document_id));
 
   if (outing.author) {
     lines.push(`**Author**: ${outing.author.name} (user ID: ${outing.author.user_id})`);
@@ -166,18 +166,10 @@ function formatOutingDetail(outing: OutingDetail): string {
 
   const routes = outing.associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes");
-    for (const route of routes) {
-      const routeLocale = route.locales.find((l) => l.lang === "fr") ?? route.locales[0];
-      lines.push(`- [${route.document_id}] ${routeLocale?.title ?? "Untitled"}`);
-    }
+    lines.push("\n## Associated routes", ...routes.map(formatTitledLine));
   }
 
   return lines.join("\n");
-}
-
-function pickTitle(locales: Array<{ lang: string; title: string }>): string {
-  return (locales.find((l) => l.lang === "fr") ?? locales[0])?.title ?? "Untitled";
 }
 
 function isPresent<T>(value: T | null | undefined | ""): value is T {

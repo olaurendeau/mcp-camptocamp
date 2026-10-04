@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointSearchResponse, WaypointDetail } from "../api/camptocamp.js";
-import { formatAreasSection } from "./areas.js";
+import { pickLocale, pickTitle, formatHeader, formatAreasSection } from "./format.js";
 
 export const searchWaypointsSchema = z.object({
   query: z.string().optional().describe("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')"),
@@ -30,8 +30,7 @@ function formatWaypointSearchResult(response: WaypointSearchResponse, areaId?: n
   const lines: string[] = [`Found ${response.total} waypoint(s)${scope}. Showing ${response.documents.length}:\n`];
 
   for (const wp of response.documents) {
-    const locale = wp.locales.find((l) => l.lang === "fr") ?? wp.locales[0];
-    const title = locale?.title ?? "Untitled";
+    const title = pickTitle(wp.locales);
     const elevation = wp.elevation ? ` | ${wp.elevation}m` : "";
 
     lines.push(`- [${wp.document_id}] ${title} (${wp.waypoint_type})${elevation}`);
@@ -57,10 +56,10 @@ function parseCoordinates(geom?: string): { lat: number; lng: number } | undefin
 }
 
 function formatWaypointDetail(waypoint: WaypointDetail): string {
-  const locale = waypoint.locales.find((l) => l.lang === "fr") ?? waypoint.locales[0];
+  const locale = pickLocale(waypoint.locales);
   const lines: string[] = [];
 
-  lines.push(`# ${locale?.title ?? "Untitled"} (ID: ${waypoint.document_id})`);
+  lines.push(formatHeader(locale?.title ?? "Untitled", waypoint.document_id));
   lines.push(`\n**Type**: ${waypoint.waypoint_type}`);
 
   if (waypoint.elevation) lines.push(`**Elevation**: ${waypoint.elevation}m`);
