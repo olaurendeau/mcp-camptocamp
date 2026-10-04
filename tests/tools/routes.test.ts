@@ -1129,7 +1129,8 @@ describe("get_route tool definition", () => {
 });
 
 // An item of GET /routes/54085 associations.recent_outings (2026-10-04): the fr locale, the typed fields, and the
-// Vanoise range among its areas (author user_ids made up); the live items also carry geometry, img_count…
+// Vanoise range among its areas; the live items also carry geometry, img_count… Every value is the live one:
+// elevation_max is 3779 (the summit) in all ten items, 1765476 included, and quality "fine" except where given.
 function recentOuting(
   id: number,
   title: string,
@@ -1137,13 +1138,14 @@ function recentOuting(
   condition: string | null,
   gain: number,
   [ski, labande]: [string, string],
-  author: string,
+  [author, userId]: [string, number],
+  quality = "fine",
 ) {
   return {
     document_id: id,
     version: 1,
     locales: [{ version: 1, lang: "fr", title, summary: null }],
-    quality: "fine",
+    quality,
     activities: ["skitouring"],
     condition_rating: condition,
     date_end: dateEnd,
@@ -1157,7 +1159,7 @@ function recentOuting(
       { document_id: 14274, locales: [{ lang: "fr", title: "France" }], area_type: "country", type: "a" },
       { document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: "range", type: "a" },
     ],
-    author: { name: author, user_id: 1000 + id },
+    author: { name: author, user_id: userId },
     type: "o",
   };
 }
@@ -1245,8 +1247,8 @@ const route54085 = {
     recent_outings: {
       total: 64,
       documents: [
-        recentOuting(1900552, GEAY, ["2026-04-26", "2026-04-26"], "good", 1425, ["4.1", "AD"], "krok"),
-        recentOuting(1900761, GEAY, ["2026-04-26", "2026-04-26"], "excellent", 1425, ["4.1", "AD"], "Strap98"),
+        recentOuting(1900552, GEAY, ["2026-04-26", "2026-04-26"], "good", 1425, ["4.1", "AD"], ["krok", 1573563]),
+        recentOuting(1900761, GEAY, ["2026-04-26", "2026-04-26"], "excellent", 1425, ["4.1", "AD"], ["Strap98", 1892731]),
         recentOuting(
           1895600,
           "Mont Pourri : Versant W - Grand Col → Col des Roches → Glacier du Geay",
@@ -1254,10 +1256,10 @@ const route54085 = {
           "good",
           2000,
           ["3.3", "AD+"],
-          "lagopède",
+          ["lagopède", 455914],
         ),
-        recentOuting(1880674, GEAY, ["2026-03-07", "2026-03-08"], "good", 1600, ["4.1", "AD"], "MarionO"),
-        recentOuting(1871490, GEAY, ["2026-02-07", "2026-02-08"], "good", 1900, ["4.1", "AD"], "Apoutsiak"),
+        recentOuting(1880674, GEAY, ["2026-03-07", "2026-03-08"], "good", 1600, ["4.1", "AD"], ["MarionO", 466185]),
+        recentOuting(1871490, GEAY, ["2026-02-07", "2026-02-08"], "good", 1900, ["4.1", "AD"], ["Apoutsiak", 1297]),
         recentOuting(
           1765476,
           "Mont pourri pas le glacier du Geay, face N du mont Turia et retour par le grand col",
@@ -1265,12 +1267,12 @@ const route54085 = {
           "good",
           2200,
           ["5.1", "TD-"],
-          "Brossollet",
+          ["Brossollet", 1363331],
         ),
-        recentOuting(1758144, GEAY, ["2025-04-10", "2025-04-10"], "good", 1425, ["4.1", "AD"], "HugoFS"),
-        recentOuting(1654405, GEAY, ["2024-06-13", "2024-06-13"], null, 1425, ["4.1", "AD"], "maxb"),
-        recentOuting(1637100, GEAY, ["2024-04-14", "2024-04-14"], "good", 1425, ["4.1", "AD"], "Tmaitre"),
-        recentOuting(1469382, GEAY, ["2022-03-15", "2022-03-16"], null, 1425, ["4.1", "AD"], "Aude.leglise"),
+        recentOuting(1758144, GEAY, ["2025-04-10", "2025-04-10"], "good", 1425, ["4.1", "AD"], ["HugoFS", 1547657]),
+        recentOuting(1654405, GEAY, ["2024-06-13", "2024-06-13"], null, 1425, ["4.1", "AD"], ["maxb", 769107], "empty"),
+        recentOuting(1637100, GEAY, ["2024-04-14", "2024-04-14"], "good", 1425, ["4.1", "AD"], ["Tmaitre", 1553329]),
+        recentOuting(1469382, GEAY, ["2022-03-15", "2022-03-16"], null, 1425, ["4.1", "AD"], ["Aude.leglise", 1469329], "empty"),
       ],
     },
   },
