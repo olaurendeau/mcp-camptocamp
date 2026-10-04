@@ -420,8 +420,8 @@ describe("handleGetRoute areas", () => {
   });
 });
 
-// Real GET /routes/53914 (Martine is on the rock, Aiguille Dibona), trimmed texts: the live API sends
-// null for unset values. Other fields (version, quality, route_types, maps…) omitted.
+// Real GET /routes/53914 (Martine is on the rock, Aiguille Dibona), texts trimmed to their first lines: the live
+// API sends null for unset values, and lift_access false. Untyped fields (version, quality, maps…) omitted.
 const route53914: api.RouteDetail = {
   document_id: 53914,
   locales: [
@@ -439,7 +439,14 @@ const route53914: api.RouteDetail = {
   elevation_max: 3131,
   height_diff_up: 412,
   height_diff_down: null,
+  height_diff_difficulties: 330,
+  height_diff_access: 80,
+  orientations: ["E"],
   durations: ["1", "2"],
+  route_types: ["loop_hut"],
+  configuration: ["face"],
+  glacier_gear: "crampons_spring",
+  lift_access: false,
   global_rating: "TD",
   engagement_rating: "I",
   risk_rating: null,
@@ -466,7 +473,7 @@ const route53914: api.RouteDetail = {
 };
 
 describe("handleGetRoute with the API's null fields", () => {
-  it("formats route 53914 with height_diff_down, risk_rating, exposition_rock_rating and aid_rating null, and its description, remarks, gear and route history as user-written text", async () => {
+  it("formats route 53914 with height_diff_down, risk_rating, exposition_rock_rating and aid_rating null, its practical facts, and its description, remarks, gear and route history as user-written text", async () => {
     mockGetRoute.mockResolvedValueOnce(route53914);
 
     const result = await handleGetRoute({ id: 53914 });
@@ -485,7 +492,14 @@ describe("handleGetRoute with the API's null fields", () => {
         "**Max elevation**: 3131m",
         "**Min elevation**: 2719m",
         "**Elevation gain**: 412m",
+        "**Difficulties height difference**: 330m",
+        "**Access height difference**: 80m",
+        "**Orientations**: E",
         "**Duration (days)**: 1, 2",
+        "**Route types**: loop_hut",
+        "**Configuration**: face",
+        "**Glacier gear**: crampons_spring",
+        "**Lift access**: no",
         "",
         "## Areas",
         "- [14274] France (country)",
@@ -1601,6 +1615,14 @@ describe("get_route practical facts", () => {
       "**Difficulties height difference**: 900m\n**Access height difference**: 300m\n**Orientations**: NW\n",
     );
     expect(result).toContain("**Glacier gear**: glacier_safety_gear\n**Lift access**: no\n");
+  });
+
+  it('prints glacier_gear "no" verbatim, as a value and not as a missing field', async () => {
+    mockGetRoute.mockResolvedValueOnce({ ...route54085Facts, glacier_gear: "no" });
+
+    const result = await handleGetRoute({ id: 54085 });
+
+    expect(result).toContain("**Configuration**: glacier\n**Glacier gear**: no\n**Lift access**: yes\n");
   });
 
   it("prints 0 height differences, and lists comma-separated and verbatim", async () => {
