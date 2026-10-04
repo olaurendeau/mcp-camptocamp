@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage } from "./paging.js";
+import { ACTIVITIES as OUTING_ACTIVITIES } from "./enums.js";
 import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
 import type { OutingSearchResponse, OutingDetail, OutingListItem, OutingListResponse } from "../api/camptocamp.js";
 import {
@@ -22,20 +23,6 @@ export const searchUserOutingsSchema = z.object({
 export const getOutingSchema = z.object({
   id: documentId("Outing ID from Camptocamp"),
 });
-
-export const OUTING_ACTIVITIES = [
-  "skitouring",
-  "snow_ice_mixed",
-  "mountain_climbing",
-  "rock_climbing",
-  "ice_climbing",
-  "hiking",
-  "snowshoeing",
-  "paragliding",
-  "mountain_biking",
-  "via_ferrata",
-  "slacklining",
-] as const;
 
 // The API answers 500 to impossible dates such as 2026-02-30, and ignores malformed ones.
 function isRealDate(s: string): boolean {
