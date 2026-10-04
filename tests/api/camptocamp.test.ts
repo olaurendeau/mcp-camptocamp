@@ -2188,8 +2188,8 @@ describe("getArticle", () => {
   });
 });
 
-// D1: `lang=fr` is a no-op on every endpoint; `pl=fr` makes a search return one locale per document,
-// French first with the API's own fallback. `pl` does nothing on detail endpoints, so they send nothing.
+// D1: `lang=fr` is a no-op on every endpoint; `pl=<lang>` (default fr) makes a search return one locale per
+// document, that language first with the API's own fallback. `pl` does nothing on details, so they send nothing.
 describe("locale parameters", () => {
   const searches: Array<[string, () => Promise<unknown>, string]> = [
     ["searchRoutes", () => searchRoutes({ query: "gamma" }), "/routes?q=gamma&limit=10&pl=fr"],
@@ -2212,6 +2212,27 @@ describe("locale parameters", () => {
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toBe(`${API}${expected}`);
     expect(new URL(url).searchParams.has("lang")).toBe(false);
+  });
+
+  // AC5.2, AC5.3: the requested language goes out as `pl`, in place of fr.
+  const searchesIn: Array<[string, (lang: string) => Promise<unknown>, string]> = [
+    ["searchRoutes", (lang) => searchRoutes({ query: "gamma", lang }), "/routes"],
+    ["searchWaypoints", (lang) => searchWaypoints({ query: "resegone", lang }), "/waypoints"],
+    ["searchOutings", (lang) => searchOutings({ area_id: 14403, lang }), "/outings"],
+    ["searchAreas", (lang) => searchAreas({ query: "valais", lang }), "/areas"],
+    ["searchBooks", (lang) => searchBooks({ query: "vallot", lang }), "/books"],
+    ["searchArticles", (lang) => searchArticles({ query: "crampons", lang }), "/articles"],
+  ];
+
+  it.each(searchesIn)("%s sends the requested lang as pl", async (_name, call, path) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await call("de");
+
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.pathname).toBe(path);
+    expect(url.searchParams.getAll("pl")).toEqual(["de"]);
+    expect(url.searchParams.has("lang")).toBe(false);
   });
 
   const details: Array<[string, (id: number) => Promise<unknown>, string]> = [
