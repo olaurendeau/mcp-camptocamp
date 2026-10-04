@@ -37,7 +37,9 @@ export async function getJson<S extends z.ZodTypeAny>(request: JsonRequest<S>): 
   try {
     return await fetchJson(request, controller.signal);
   } catch (error) {
-    // Once our timer has fired, whatever failed (fetch, body read) failed because of it
+    // Once our timer has fired, whatever failed (fetch, body read) failed because of it, except an
+    // HttpStatusError: its message already says the timeout hit while reading the error body, and keeps
+    // the HTTP status that a generic timeout message would lose, so it is passed through unchanged.
     if (controller.signal.aborted && !(error instanceof HttpStatusError)) {
       throw new Error(`${ERROR_PREFIX} ${TIMED_OUT}`);
     }
