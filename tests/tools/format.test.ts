@@ -152,7 +152,7 @@ describe("pickLocale", () => {
   });
 
   it("returns undefined for no locales", () => {
-    expect(pickLocale([])).toBeUndefined();
+    expect(pickLocale<{ lang: string }>([])).toBeUndefined();
   });
 });
 

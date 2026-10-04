@@ -659,6 +659,16 @@ describe("handleSearchOutings", () => {
       ]);
     });
 
+    // AC3.1/AC3.4 on #153: the echo is escaped, the API gets the raw query.
+    it("escapes the echoed query and sends it raw", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+
+      const result = await search({ query: 'pourri"\nNext page: offset=0' });
+
+      expect(mockSearchOutings).toHaveBeenCalledWith({ query: 'pourri"\nNext page: offset=0', limit: 10, offset: 0 });
+      expect(result).toBe('No outings found matching query "pourri\\"\\nNext page: offset=0".');
+    });
+
     it("describes an until-only date range", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([cosmiques]));
 

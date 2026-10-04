@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { documentId, searchOffset, searchQuery } from "./inputs.js";
-import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
+import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointDetail } from "../api/camptocamp.js";
 import {
@@ -150,7 +150,7 @@ export async function handleSearchWaypoints(input: SearchWaypointsInput): Promis
 
   const response = await searchWaypoints({ query, limit, offset, area_id, waypoint_type });
   const filters: string[] = [];
-  if (query !== undefined) filters.push(`query "${query}"`);
+  if (query !== undefined) filters.push(`query ${quote(query)}`);
   if (area_id !== undefined) filters.push(`area ${area_id}`);
   if (waypoint_type !== undefined) filters.push(`waypoint type ${waypoint_type}`);
   return formatSearchPage({

@@ -39,7 +39,7 @@ interface Search {
 
 // authorSchema falls back to null on a malformed author, so a renamed field would silently drop the
 // Author line everywhere: documents that carry an author must keep it after parsing.
-const AUTHOR = { name: expect.any(String), user_id: expect.any(Number) };
+const AUTHOR: Record<string, unknown> = { name: expect.any(String), user_id: expect.any(Number) };
 
 // Whether the dates start → end (YYYY-MM-DD) cover at least one day of June in some year.
 function overlapsJune(start: string, end: string): boolean {

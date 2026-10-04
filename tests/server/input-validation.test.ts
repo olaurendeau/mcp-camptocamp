@@ -76,7 +76,7 @@ describe("integer ID inputs", () => {
 
     expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(String(fetchMock.mock.calls[0][0])).toContain(String(ACCEPTED_ID));
+    expect(fetchMock.mock.calls[0][0] as string).toContain(String(ACCEPTED_ID));
   });
 
   describe.each(UNSAFE_IDS)("rejects %d", (unsafeId) => {
@@ -173,7 +173,7 @@ describe("search query inputs", () => {
 
     expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.has("q")).toBe(false);
+    expect(new URL(fetchMock.mock.calls[0][0] as string).searchParams.has("q")).toBe(false);
   });
 });
 
@@ -232,7 +232,7 @@ describe("search_outings field inputs", () => {
     const result = await client.callTool({ name: "search_outings", arguments: {} });
 
     expect(resultText(result)).toBe("No outings found.");
-    const params = new URL(String(fetchMock.mock.calls[0][0])).searchParams;
+    const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
     expect(params.get("limit")).toBe("10");
     expect(params.get("offset")).toBe("0");
   });
@@ -327,7 +327,7 @@ describe("cross-field rules", () => {
       await client.callTool({ name: tool, arguments: { query: "pourri", offset: 9990, limit: 10 } });
       await client.callTool({ name: tool, arguments: { query: "pourri" } });
 
-      const [paged, first] = fetchMock.mock.calls.map((call) => new URL(String(call[0])).searchParams);
+      const [paged, first] = fetchMock.mock.calls.map((call) => new URL(call[0] as string).searchParams);
       expect(paged.get("offset")).toBe("9990");
       expect(paged.get("limit")).toBe("10");
       expect(first.get("offset")).toBe("0");
@@ -370,7 +370,7 @@ describe("cross-field rules", () => {
       arguments: { user_id: 430052, period_start: "06-01", period_end: "06-30" },
     });
 
-    const params = new URL(String(fetchMock.mock.calls[0][0])).searchParams;
+    const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
     expect(params.get("period")).toBe("2020-06-01,2020-06-30");
     expect(params.get("u")).toBe("430052");
   });
@@ -443,7 +443,7 @@ describe("search_routes field inputs", () => {
     });
     await client.callTool({ name: "search_routes", arguments: { waypoint_id: 37916, activity: "skitouring" } });
 
-    const [first, second] = fetchMock.mock.calls.map(([url]) => new URL(String(url)).searchParams);
+    const [first, second] = fetchMock.mock.calls.map(([url]) => new URL(url as string).searchParams);
     expect(Object.fromEntries(first)).toEqual({
       limit: "10",
       offset: "0",
@@ -495,7 +495,7 @@ describe("search_waypoints and search_books type inputs", () => {
       arguments: { query: "vanoise", book_type: "topo", activity: "skitouring" },
     });
 
-    const [waypoints, books] = fetchMock.mock.calls.map(([url]) => new URL(String(url)).searchParams);
+    const [waypoints, books] = fetchMock.mock.calls.map(([url]) => new URL(url as string).searchParams);
     expect(Object.fromEntries(waypoints)).toEqual({ q: "pourri", limit: "10", offset: "0", pl: "fr", wtyp: "hut" });
     expect(Object.fromEntries(books)).toEqual({
       q: "vanoise",

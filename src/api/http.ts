@@ -33,7 +33,9 @@ class BodyTooLargeError extends Error {}
 // after 15 s; it covers the fetch, the body read and its validation.
 export async function getJson<S extends z.ZodTypeAny>(request: JsonRequest<S>): Promise<z.infer<S>> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, TIMEOUT_MS);
   try {
     return await fetchJson(request, controller.signal);
   } catch (error) {
@@ -41,7 +43,7 @@ export async function getJson<S extends z.ZodTypeAny>(request: JsonRequest<S>): 
     // HttpStatusError: its message already says the timeout hit while reading the error body, and keeps
     // the HTTP status that a generic timeout message would lose, so it is passed through unchanged.
     if (controller.signal.aborted && !(error instanceof HttpStatusError)) {
-      throw new Error(`${ERROR_PREFIX} ${TIMED_OUT}`);
+      throw new Error(`${ERROR_PREFIX} ${TIMED_OUT}`, { cause: error });
     }
     throw error;
   } finally {
@@ -61,7 +63,7 @@ async function fetchJson<S extends z.ZodTypeAny>(
       signal,
     });
   } catch (error) {
-    throw new Error(`${ERROR_PREFIX} network error (${networkErrorDetail(error)})`);
+    throw new Error(`${ERROR_PREFIX} network error (${networkErrorDetail(error)})`, { cause: error });
   }
   if (!response.ok) {
     throw new HttpStatusError(await httpErrorMessage(response, document, signal));
@@ -110,11 +112,11 @@ function parseBody<S extends z.ZodTypeAny>(text: string, schema: S): z.infer<S> 
   }
   const result = schema.safeParse(body);
   if (!result.success) {
-    const [issue] = result.error.issues;
+    const [issue] = result.error.issues as [z.ZodIssue, ...z.ZodIssue[]]; // a failed parse has at least one
     const location = issue.path.join(".");
     throw new Error(`${ERROR_PREFIX} unexpected response (${location ? `${location}: ` : ""}${issue.message})`);
   }
-  return result.data;
+  return result.data as z.infer<S>; // safeParse on a generic schema types its data as any
 }
 
 // fetch rejects with TypeError("fetch failed") and puts the useful part (e.g. code ENOTFOUND) in `cause`.

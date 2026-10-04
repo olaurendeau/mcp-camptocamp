@@ -10,6 +10,23 @@ export function assertResultWindow(offset: number, limit: number): void {
   }
 }
 
+const ESCAPES: Record<string, string> = { '"': '\\"', "\\": "\\\\", "\n": "\\n", "\r": "\\r", "\t": "\\t" };
+
+/**
+ * Wraps user input echoed in an output line in double quotes, on one line, so it cannot fake a
+ * line of its own (e.g. a `Next page:` footer): `"`, `\`, LF, CR and tab escape as in JSON; other
+ * C0 and C1 controls, DEL, U+2028 and U+2029 as `\uxxxx`; every other character is unchanged.
+ */
+export function quote(value: string): string {
+  let escaped = "";
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    const control = code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+    escaped += ESCAPES[char] ?? (control ? `\\u${code.toString(16).padStart(4, "0")}` : char);
+  }
+  return `"${escaped}"`;
+}
+
 export interface SearchPage {
   /** Singular document kind, e.g. "outing". */
   kind: string;

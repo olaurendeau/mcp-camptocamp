@@ -327,7 +327,9 @@ describe("timeout", () => {
     fetchMock.mockImplementationOnce(
       (_url, init) =>
         new Promise((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+          init?.signal?.addEventListener("abort", () => {
+            reject(init.signal?.reason as Error);
+          });
         }),
     );
     const client = await connect();
@@ -350,6 +352,7 @@ describe("non-Error throws", () => {
   it("are turned into an error result with their string form", async () => {
     vi.resetModules();
     vi.doMock("../../src/api/http.js", () => ({
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- a non-Error rejection is the case under test
       getJson: () => Promise.reject("upstream exploded"),
     }));
     const { createServer } = await import("../../src/server.js");

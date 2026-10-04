@@ -25,8 +25,8 @@ describe("throughSchema", () => {
     ["mockResolvedValue", (mock) => mock.mockResolvedValue(fixture)],
     ["mockReturnValueOnce", (mock) => mock.mockReturnValueOnce(Promise.resolve(fixture))],
     ["mockReturnValue", (mock) => mock.mockReturnValue(Promise.resolve(fixture))],
-    ["mockImplementationOnce", (mock) => mock.mockImplementationOnce(async () => fixture)],
-    ["mockImplementation", (mock) => mock.mockImplementation(async () => fixture)],
+    ["mockImplementationOnce", (mock) => mock.mockImplementationOnce(() => Promise.resolve(fixture))],
+    ["mockImplementation", (mock) => mock.mockImplementation(() => Promise.resolve(fixture))],
   ])("parses a fixture set with %s through the schema", async (_, setFixture) => {
     const mock = getSummit();
     setFixture(mock);
@@ -38,7 +38,7 @@ describe("throughSchema", () => {
     const mock = getSummit();
 
     await mock.withImplementation(
-      async () => fixture,
+      () => Promise.resolve(fixture),
       async () => {
         await expect(mock(37355)).resolves.toEqual(parsed);
       },
@@ -49,7 +49,7 @@ describe("throughSchema", () => {
     const mock = getSummit();
 
     const result = mock.withImplementation(
-      async () => fixture,
+      () => Promise.resolve(fixture),
       async () => {
         await expect(mock(37355)).resolves.toEqual(parsed);
       },
@@ -63,7 +63,7 @@ describe("throughSchema", () => {
 
     expect(
       mock.withImplementation(
-        async () => fixture,
+        () => Promise.resolve(fixture),
         () => undefined,
       ),
     ).toBe(mock);
