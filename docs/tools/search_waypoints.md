@@ -28,6 +28,63 @@ Find summits, huts, passes, crags and other waypoints by name, by area, or both,
 
 <!-- generated:inputs end -->
 
+## Output format
+
+The output is plain text, in this order:
+
+1. `Found <total> waypoint(s). Showing <n> from offset <offset>:`, where `<total>` counts every match on Camptocamp.
+2. `Filters: …`, which repeats the filters applied: `query "…"`, `area <id>` and `waypoint type <type>`. The query is printed between double quotes, with quotes, backslashes and line breaks escaped, so it always stays on one line.
+3. A blank line, then one line per waypoint, in Camptocamp's order:
+
+   ```text
+   - [<id>] <title> (<waypoint_type>) | <elevation>m
+   ```
+
+   The elevation is left out when Camptocamp has none, and always for a `virtual` waypoint. A waypoint Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`, or by `- (not shown: Camptocamp sent an item in an unexpected format)` when its ID is unreadable. See [Missing data](../using-with-llms.md#missing-data).
+
+4. When more waypoints follow, a blank line and a footer: `Next page: offset=N`, `Next page: offset=N (limit at most M)` near the end of the 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` See [Paging](../using-with-llms.md#paging).
+
+When nothing matches, the whole output is one line: `No waypoints found matching <filters>.`
+
+## Example
+
+`search_waypoints {area_id: 14409, waypoint_type: "hut", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+```text
+Found 41 waypoint(s). Showing 3 from offset 0:
+Filters: area 14409, waypoint type hut
+
+- [1688175] Ferme refuge du Vallon d'en Haut (hut) | 2290m
+- [1678196] Refuge d'Entre Le lac (hut) | 2143m
+- [1603319] Chalet CAF de Bonneval sur Arc  (hut) | 1810m
+
+Next page: offset=3
+```
+
+- The 41 waypoints are the huts of the Vanoise range (`area_id` 14409, from [`search_areas`](search_areas.md)).
+- Titles are printed as Camptocamp stores them: the third title ends with a space, hence the two spaces before `(hut)`.
+- A hut's places, custodianship and access period are only in [`get_waypoint`](get_waypoint.md): `get_waypoint {id: 1603319}`.
+
+To find one summit by name, see [The altitude of a summit](../using-with-llms.md#the-altitude-of-a-summit), which uses `search_waypoints {query: "polset", waypoint_type: "summit", limit: 3}`.
+
+## Limits
+
+- **A query, an area or both.** `waypoint_type` only narrows a `query` or an `area_id`; on its own it is refused before any request. `search_waypoints {waypoint_type: "hut", limit: 3}`, captured from v1.3.0 on 2026-10-05:
+
+  ```text
+  Error: search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.
+  ```
+
+  A blank `query` counts as no query.
+
+- **One type per call.** `waypoint_type` takes one of the 26 values listed in Inputs, and any other value is refused with the valid list. A summit and a hut with the same name are two waypoints: pass `waypoint_type` to keep only one kind.
+- **Several waypoints can share a name.** When the question does not say which one, name the candidates with their IDs and elevations.
+- **Virtual waypoints.** A `virtual` waypoint groups documents and has no real location, so its line has no elevation. See [Missing data](../using-with-llms.md#missing-data).
+- **Unknown area IDs return nothing.** An unknown `area_id` gives no results, not an error: `No waypoints found matching area 999999999.` for `search_waypoints {area_id: 999999999, limit: 3}`, captured from v1.3.0 on 2026-10-05.
+- **Paging.** `limit` is 1 to 50, and `offset + limit` cannot exceed 10,000: Camptocamp only returns the first 10,000 results of a search.
+- **Language.** `lang` picks the language of titles; a waypoint without a title in that language shows its title in the first language available. Searches print no `**Language**` line: see [Language](../using-with-llms.md#language).
+- **The elevation is all a result gives.** For coordinates, hut details and the routes of a waypoint, call [`get_waypoint`](get_waypoint.md).
+
 ## Related tools
 
 - [`search_areas`](search_areas.md): find the `area_id` of a region.
