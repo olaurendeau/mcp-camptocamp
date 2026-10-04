@@ -152,10 +152,10 @@ describe("handleSearchWaypoints with area_id", () => {
 
     await handleSearchWaypoints({ query: "refuge", limit: 10, area_id: 14403 });
 
-    expect(mockSearchWaypoints).toHaveBeenCalledWith("refuge", 10, undefined, 14403);
+    expect(mockSearchWaypoints).toHaveBeenCalledWith({ query: "refuge", limit: 10, area_id: 14403 });
   });
 
-  it("passes an undefined area to the API and keeps today's messages without area_id", async () => {
+  it("passes no area to the API and keeps today's messages without area_id", async () => {
     mockSearchWaypoints.mockResolvedValueOnce({
       total: 12,
       documents: [
@@ -170,7 +170,7 @@ describe("handleSearchWaypoints with area_id", () => {
 
     const result = await handleSearchWaypoints({ query: "x", limit: 10 });
 
-    expect(mockSearchWaypoints).toHaveBeenCalledWith("x", 10, undefined, undefined);
+    expect(mockSearchWaypoints).toHaveBeenCalledWith({ query: "x", limit: 10 });
     expect(result.split("\n")[0]).toBe("Found 12 waypoint(s). Showing 1:");
 
     mockSearchWaypoints.mockResolvedValueOnce({ total: 0, documents: [] });
@@ -211,7 +211,7 @@ describe("handleSearchWaypoints with area_id", () => {
     expect(result).toBe("No waypoints found in area 14403.");
   });
 
-  it("searches by area_id alone, passing query as undefined", async () => {
+  it("searches by area_id alone, without a query", async () => {
     mockSearchWaypoints.mockResolvedValueOnce({
       total: 37,
       documents: [
@@ -226,7 +226,7 @@ describe("handleSearchWaypoints with area_id", () => {
 
     const result = await handleSearchWaypoints({ area_id: 14403, limit: 10 });
 
-    expect(mockSearchWaypoints).toHaveBeenCalledWith(undefined, 10, undefined, 14403);
+    expect(mockSearchWaypoints).toHaveBeenCalledWith({ limit: 10, area_id: 14403 });
     expect(result).toContain("in area 14403");
   });
 
@@ -246,7 +246,7 @@ describe("handleSearchWaypoints with area_id", () => {
 
     await handleSearchWaypoints({ query: "  ", limit: 10, area_id: 14403 });
 
-    expect(mockSearchWaypoints).toHaveBeenCalledWith(undefined, 10, undefined, 14403);
+    expect(mockSearchWaypoints).toHaveBeenCalledWith({ limit: 10, area_id: 14403 });
   });
 });
 

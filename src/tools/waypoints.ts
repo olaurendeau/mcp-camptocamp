@@ -84,7 +84,7 @@ export async function handleSearchWaypoints(input: SearchWaypointsInput): Promis
   if (query === undefined && input.area_id === undefined) {
     throw new Error("search_waypoints needs a query, an area_id, or both. Use search_areas to find an area_id.");
   }
-  const response = await searchWaypoints(query, input.limit, undefined, input.area_id);
+  const response = await searchWaypoints({ query, limit: input.limit, area_id: input.area_id });
   return formatWaypointSearchResult(response, input.area_id);
 }
 

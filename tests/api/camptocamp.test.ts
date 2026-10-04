@@ -48,7 +48,7 @@ describe("searchRoutes", () => {
 
     mockFetch.mockResolvedValueOnce(makeResponse(mockData));
 
-    const result = await searchRoutes("Mont Blanc");
+    const result = await searchRoutes({ query: "Mont Blanc" });
 
     expect(mockFetch).toHaveBeenCalledOnce();
     const url = mockFetch.mock.calls[0][0] as string;
@@ -61,20 +61,18 @@ describe("searchRoutes", () => {
     expect(result.documents[0].locales[0].title).toBe("Voie normale Mont Blanc");
   });
 
-  it("respects custom limit and lang", async () => {
+  it("puts a custom limit in the URL", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 
-    await searchRoutes("test", 5, "en");
+    await searchRoutes({ query: "test", limit: 5 });
 
-    const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain("limit=5");
-    expect(url).toContain("lang=en");
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/routes?q=test&limit=5&lang=fr`);
   });
 
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
 
-    await expect(searchRoutes("test")).rejects.toThrow("Camptocamp API error: 500");
+    await expect(searchRoutes({ query: "test" })).rejects.toThrow("Camptocamp API error: 500");
   });
 });
 
@@ -123,7 +121,7 @@ describe("searchWaypoints", () => {
 
     mockFetch.mockResolvedValueOnce(makeResponse(mockData));
 
-    const result = await searchWaypoints("Mont Blanc");
+    const result = await searchWaypoints({ query: "Mont Blanc" });
 
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain("/waypoints");
@@ -136,7 +134,7 @@ describe("searchWaypoints", () => {
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 503));
 
-    await expect(searchWaypoints("test")).rejects.toThrow("Camptocamp API error: 503");
+    await expect(searchWaypoints({ query: "test" })).rejects.toThrow("Camptocamp API error: 503");
   });
 });
 
@@ -188,7 +186,7 @@ describe("searchUserOutings", () => {
 
     mockFetch.mockResolvedValueOnce(makeResponse(mockData));
 
-    const result = await searchUserOutings(430052);
+    const result = await searchUserOutings({ user_id: 430052 });
 
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain("/outings");
@@ -200,20 +198,18 @@ describe("searchUserOutings", () => {
     expect(result.documents[0].author?.name).toBe("o.laurendeau");
   });
 
-  it("respects custom limit and lang", async () => {
+  it("puts a custom limit in the URL", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 
-    await searchUserOutings(430052, 5, "en");
+    await searchUserOutings({ user_id: 430052, limit: 5 });
 
-    const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain("limit=5");
-    expect(url).toContain("lang=en");
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?u=430052&limit=5&lang=fr`);
   });
 
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
 
-    await expect(searchUserOutings(430052)).rejects.toThrow("Camptocamp API error: 500");
+    await expect(searchUserOutings({ user_id: 430052 })).rejects.toThrow("Camptocamp API error: 500");
   });
 });
 
@@ -327,7 +323,7 @@ describe("searchAreas", () => {
   it("calls the exact areas URL and returns the parsed response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [AREA_ECRINS], total: 1 }));
 
-    const result = await searchAreas("ecrins");
+    const result = await searchAreas({ query: "ecrins" });
 
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/areas?q=ecrins&limit=10&lang=fr`);
@@ -339,7 +335,7 @@ describe("searchAreas", () => {
   it("adds atyp only when an area type is given, keeping the real locale order", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [AREA_VALAIS_E], total: 2 }));
 
-    const result = await searchAreas("valais", 10, "fr", "range");
+    const result = await searchAreas({ query: "valais", area_type: "range" });
 
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toBe(`${API}/areas?q=valais&limit=10&lang=fr&atyp=range`);
@@ -360,7 +356,7 @@ describe("searchAreas", () => {
       json: () => Promise.resolve({}),
     });
 
-    await expect(searchAreas("ecrins")).rejects.toThrow("Camptocamp API error: 500 Error");
+    await expect(searchAreas({ query: "ecrins" })).rejects.toThrow("Camptocamp API error: 500 Error");
   });
 });
 
@@ -431,7 +427,7 @@ describe("area filter on searchRoutes and searchWaypoints", () => {
       it("keeps the URL unchanged without an area", async () => {
         mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 
-        await fn("Mont Blanc");
+        await fn({ query: "Mont Blanc" });
 
         expect(mockFetch.mock.calls[0][0]).toBe(`${API}/${path}?q=Mont+Blanc&limit=10&lang=fr`);
       });
@@ -439,15 +435,25 @@ describe("area filter on searchRoutes and searchWaypoints", () => {
       it("appends a= after the existing parameters when an area is given", async () => {
         mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 
-        await fn("couloir", 10, "fr", 14403);
+        await fn({ query: "couloir", limit: 10, area_id: 14403 });
 
         expect(mockFetch.mock.calls[0][0]).toBe(`${API}/${path}?q=couloir&limit=10&lang=fr&a=14403`);
       });
 
-      it("omits q= when the query is undefined", async () => {
+      it("omits q= when no query is given", async () => {
         mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 
-        await fn(undefined, 10, "fr", 14403);
+        await fn({ limit: 10, area_id: 14403 });
+
+        const url = mockFetch.mock.calls[0][0] as string;
+        expect(url).toBe(`${API}/${path}?limit=10&lang=fr&a=14403`);
+        expect(url).not.toContain("q=");
+      });
+
+      it("omits q= when the query key is set to undefined, as the tool handlers send it", async () => {
+        mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+        await fn({ query: undefined, limit: 10, area_id: 14403 });
 
         const url = mockFetch.mock.calls[0][0] as string;
         expect(url).toBe(`${API}/${path}?limit=10&lang=fr&a=14403`);
@@ -754,7 +760,7 @@ describe("searchBooks", () => {
     };
     mockFetch.mockResolvedValueOnce(makeResponse(mockData));
 
-    const result = await searchBooks("vallot");
+    const result = await searchBooks({ query: "vallot" });
 
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books?q=vallot&limit=10&lang=fr`);
@@ -765,20 +771,18 @@ describe("searchBooks", () => {
     expect(result.documents[3].activities).toBeNull();
   });
 
-  it("puts custom limit and lang in the URL", async () => {
+  it("puts a custom limit in the URL", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 
-    await searchBooks("x", 5, "en");
+    await searchBooks({ query: "x", limit: 5 });
 
-    const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain("limit=5");
-    expect(url).toContain("lang=en");
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/books?q=x&limit=5&lang=fr`);
   });
 
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
 
-    await expect(searchBooks("vallot")).rejects.toThrow("Camptocamp API error: 500 Error");
+    await expect(searchBooks({ query: "vallot" })).rejects.toThrow("Camptocamp API error: 500 Error");
   });
 });
 
@@ -971,7 +975,7 @@ describe("searchArticles", () => {
     };
     mockFetch.mockResolvedValueOnce(makeResponse(mockData));
 
-    const result = await searchArticles("crampons", 10);
+    const result = await searchArticles({ query: "crampons", limit: 10 });
 
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=crampons&limit=10&lang=fr`);
@@ -1005,7 +1009,7 @@ describe("searchArticles", () => {
     };
     mockFetch.mockResolvedValueOnce(makeResponse(mockData));
 
-    const result = await searchArticles("Du lointain nous nous rappellons", 10);
+    const result = await searchArticles({ query: "Du lointain nous nous rappellons", limit: 10 });
 
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=Du+lointain+nous+nous+rappellons&limit=10&lang=fr`);
     expect(result.total).toBe(1);
@@ -1014,20 +1018,18 @@ describe("searchArticles", () => {
     expect(result.documents[0].categories).toEqual(["stories"]);
   });
 
-  it("puts custom limit and lang in the URL", async () => {
+  it("puts a custom limit in the URL", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 
-    await searchArticles("x", 5, "en");
+    await searchArticles({ query: "x", limit: 5 });
 
-    const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain("limit=5");
-    expect(url).toContain("lang=en");
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/articles?q=x&limit=5&lang=fr`);
   });
 
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
 
-    await expect(searchArticles("crampons")).rejects.toThrow("Camptocamp API error: 500 Error");
+    await expect(searchArticles({ query: "crampons" })).rejects.toThrow("Camptocamp API error: 500 Error");
   });
 });
 

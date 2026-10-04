@@ -257,7 +257,7 @@ export async function handleSearchOutings(input: SearchOutingsInput): Promise<st
 }
 
 export async function handleSearchUserOutings(input: SearchUserOutingsInput): Promise<string> {
-  const response = await searchUserOutings(input.user_id, input.limit);
+  const response = await searchUserOutings(input);
   return formatOutingSearchResult(response, input.user_id);
 }
 
