@@ -133,6 +133,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `search_articles`     | Search articles (gear, technique, environment, stories) by keyword; collab or personal type; paged with `offset` |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)                       |
 
+Virtual waypoints (`waypoint_type` `virtual`) are groupings with no real location: no tool prints their elevation or coordinates.
+
 `search_routes` needs at least one filter (D5 on #58); any one is enough. Rating bounds are checked against the scale of `rating_system` (`ROUTE_RATING_SYSTEMS` in `src/tools/ratings.ts`) and list values against `src/tools/enums.ts` before any request, since Camptocamp silently ignores an unknown value (R7). The same goes for `waypoint_type` on `search_waypoints` (`WAYPOINT_TYPES`, 26 values; not a filter on its own, so a query or `area_id` is still required) and `book_type` / `activity` on `search_books` (`BOOK_TYPES`, 9 values; `ACTIVITIES`).
 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.

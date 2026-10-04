@@ -1017,6 +1017,32 @@ describe("handleGetBook", () => {
     expect(result).not.toContain("- [37586] Aiguille des Glaciers (summit) |");
   });
 
+  it("prints no elevation for a virtual waypoint, even a non-zero one", async () => {
+    // Derived: no sampled book links a virtual waypoint; waypoint 1947492 as the live GET /routes/944120
+    // lists it (2026-10-04), with its placeholder elevation 0 set to 7999, added to the 209293 fixture.
+    mockGetBook.mockResolvedValueOnce({
+      ...BOOK_209293,
+      associations: {
+        waypoints: [
+          {
+            document_id: 1947492,
+            locales: [
+              { lang: "en", title: "First Ascents in 2013" },
+              { lang: "fr", title: "Ouvertures 2013" },
+            ],
+            waypoint_type: "virtual",
+            elevation: 7999,
+          },
+        ],
+      },
+    });
+
+    const result = await handleGetBook({ id: 209293 });
+
+    expect(result).toContain("\n## Associated waypoints\n- [1947492] Ouvertures 2013 (virtual)");
+    expect(result).not.toContain("7999m");
+  });
+
   it("looks up the fr title of a waypoint whose first locale is another language", async () => {
     // Derived: waypoint 37355 of the live 209293 response, with only its live it ("Monte Bianco") and fr
     // ("Mont Blanc") locales, put in it-then-fr order (live order is fr first), and its live elevation.
