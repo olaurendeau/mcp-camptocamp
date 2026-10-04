@@ -206,8 +206,9 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "string",
       },
       "date_to": {
-        "$ref": "#/properties/date_from",
         "description": "Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string",
       },
       "limit": {
         "default": 10,
@@ -223,8 +224,9 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "integer",
       },
       "period_end": {
-        "$ref": "#/properties/period_start",
         "description": "Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30)",
+        "pattern": "^\\d{2}-\\d{2}$",
+        "type": "string",
       },
       "period_start": {
         "description": "First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01)",

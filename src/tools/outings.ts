@@ -35,18 +35,22 @@ function isRealDate(s: string): boolean {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === s;
 }
 
+// Factories, not shared instances: a shared instance becomes a JSON Schema `$ref` to the first
+// field using it, and strict clients then show that field's description for the others.
 const DATE_MESSAGE = "must be a real date in YYYY-MM-DD format";
-const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, DATE_MESSAGE)
-  .refine(isRealDate, DATE_MESSAGE);
+const isoDate = () =>
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, DATE_MESSAGE)
+    .refine(isRealDate, DATE_MESSAGE);
 
 // A day of the year for `period`, checked in 2020 (a leap year) like the API layer sends it.
 const PERIOD_DAY_MESSAGE = "must be a real day in MM-DD format (e.g. 06-01; 02-29 allowed)";
-const periodDay = z
-  .string()
-  .regex(/^\d{2}-\d{2}$/, PERIOD_DAY_MESSAGE)
-  .refine((s) => isRealDate(`2020-${s}`), PERIOD_DAY_MESSAGE);
+const periodDay = () =>
+  z
+    .string()
+    .regex(/^\d{2}-\d{2}$/, PERIOD_DAY_MESSAGE)
+    .refine((s) => isRealDate(`2020-${s}`), PERIOD_DAY_MESSAGE);
 
 export const searchOutingsSchema = z.object({
   query: searchQuery("Keyword matched against outing titles (e.g. 'cosmiques')", { allowBlank: true }).optional(),
@@ -57,16 +61,16 @@ export const searchOutingsSchema = z.object({
     })
     .optional()
     .describe(`Activity, one of: ${OUTING_ACTIVITIES.join(", ")}`),
-  date_from: isoDate
+  date_from: isoDate()
     .optional()
     .describe("Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it"),
-  date_to: isoDate
+  date_to: isoDate()
     .optional()
     .describe("Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it"),
-  period_start: periodDay
+  period_start: periodDay()
     .optional()
     .describe("First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01)"),
-  period_end: periodDay
+  period_end: periodDay()
     .optional()
     .describe("Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30)"),
   route_id: documentId("Camptocamp route ID from search_routes").optional(),

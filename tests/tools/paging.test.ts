@@ -37,6 +37,18 @@ describe("formatSearchPage", () => {
     );
   });
 
+  // A note can qualify the empty result itself (e.g. a filter that can miss documents).
+  it("keeps the notes after the nothing-found line", () => {
+    const notes = ["Note: first note", "Note: second note"];
+
+    expect(
+      formatSearchPage({ kind: "outing", total: 0, offset: 0, limit: 10, lines: [], filters: ["area 1"], notes }),
+    ).toBe("No outings found matching area 1.\nNote: first note\nNote: second note");
+    expect(formatSearchPage({ kind: "outing", total: 0, offset: 0, limit: 10, lines: [], notes })).toBe(
+      "No outings found.\nNote: first note\nNote: second note",
+    );
+  });
+
   it("prints the header, the filters, a blank line and the lines", () => {
     const result = formatSearchPage({
       kind: "waypoint",

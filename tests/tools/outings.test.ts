@@ -580,6 +580,17 @@ describe("handleSearchOutings", () => {
       expect(result).not.toContain("Note:");
     });
 
+    // The period filter can drop boundary days, so "nothing found" is not stated as a plain fact.
+    it("keeps the boundary-day note when nothing matches the period", async () => {
+      mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+
+      const result = await search({ waypoint_id: 37916, period_start: "07-14", period_end: "07-14" });
+
+      expect(result).toBe(
+        `No outings found matching period 07-14 → 07-14 of every year, waypoint 37916.\n${PERIOD_NOTE}`,
+      );
+    });
+
     it("names the user when nothing matches", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([]));
 
