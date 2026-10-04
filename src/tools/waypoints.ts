@@ -49,10 +49,12 @@ function parseCoordinates(geom?: string | null): { lat: number; lng: number } | 
   }
 }
 
-// On a hut, capacity counts the unstaffed places (the winter room) and capacity_staffed the places when
-// wardened; on other types (bivouac, gîte…) capacity is just the number of places.
+// capacity counts the places open outside the wardened period (a hut's winter room) and capacity_staffed
+// the places when wardened, on huts, gîtes and camp sites alike; only a bivouac's capacity is just its number
+// of places (c2c_ui src/translations/fr.json labels capacity "Nombre de places hors gardiennage", and
+// "Nombre de places" in the bivouac context).
 function formatHutLines(waypoint: WaypointDetail): string[] {
-  const capacityLabel = waypoint.waypoint_type === "hut" ? "Capacity (unstaffed)" : "Capacity";
+  const capacityLabel = waypoint.waypoint_type === "bivouac" ? "Capacity" : "Capacity (unstaffed)";
   const fields: Array<[string, string | number | null | undefined]> = [
     [capacityLabel, waypoint.capacity],
     ["Capacity (staffed)", waypoint.capacity_staffed],
@@ -125,7 +127,7 @@ export const waypointToolDefinitions = [
     name: "get_waypoint",
     title: "Get waypoint details",
     description:
-      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, hut capacity (unstaffed and staffed), custodianship, phones and website, summary, description, access, access period (free text, as written), and the areas it belongs to (range, admin_limits, country). " +
+      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, capacity (for huts, gîtes and camp sites: places outside the wardened period, then places when wardened; for a bivouac: its number of places), custodianship, phones and website, summary, description, access, access period (free text, as written), and the areas it belongs to (range, admin_limits, country). " +
       CUSTODIANSHIP_NOTE +
       " Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,

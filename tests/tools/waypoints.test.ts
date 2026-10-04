@@ -539,6 +539,32 @@ describe("get_waypoint hut details", () => {
     expect(result.split("\n").slice(2)).toEqual(["", "**Type**: bivouac", "**Elevation**: 2084m", "**Capacity**: 12"]);
   });
 
+  it("labels a gîte's capacity Capacity (unstaffed) next to its staffed capacity", async () => {
+    // Trimmed from the live GET /waypoints/1931523?lang=fr response (2026-10-04): geometry, areas,
+    // associations and the sl locale's text fields dropped.
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 1931523,
+      locales: [{ lang: "sl", title: "Koča Antona Bavčerja na Čavnu" }],
+      waypoint_type: "gite",
+      elevation: 1242,
+      capacity: 10,
+      capacity_staffed: 40,
+      custodianship: "always_accessible",
+      phone: null,
+      phone_custodian: null,
+      url: "https://mapzs.pzs.si/poi/1062",
+    });
+
+    const result = await handleGetWaypoint({ id: 1931523 });
+
+    expect(result.split("\n").slice(5)).toEqual([
+      "**Capacity (unstaffed)**: 10",
+      "**Capacity (staffed)**: 40",
+      "**Custodianship**: always_accessible",
+      "**Website**: https://mapzs.pzs.si/poi/1062",
+    ]);
+  });
+
   it("prints an unknown custodianship verbatim", async () => {
     mockGetWaypoint.mockResolvedValueOnce({ ...hut104151, custodianship: "seasonal_key_box" });
 

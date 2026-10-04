@@ -143,8 +143,9 @@ export const waypointDetailSchema = z.object({
   ),
   waypoint_type: z.string(),
   elevation: z.number().nullish(),
-  // Hut fields, null on other waypoint types. capacity is the unstaffed capacity on a hut (0 when the
-  // hut has no winter room, waypoint 273946); custodianship is printed verbatim (src/tools/enums.ts).
+  // Hut fields, also set on gîtes and camp sites, null elsewhere. capacity is the number of places outside
+  // the wardened period (0 when a hut has no winter room, waypoint 273946), or a bivouac's number of places;
+  // custodianship is printed verbatim (src/tools/enums.ts).
   capacity: z.number().nullish(),
   capacity_staffed: z.number().nullish(),
   custodianship: z.string().nullish(),
