@@ -279,3 +279,71 @@ export function checkSources(text: string): string[] {
   }
   return problems;
 }
+
+/** The content of the file at `path`, or undefined if it is missing or not a file. */
+function readExistingFile(path: string): string | undefined {
+  return existsSync(path) && statSync(path).isFile() ? readFileSync(path, "utf8") : undefined;
+}
+
+const LAST_VERIFIED = /^Last verified: (\d{4}-\d{2}-\d{2}) against official docs$/m;
+const MATRIX_COLUMNS = ["Client", "Works?", "Page", "Last verified"];
+
+/** The body of the `## <title>` section of `text`, up to the next `## ` heading, or undefined without one. */
+export function section(text: string, title: string): string | undefined {
+  const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^## ${escaped}\\s*$([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, "m").exec(text)?.[1];
+}
+
+/**
+ * Problems with the `## Support matrix` of the docs index `file` (content `text`): its columns, a page link and
+ * the page's own `Last verified` date in each row, and a row for each of `pages`. `readPage` returns a page's
+ * content, or undefined when it is missing; an anchor-only link (`#…`) points at `file` itself, as in `checkLinks`.
+ */
+export function checkSupportMatrix(
+  file: string,
+  text: string,
+  pages: string[],
+  readPage: (path: string) => string | undefined = readExistingFile,
+): string[] {
+  const body = section(text, "Support matrix");
+  if (body === undefined) {
+    return ['no "## Support matrix" section'];
+  }
+  const table = body
+    .split("\n")
+    .filter((line) => line.startsWith("|"))
+    .map((line) =>
+      line
+        .slice(1, -1)
+        .split("|")
+        .map((cell) => cell.trim()),
+    );
+  const header = table.length === 0 ? "no table" : table[0].join(", ");
+  if (header !== MATRIX_COLUMNS.join(", ")) {
+    return [`expected the columns ${MATRIX_COLUMNS.join(", ")}, got ${header}`];
+  }
+  const rows = table.slice(2);
+  const linked = new Set<string>();
+  const problems = rows.flatMap((cells) => {
+    const [client, , page, date] = cells;
+    if (cells.length !== MATRIX_COLUMNS.length) {
+      return [`row "${client}": expected ${MATRIX_COLUMNS.length} cells, got ${cells.length}`];
+    }
+    const target = links(page).find((link) => !/^[a-z][a-z0-9+.-]*:/i.test(link));
+    if (target === undefined) {
+      return [`row "${client}": no link to a page`];
+    }
+    const path = decodeURIComponent(target.replace(/#.*/, ""));
+    const resolved = path === "" ? file : resolve(dirname(file), path);
+    linked.add(resolved);
+    const content = resolved === file ? text : readPage(resolved);
+    const verified = content === undefined ? undefined : LAST_VERIFIED.exec(content)?.[1];
+    return verified === date
+      ? []
+      : [`row "${client}": Last verified ${date}, but ${relative(ROOT, resolved)} says ${verified ?? "nothing"}`];
+  });
+  return [
+    ...problems,
+    ...pages.filter((page) => !linked.has(page)).map((page) => `${relative(ROOT, page)}: no row links this page`),
+  ];
+}
