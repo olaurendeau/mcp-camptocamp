@@ -103,18 +103,17 @@ describe("handleSearchAreas", () => {
 
     await handleSearchAreas({ query: "valais", limit: 20, area_type: "range" });
 
-    expect(mockSearchAreas).toHaveBeenCalledWith("valais", 20, undefined, "range");
+    expect(mockSearchAreas).toHaveBeenCalledWith({ query: "valais", limit: 20, area_type: "range" });
   });
 
-  it("passes undefined as area type when area_type is absent", async () => {
+  it("sends no area type when area_type is absent", async () => {
     mockSearchAreas.mockResolvedValueOnce({ total: 0, documents: [] });
 
     await handleSearchAreas({ query: "ecrins", limit: 10 });
 
     expect(mockSearchAreas).toHaveBeenCalledTimes(1);
-    expect(mockSearchAreas.mock.calls[0]?.[0]).toBe("ecrins");
-    expect(mockSearchAreas.mock.calls[0]?.[1]).toBe(10);
-    expect(mockSearchAreas.mock.calls[0]?.[3]).toBeUndefined();
+    expect(mockSearchAreas.mock.calls[0]).toEqual([{ query: "ecrins", limit: 10 }]);
+    expect(mockSearchAreas.mock.calls[0]?.[0].area_type).toBeUndefined();
   });
 
   it("formats the header and one line per area", async () => {

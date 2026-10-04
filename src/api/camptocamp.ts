@@ -3,6 +3,40 @@ import { getJson } from "./http.js";
 const DEFAULT_LANG = "fr";
 const DEFAULT_LIMIT = 10;
 
+function detailParams(): URLSearchParams {
+  return new URLSearchParams({ lang: DEFAULT_LANG });
+}
+
+// Options of searchRoutes and searchWaypoints: a keyword, an area, or both.
+interface KeywordOrAreaSearchOptions {
+  query?: string;
+  area_id?: number;
+  limit?: number; // default DEFAULT_LIMIT
+}
+export type RouteSearchOptions = KeywordOrAreaSearchOptions;
+export type WaypointSearchOptions = KeywordOrAreaSearchOptions;
+
+function keywordOrAreaParams(options: KeywordOrAreaSearchOptions): URLSearchParams {
+  const params = new URLSearchParams();
+  if (options.query !== undefined) params.set("q", options.query);
+  params.set("limit", String(options.limit ?? DEFAULT_LIMIT));
+  params.set("lang", DEFAULT_LANG);
+  if (options.area_id !== undefined) params.set("a", String(options.area_id));
+  return params;
+}
+
+// Options of searchAreas, searchBooks and searchArticles: a required keyword.
+interface KeywordSearchOptions {
+  query: string;
+  limit?: number; // default DEFAULT_LIMIT
+}
+export type BookSearchOptions = KeywordSearchOptions;
+export type ArticleSearchOptions = KeywordSearchOptions;
+
+function keywordParams(options: KeywordSearchOptions): URLSearchParams {
+  return new URLSearchParams({ q: options.query, limit: String(options.limit ?? DEFAULT_LIMIT), lang: DEFAULT_LANG });
+}
+
 export interface RouteSearchResult {
   document_id: number;
   locales: Array<{ lang: string; title: string; title_prefix?: string }>;
@@ -74,42 +108,20 @@ export interface WaypointDetail {
   areas?: AreaSearchResult[] | null;
 }
 
-export async function searchRoutes(
-  query: string | undefined,
-  limit = DEFAULT_LIMIT,
-  lang = DEFAULT_LANG,
-  areaId?: number,
-): Promise<RouteSearchResponse> {
-  const params = new URLSearchParams();
-  if (query !== undefined) params.set("q", query);
-  params.set("limit", String(limit));
-  params.set("lang", lang);
-  if (areaId !== undefined) params.set("a", String(areaId));
-  return getJson<RouteSearchResponse>({ path: "/routes", params });
+export async function searchRoutes(options: RouteSearchOptions): Promise<RouteSearchResponse> {
+  return getJson<RouteSearchResponse>({ path: "/routes", params: keywordOrAreaParams(options) });
 }
 
-export async function getRoute(id: number, lang = DEFAULT_LANG): Promise<RouteDetail> {
-  const params = new URLSearchParams({ lang });
-  return getJson<RouteDetail>({ path: `/routes/${id}`, params });
+export async function getRoute(id: number): Promise<RouteDetail> {
+  return getJson<RouteDetail>({ path: `/routes/${id}`, params: detailParams() });
 }
 
-export async function searchWaypoints(
-  query: string | undefined,
-  limit = DEFAULT_LIMIT,
-  lang = DEFAULT_LANG,
-  areaId?: number,
-): Promise<WaypointSearchResponse> {
-  const params = new URLSearchParams();
-  if (query !== undefined) params.set("q", query);
-  params.set("limit", String(limit));
-  params.set("lang", lang);
-  if (areaId !== undefined) params.set("a", String(areaId));
-  return getJson<WaypointSearchResponse>({ path: "/waypoints", params });
+export async function searchWaypoints(options: WaypointSearchOptions): Promise<WaypointSearchResponse> {
+  return getJson<WaypointSearchResponse>({ path: "/waypoints", params: keywordOrAreaParams(options) });
 }
 
-export async function getWaypoint(id: number, lang = DEFAULT_LANG): Promise<WaypointDetail> {
-  const params = new URLSearchParams({ lang });
-  return getJson<WaypointDetail>({ path: `/waypoints/${id}`, params });
+export async function getWaypoint(id: number): Promise<WaypointDetail> {
+  return getJson<WaypointDetail>({ path: `/waypoints/${id}`, params: detailParams() });
 }
 
 export interface OutingSearchResult {
@@ -166,18 +178,22 @@ export interface OutingDetail {
   };
 }
 
-export async function searchUserOutings(
-  userId: number,
-  limit = DEFAULT_LIMIT,
-  lang = DEFAULT_LANG,
-): Promise<OutingSearchResponse> {
-  const params = new URLSearchParams({ u: String(userId), limit: String(limit), lang });
+export interface UserOutingSearchOptions {
+  user_id: number;
+  limit?: number; // default DEFAULT_LIMIT
+}
+
+export async function searchUserOutings(options: UserOutingSearchOptions): Promise<OutingSearchResponse> {
+  const params = new URLSearchParams({
+    u: String(options.user_id),
+    limit: String(options.limit ?? DEFAULT_LIMIT),
+    lang: DEFAULT_LANG,
+  });
   return getJson<OutingSearchResponse>({ path: "/outings", params });
 }
 
-export async function getOuting(id: number, lang = DEFAULT_LANG): Promise<OutingDetail> {
-  const params = new URLSearchParams({ lang });
-  return getJson<OutingDetail>({ path: `/outings/${id}`, params });
+export async function getOuting(id: number): Promise<OutingDetail> {
+  return getJson<OutingDetail>({ path: `/outings/${id}`, params: detailParams() });
 }
 
 export type AreaType = "range" | "admin_limits" | "country";
@@ -206,20 +222,18 @@ export interface AreaDetail {
   geometry?: { geom?: string | null; geom_detail?: string | null } | null; // typed for fixtures only; never displayed
 }
 
-export async function searchAreas(
-  query: string,
-  limit = DEFAULT_LIMIT,
-  lang = DEFAULT_LANG,
-  areaType?: AreaType,
-): Promise<AreaSearchResponse> {
-  const params = new URLSearchParams({ q: query, limit: String(limit), lang });
-  if (areaType !== undefined) params.set("atyp", areaType);
+export interface AreaSearchOptions extends KeywordSearchOptions {
+  area_type?: AreaType;
+}
+
+export async function searchAreas(options: AreaSearchOptions): Promise<AreaSearchResponse> {
+  const params = keywordParams(options);
+  if (options.area_type !== undefined) params.set("atyp", options.area_type);
   return getJson<AreaSearchResponse>({ path: "/areas", params });
 }
 
-export async function getArea(id: number, lang = DEFAULT_LANG): Promise<AreaDetail> {
-  const params = new URLSearchParams({ lang });
-  return getJson<AreaDetail>({ path: `/areas/${id}`, params });
+export async function getArea(id: number): Promise<AreaDetail> {
+  return getJson<AreaDetail>({ path: `/areas/${id}`, params: detailParams() });
 }
 
 // The API treats `date=X,` as the single day X, so open-ended ranges use these bounds.
@@ -267,7 +281,7 @@ export interface OutingListResponse {
   total: number;
 }
 
-export async function searchOutings(params: OutingSearchParams = {}, lang = DEFAULT_LANG): Promise<OutingListResponse> {
+export async function searchOutings(params: OutingSearchParams = {}): Promise<OutingListResponse> {
   const search = new URLSearchParams();
   // `q=` (empty) returns every outing, so only send a non-empty keyword.
   if (params.query) search.set("q", params.query);
@@ -281,7 +295,7 @@ export async function searchOutings(params: OutingSearchParams = {}, lang = DEFA
   search.set("sort", "-date_end");
   search.set("limit", String(params.limit ?? DEFAULT_LIMIT));
   search.set("offset", String(params.offset ?? 0));
-  search.set("lang", lang);
+  search.set("lang", DEFAULT_LANG);
   return getJson<OutingListResponse>({ path: "/outings", params: search });
 }
 
@@ -333,18 +347,12 @@ export interface BookDetail {
   };
 }
 
-export async function searchBooks(
-  query: string,
-  limit = DEFAULT_LIMIT,
-  lang = DEFAULT_LANG,
-): Promise<BookSearchResponse> {
-  const params = new URLSearchParams({ q: query, limit: String(limit), lang });
-  return getJson<BookSearchResponse>({ path: "/books", params });
+export async function searchBooks(options: BookSearchOptions): Promise<BookSearchResponse> {
+  return getJson<BookSearchResponse>({ path: "/books", params: keywordParams(options) });
 }
 
-export async function getBook(id: number, lang = DEFAULT_LANG): Promise<BookDetail> {
-  const params = new URLSearchParams({ lang });
-  return getJson<BookDetail>({ path: `/books/${id}`, params });
+export async function getBook(id: number): Promise<BookDetail> {
+  return getJson<BookDetail>({ path: `/books/${id}`, params: detailParams() });
 }
 
 export interface ArticleSearchResult {
@@ -392,16 +400,10 @@ export interface ArticleDetail {
   };
 }
 
-export async function searchArticles(
-  query: string,
-  limit = DEFAULT_LIMIT,
-  lang = DEFAULT_LANG,
-): Promise<ArticleSearchResponse> {
-  const params = new URLSearchParams({ q: query, limit: String(limit), lang });
-  return getJson<ArticleSearchResponse>({ path: "/articles", params });
+export async function searchArticles(options: ArticleSearchOptions): Promise<ArticleSearchResponse> {
+  return getJson<ArticleSearchResponse>({ path: "/articles", params: keywordParams(options) });
 }
 
-export async function getArticle(id: number, lang = DEFAULT_LANG): Promise<ArticleDetail> {
-  const params = new URLSearchParams({ lang });
-  return getJson<ArticleDetail>({ path: `/articles/${id}`, params });
+export async function getArticle(id: number): Promise<ArticleDetail> {
+  return getJson<ArticleDetail>({ path: `/articles/${id}`, params: detailParams() });
 }
