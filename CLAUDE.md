@@ -14,6 +14,7 @@ src/
 ├── api/
 │   └── camptocamp.ts     # Camptocamp API v6 client (fetch wrapper, typed responses)
 └── tools/
+    ├── format.ts         # Shared formatting helpers: locales, headers, document lines, dates, isPresent (0 and false are printed)
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY), shared by every route/outing line
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
@@ -29,6 +30,7 @@ tests/
 ├── hooks/
 │   └── guard.test.sh       # Tests for the agent guard hook (.claude/hooks/guard.sh), run on the host
 └── tools/
+    ├── format.test.ts      # Shared formatting helper unit tests
     ├── ratings.test.ts     # Rating label order and Labande joining
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
