@@ -3,7 +3,7 @@ import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage } from "./paging.js";
 import { ACTIVITIES, enumValue } from "./enums.js";
 import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
-import type { OutingSearchResponse, OutingDetail, OutingListItem, OutingListResponse } from "../api/camptocamp.js";
+import type { OutingSearchResponse, OutingDetail, OutingListResponse } from "../api/camptocamp.js";
 import {
   pickLocale,
   pickTitle,
@@ -11,6 +11,7 @@ import {
   formatDateRange,
   formatHeader,
   formatAssociatedRouteLine,
+  formatOutingLine,
 } from "./format.js";
 import { formatRatingLines, formatRatingParts } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
@@ -159,28 +160,6 @@ function describeFilters(params: SearchOutingsInput): string[] {
   if (params.route_id !== undefined) filters.push(`route ${params.route_id}`);
   if (params.waypoint_id !== undefined) filters.push(`waypoint ${params.waypoint_id}`);
   return filters;
-}
-
-function formatOutingLine(outing: OutingListItem): string {
-  const parts: string[] = [];
-  const push = (label: string, value: string | number | null | undefined, unit = ""): void => {
-    if (isPresent(value)) parts.push(`${label}${value}${unit}`);
-  };
-
-  push("", formatDateRange(outing.date_start, outing.date_end));
-  push("Conditions: ", outing.condition_rating);
-  push("Max elevation: ", outing.elevation_max, "m");
-  push("Elevation gain: ", outing.height_diff_up, "m");
-  parts.push(...formatRatingParts(outing));
-
-  const ranges = (outing.areas ?? []).filter((area) => area.area_type === "range");
-  if (ranges.length > 0) {
-    parts.push(`Areas: ${ranges.map((area) => `${pickTitle(area.locales)} [${area.document_id}]`).join(", ")}`);
-  }
-  push("Author: ", outing.author?.name);
-
-  const head = `- [${outing.document_id}] ${pickTitle(outing.locales)} (${outing.activities.join(", ")})`;
-  return [head, ...parts].join(" | ");
 }
 
 // D1: the period is sent as given, so no outing outside it is shown, and the gap is stated.

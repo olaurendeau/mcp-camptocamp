@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import {
   isPresent,
   formatDateRange,
@@ -13,6 +13,9 @@ import {
   formatTitledLine,
   formatAreaLine,
   formatAreasSection,
+  formatBookLine,
+  formatOutingLine,
+  formatRecentOutings,
 } from "../../src/tools/format.js";
 import type { AreaSearchResult } from "../../src/api/camptocamp.js";
 
@@ -57,6 +60,17 @@ describe("isPresent", () => {
     for (const value of [0, false, "0", "PD", ["hiking"]]) {
       expect(isPresent(value)).toBe(true);
     }
+  });
+
+  it("narrows only the true branch: an absent value may still be an empty string or list", () => {
+    const text = "" as string | null | undefined;
+    if (isPresent(text)) {
+      expectTypeOf(text).toExtend<string>();
+    } else {
+      expectTypeOf(text).toEqualTypeOf<string | null | undefined>();
+    }
+    const list = [] as string[] | null;
+    if (!isPresent(list)) expectTypeOf(list).toEqualTypeOf<string[] | null>();
   });
 });
 
@@ -344,6 +358,108 @@ describe("formatWaypointLine", () => {
   it("prints nothing for a null or missing elevation", () => {
     expect(formatWaypointLine({ ...domes, elevation: null })).toBe("- [37295] Dômes de Miage - Sommet W (summit)");
     expect(formatWaypointLine(domes)).toBe("- [37295] Dômes de Miage - Sommet W (summit)");
+  });
+
+  it("marks the main waypoint after the elevation", () => {
+    // Waypoint 37916, main_waypoint_id of GET /routes/54085 (2026-10-04).
+    const montPourri = {
+      document_id: 37916,
+      locales: [{ lang: "fr", title: "Mont Pourri" }],
+      waypoint_type: "summit",
+      elevation: 3779,
+    };
+    expect(formatWaypointLine(montPourri, { main: true })).toBe(
+      "- [37916] Mont Pourri (summit) | 3779m | main waypoint",
+    );
+    expect(formatWaypointLine(montPourri, { main: false })).toBe("- [37916] Mont Pourri (summit) | 3779m");
+    expect(formatWaypointLine({ ...montPourri, elevation: null }, { main: true })).toBe(
+      "- [37916] Mont Pourri (summit) | main waypoint",
+    );
+  });
+});
+
+describe("formatBookLine", () => {
+  // Books 14643 and 472409 of GET /routes/54085 associations (2026-10-04).
+  it("prints the title verbatim, the author, the types and the activities", () => {
+    expect(
+      formatBookLine({
+        document_id: 14643,
+        locales: [{ lang: "fr", title: "Le topo de la Vanoise -  Tarentaise - Beaufortain", summary: null }],
+        author: "James Merel, Philippe Deslandes",
+        book_types: ["topo"],
+        activities: ["mountain_climbing", "snow_ice_mixed", "rock_climbing"],
+      }),
+    ).toBe(
+      "- [14643] Le topo de la Vanoise -  Tarentaise - Beaufortain | Author: James Merel, Philippe Deslandes | " +
+        "Types: topo | Activities: mountain_climbing, snow_ice_mixed, rock_climbing",
+    );
+  });
+
+  it("leaves out a null author and empty lists", () => {
+    expect(
+      formatBookLine({
+        document_id: 472409,
+        locales: [{ lang: "fr", title: "Montagnes Magazine #396" }],
+        author: null,
+        book_types: ["magazine"],
+        activities: [],
+      }),
+    ).toBe("- [472409] Montagnes Magazine #396 | Types: magazine");
+  });
+});
+
+// Outing 1900552, first of GET /routes/54085 associations.recent_outings (2026-10-04), reduced to the typed fields.
+const outing1900552 = {
+  document_id: 1900552,
+  locales: [{ lang: "fr", title: "Mont Pourri : Versant W par le Glacier du Geay" }],
+  activities: ["skitouring"],
+  date_start: "2026-04-26",
+  date_end: "2026-04-26",
+  condition_rating: "good",
+  elevation_max: 3779,
+  height_diff_up: 1425,
+  ski_rating: "4.1",
+  labande_global_rating: "AD",
+  areas: [
+    { document_id: 14274, locales: [{ lang: "fr", title: "France" }], area_type: "country" },
+    { document_id: 14409, locales: [{ lang: "fr", title: "Vanoise" }], area_type: "range" },
+  ],
+  author: { name: "krok", user_id: 1573563 },
+};
+const OUTING_1900552_LINE =
+  "- [1900552] Mont Pourri : Versant W par le Glacier du Geay (skitouring) | 2026-04-26 | Conditions: good | " +
+  "Max elevation: 3779m | Elevation gain: 1425m | Ski rating (Toponeige): 4.1 | Labande: AD | " +
+  "Areas: Vanoise [14409] | Author: krok";
+
+describe("formatOutingLine", () => {
+  it("writes the search_outings line: dates, conditions, elevations, ratings, ranges and author", () => {
+    expect(formatOutingLine(outing1900552)).toBe(OUTING_1900552_LINE);
+  });
+});
+
+describe("formatRecentOutings", () => {
+  const more = "search_outings with route_id=54085";
+
+  it("heads the lines with the shown and total counts and ends with where to find more", () => {
+    expect(formatRecentOutings({ documents: [outing1900552], total: 64 }, more)).toEqual([
+      "\n## Recent outings (1 of 64)",
+      OUTING_1900552_LINE,
+      "More: search_outings with route_id=54085",
+    ]);
+  });
+
+  it("leaves out the More line when every outing is shown", () => {
+    expect(formatRecentOutings({ documents: [outing1900552], total: 1 }, more)).toEqual([
+      "\n## Recent outings (1 of 1)",
+      OUTING_1900552_LINE,
+    ]);
+  });
+
+  it("returns no section without outings", () => {
+    // Route 944120 of GET /routes/944120 (2026-10-04) has recent_outings {documents: [], total: 0}.
+    expect(formatRecentOutings({ documents: [], total: 0 }, more)).toEqual([]);
+    expect(formatRecentOutings(null, more)).toEqual([]);
+    expect(formatRecentOutings(undefined, more)).toEqual([]);
   });
 });
 
