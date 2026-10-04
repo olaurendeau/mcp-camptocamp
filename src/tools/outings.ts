@@ -3,7 +3,14 @@ import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage } from "./paging.js";
 import { searchUserOutings, getOuting, searchOutings } from "../api/camptocamp.js";
 import type { OutingSearchResponse, OutingDetail, OutingListItem, OutingListResponse } from "../api/camptocamp.js";
-import { pickLocale, pickTitle, formatHeader, formatAssociatedRouteLine } from "./format.js";
+import {
+  pickLocale,
+  pickTitle,
+  isPresent,
+  formatDateRange,
+  formatHeader,
+  formatAssociatedRouteLine,
+} from "./format.js";
 import { formatRatingLines, formatRatingParts } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
@@ -85,12 +92,6 @@ export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
 export type GetOutingInput = z.infer<typeof getOutingSchema>;
 export type SearchOutingsInput = z.infer<typeof searchOutingsSchema>;
 
-function formatDateRange(dateStart?: string | null, dateEnd?: string | null): string {
-  if (!dateStart) return "";
-  if (!dateEnd || dateStart === dateEnd) return dateStart;
-  return `${dateStart} → ${dateEnd}`;
-}
-
 function formatOutingSearchResult(response: OutingSearchResponse, userId: number): string {
   if (response.documents.length === 0) {
     return `No outings found for user ${userId}.`;
@@ -105,7 +106,7 @@ function formatOutingSearchResult(response: OutingSearchResponse, userId: number
     const activities = outing.activities.join(", ");
     const date = formatDateRange(outing.date_start, outing.date_end);
     const datePart = date ? ` | ${date}` : "";
-    const elevation = outing.elevation_max ? ` | Max elevation: ${outing.elevation_max}m` : "";
+    const elevation = isPresent(outing.elevation_max) ? ` | Max elevation: ${outing.elevation_max}m` : "";
     const ratings = formatRatingParts(outing)
       .map((part) => ` | ${part}`)
       .join("");
@@ -130,15 +131,15 @@ function formatOutingDetail(outing: OutingDetail): string {
 
   const date = formatDateRange(outing.date_start, outing.date_end);
   if (date) lines.push(`**Date**: ${date}`);
-  if (outing.participant_count) lines.push(`**Participants**: ${outing.participant_count}`);
+  if (isPresent(outing.participant_count)) lines.push(`**Participants**: ${outing.participant_count}`);
 
   lines.push(...formatRatingLines(outing));
   if (outing.condition_rating) lines.push(`**Conditions**: ${outing.condition_rating}`);
 
-  if (outing.elevation_max) lines.push(`**Max elevation**: ${outing.elevation_max}m`);
-  if (outing.elevation_min) lines.push(`**Min elevation**: ${outing.elevation_min}m`);
-  if (outing.height_diff_up) lines.push(`**Elevation gain**: ${outing.height_diff_up}m`);
-  if (outing.height_diff_down) lines.push(`**Elevation loss**: ${outing.height_diff_down}m`);
+  if (isPresent(outing.elevation_max)) lines.push(`**Max elevation**: ${outing.elevation_max}m`);
+  if (isPresent(outing.elevation_min)) lines.push(`**Min elevation**: ${outing.elevation_min}m`);
+  if (isPresent(outing.height_diff_up)) lines.push(`**Elevation gain**: ${outing.height_diff_up}m`);
+  if (isPresent(outing.height_diff_down)) lines.push(`**Elevation loss**: ${outing.height_diff_down}m`);
 
   lines.push(...formatUserText("description", "Description", locale?.description));
   lines.push(...formatUserText("route_description", "Route description", locale?.route_description));
@@ -153,10 +154,6 @@ function formatOutingDetail(outing: OutingDetail): string {
   }
 
   return lines.join("\n");
-}
-
-function isPresent<T>(value: T | null | undefined | ""): value is T {
-  return value != null && value !== "";
 }
 
 function describeFilters(params: SearchOutingsInput): string[] {

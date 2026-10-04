@@ -18,7 +18,7 @@ src/
 │   ├── schemas.ts        # zod response schemas, the one place response types are declared
 │   └── camptocamp.ts     # Camptocamp API v6 client: one function per endpoint, pl=fr on searches
 └── tools/
-    ├── format.ts         # Shared formatting: pickLocale, joinList, formatHeader, association lines, areas section
+    ├── format.ts         # Shared formatting: pickLocale, joinList, formatHeader, document lines, areas section, dates, isPresent (0 and false are printed)
     ├── inputs.ts         # Shared zod inputs: bounded document IDs, 200-char queries
     ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY), shared by every route/outing line
     ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window
