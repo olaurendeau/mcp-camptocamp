@@ -667,6 +667,67 @@ describe("rating labels", () => {
   });
 });
 
+describe("zero values", () => {
+  it("prints 0 for the elevations of route 755308 and leaves out its null height differences", async () => {
+    // Trimmed from the live GET /routes/755308?lang=fr response (2026-10-04): a deep-water solo at sea
+    // level; null ratings, areas and texts left out.
+    mockGetRoute.mockResolvedValueOnce({
+      document_id: 755308,
+      locales: [
+        { lang: "es", title: "Canceou", title_prefix: "Le Moulon [Psicobloc]" },
+        { lang: "fr", title: "Psicobloc", title_prefix: "Le Moulon [Psicobloc]" },
+      ],
+      activities: ["rock_climbing"],
+      elevation_max: 0,
+      elevation_min: 0,
+      height_diff_up: null,
+      height_diff_down: null,
+    });
+
+    const result = await handleGetRoute({ id: 755308 });
+
+    expect(result.split("\n").slice(3)).toEqual([
+      "**Activities**: rock_climbing",
+      "**Max elevation**: 0m",
+      "**Min elevation**: 0m",
+    ]);
+  });
+
+  it("prints 0 for the height differences of route 1863822 and leaves out its null elevations", async () => {
+    // Trimmed from the live GET /routes/1863822?lang=fr response (2026-10-04); areas and texts left out.
+    mockGetRoute.mockResolvedValueOnce({
+      document_id: 1863822,
+      locales: [
+        {
+          lang: "fr",
+          title: "Le coin de bois et les anges passent ",
+          title_prefix: "Cap Canaille - Saphira et Grande Bleue",
+        },
+      ],
+      activities: ["rock_climbing"],
+      elevation_max: null,
+      elevation_min: null,
+      height_diff_up: 0,
+      height_diff_down: 0,
+      global_rating: "ED-",
+      equipment_rating: "P4",
+      exposition_rock_rating: "E5",
+      rock_free_rating: "6c+",
+      rock_required_rating: "6b",
+      aid_rating: "A2",
+    });
+
+    const result = await handleGetRoute({ id: 1863822 });
+
+    const lines = result.split("\n");
+    expect(lines.slice(lines.indexOf("**Aid rating**: A2") + 1)).toEqual([
+      "**Elevation gain**: 0m",
+      "**Elevation loss**: 0m",
+    ]);
+    expect(result).not.toContain("elevation**");
+  });
+});
+
 describe("get_route tool definition", () => {
   it("tells the LLM about the areas section and area_id reuse", () => {
     const tool = routeToolDefinitions.find((t) => t.name === "get_route");

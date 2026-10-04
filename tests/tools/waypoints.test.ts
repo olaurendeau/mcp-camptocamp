@@ -367,3 +367,42 @@ describe("get_waypoint tool definition", () => {
     );
   });
 });
+
+describe("zero elevation", () => {
+  // Trimmed from the live GET /waypoints?q=portbou&limit=10&pl=fr and GET /waypoints/1350803?lang=fr
+  // responses (2026-10-04): a seaside access point at elevation 0.
+  const portbou = {
+    document_id: 1350803,
+    locales: [{ lang: "fr", title: "Portbou" }],
+    waypoint_type: "access",
+    elevation: 0,
+  };
+
+  it("prints an elevation of 0 in search_waypoints", async () => {
+    mockSearchWaypoints.mockResolvedValueOnce({ total: 1, documents: [portbou] });
+
+    const result = await handleSearchWaypoints({ query: "portbou", limit: 10 });
+
+    expect(result.split("\n").slice(2)).toEqual(["- [1350803] Portbou (access) | 0m"]);
+  });
+
+  it("prints an elevation of 0 in get_waypoint", async () => {
+    mockGetWaypoint.mockResolvedValueOnce({
+      ...portbou,
+      geometry: { geom: '{"type": "Point", "coordinates": [351703.791013, 5225111.729224]}' },
+    });
+
+    const result = await handleGetWaypoint({ id: 1350803 });
+
+    expect(result.split("\n").slice(2, 5)).toEqual(["", "**Type**: access", "**Elevation**: 0m"]);
+  });
+
+  it("prints no elevation line when the elevation is null", async () => {
+    mockGetWaypoint.mockResolvedValueOnce({ ...portbou, elevation: null });
+
+    const result = await handleGetWaypoint({ id: 1350803 });
+
+    expect(result).not.toContain("Elevation");
+    expect(result).not.toContain("null");
+  });
+});

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { documentId, searchQuery } from "./inputs.js";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteSearchResponse, RouteDetail } from "../api/camptocamp.js";
-import { pickLocale, formatHeader, formatRouteName, formatRouteLine, formatAreasSection } from "./format.js";
+import { pickLocale, isPresent, formatHeader, formatRouteName, formatRouteLine, formatAreasSection } from "./format.js";
 import { formatRatingLines } from "./ratings.js";
 
 export const searchRoutesSchema = z.object({
@@ -39,10 +39,10 @@ function formatRouteDetail(route: RouteDetail): string {
 
   lines.push(...formatRatingLines(route));
 
-  if (route.elevation_max) lines.push(`**Max elevation**: ${route.elevation_max}m`);
-  if (route.elevation_min) lines.push(`**Min elevation**: ${route.elevation_min}m`);
-  if (route.height_diff_up) lines.push(`**Elevation gain**: ${route.height_diff_up}m`);
-  if (route.height_diff_down) lines.push(`**Elevation loss**: ${route.height_diff_down}m`);
+  if (isPresent(route.elevation_max)) lines.push(`**Max elevation**: ${route.elevation_max}m`);
+  if (isPresent(route.elevation_min)) lines.push(`**Min elevation**: ${route.elevation_min}m`);
+  if (isPresent(route.height_diff_up)) lines.push(`**Elevation gain**: ${route.height_diff_up}m`);
+  if (isPresent(route.height_diff_down)) lines.push(`**Elevation loss**: ${route.height_diff_down}m`);
 
   lines.push(...formatAreasSection(route.areas));
 

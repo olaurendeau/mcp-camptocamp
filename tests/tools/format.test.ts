@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  isPresent,
+  formatDateRange,
   pickLocale,
   pickTitle,
   joinList,
@@ -43,6 +45,47 @@ const areteDesBosses = {
     { lang: "en", title: "Arête des Bosses", title_prefix: "Mont Blanc" },
   ],
 };
+
+describe("isPresent", () => {
+  it("treats null, undefined, an empty string and an empty list as absent", () => {
+    for (const value of [null, undefined, "", []]) {
+      expect(isPresent(value)).toBe(false);
+    }
+  });
+
+  it("treats 0, false, a string and a non-empty list as present", () => {
+    for (const value of [0, false, "0", "PD", ["hiking"]]) {
+      expect(isPresent(value)).toBe(true);
+    }
+  });
+});
+
+describe("formatDateRange", () => {
+  it("joins two different dates with an arrow", () => {
+    expect(formatDateRange("2026-06-10", "2026-06-12")).toBe("2026-06-10 → 2026-06-12");
+  });
+
+  it("prints a one-day outing once", () => {
+    expect(formatDateRange("2026-08-10", "2026-08-10")).toBe("2026-08-10");
+  });
+
+  it("prints the end date alone when there is no start date, without inventing one", () => {
+    expect(formatDateRange(null, "2026-08-10")).toBe("2026-08-10");
+    expect(formatDateRange(undefined, "2026-08-10")).toBe("2026-08-10");
+    expect(formatDateRange("", "2026-08-10")).toBe("2026-08-10");
+  });
+
+  it("prints the start date alone when there is no end date, without inventing one", () => {
+    expect(formatDateRange("2026-08-10", null)).toBe("2026-08-10");
+    expect(formatDateRange("2026-08-10", undefined)).toBe("2026-08-10");
+    expect(formatDateRange("2026-08-10", "")).toBe("2026-08-10");
+  });
+
+  it("returns an empty string without any date", () => {
+    expect(formatDateRange(null, null)).toBe("");
+    expect(formatDateRange()).toBe("");
+  });
+});
 
 describe("pickLocale", () => {
   it("returns the fr locale when it is not first", () => {
