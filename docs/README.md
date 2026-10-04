@@ -18,7 +18,10 @@ For a client without its own page here, use the [configuration for other MCP cli
 
 ## Guides
 
-Guides on using the tools with an LLM are listed here as they are written.
+- [Agent SDKs](agent-sdks.md): start the server from your own agent code with the OpenAI Agents SDK (Python and JS), the Mistral Python SDK or google-genai (Python and JS).
+- [System prompt](system-prompt.md): a prompt to paste into your agent, so the model quotes Camptocamp, cites it and says when a value is missing.
+
+Other guides on using the tools with an LLM are listed here as they are written.
 
 ## Tool reference
 
