@@ -17,9 +17,17 @@ import {
   formatListItems,
   formatLanguageLine,
 } from "./format.js";
-import { formatUserText, USER_TEXT_NOTE } from "./text.js";
+import { formatUserTexts, USER_TEXT_NOTE, type TextSection } from "./text.js";
 import { CUSTODIANSHIPS, WAYPOINT_TYPES, enumValue } from "./enums.js";
 import type { Lang } from "./enums.js";
+
+// The free-text sections get_waypoint prints, in print order.
+const WAYPOINT_TEXT = [
+  ["summary", "Summary"],
+  ["description", "Description"],
+  ["access", "Access"],
+  ["access_period", "Access period"],
+] as const satisfies readonly TextSection<string>[];
 
 export const searchWaypointsSchema = z.object({
   query: searchQuery("Search query for waypoints (e.g. 'Mont Blanc', 'refuge Goûter')", {
@@ -110,10 +118,7 @@ function formatWaypointDetail(waypoint: WaypointDetail, lang?: Lang): string {
 
   lines.push(...formatAreasSection(waypoint.areas, lang));
 
-  lines.push(...formatUserText("summary", "Summary", locale?.summary));
-  lines.push(...formatUserText("description", "Description", locale?.description));
-  lines.push(...formatUserText("access", "Access", locale?.access));
-  lines.push(...formatUserText("access_period", "Access period", locale?.access_period));
+  lines.push(...formatUserTexts(locale, WAYPOINT_TEXT));
 
   lines.push(...formatWaypointAssociations(waypoint, lang));
 

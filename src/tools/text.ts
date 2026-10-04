@@ -115,10 +115,32 @@ function truncate(text: string): string[] {
   return [codePoints.slice(0, MAX_USER_TEXT).join(""), `[truncated, ${more} more characters]`];
 }
 
+// Whether a free-text field has anything to print: missing, null, empty and whitespace-only fields don't.
+export function hasUserText(value: string | null | undefined): value is string {
+  return Boolean(value?.trim());
+}
+
+// One free-text section of a detail tool: the API field name and the heading it prints under.
+export type TextSection<F extends string> = readonly [field: F, heading: string];
+
+// The free-text sections shared by get_area, get_book and get_article, in print order.
+export const SUMMARY_AND_DESCRIPTION = [
+  ["summary", "Summary"],
+  ["description", "Description"],
+] as const satisfies readonly TextSection<string>[];
+
 // The section for one free-text field: a blank line, "## <heading>", then the text between markers
 // labelled with the API field name. No section when the field is missing or blank.
 export function formatUserText(field: string, heading: string, value: string | null | undefined): string[] {
-  if (!value?.trim()) return [];
+  if (!hasUserText(value)) return [];
   const body = truncate(neutraliseMarkers(demoteHeadings(cleanMarkup(value))));
   return ["", `## ${heading}`, `[begin user-written text: ${field}]`, ...body, `[end user-written text: ${field}]`];
+}
+
+// Every free-text section of one locale, in the order of `sections`; blank fields print nothing.
+export function formatUserTexts<F extends string>(
+  locale: Partial<Record<F, string | null>> | undefined,
+  sections: readonly TextSection<F>[],
+): string[] {
+  return sections.flatMap(([field, heading]) => formatUserText(field, heading, locale?.[field]));
 }

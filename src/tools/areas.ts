@@ -5,7 +5,7 @@ import { searchAreas, getArea } from "../api/camptocamp.js";
 import type { AreaDetail } from "../api/camptocamp.js";
 import { pickLocale, pickTitle, formatHeader, formatAreaLine, formatListItems, formatLanguageLine } from "./format.js";
 import type { Lang } from "./enums.js";
-import { formatUserText, USER_TEXT_NOTE } from "./text.js";
+import { formatUserTexts, SUMMARY_AND_DESCRIPTION, USER_TEXT_NOTE } from "./text.js";
 
 export const searchAreasSchema = z.object({
   query: searchQuery("Area name in any language (e.g. 'Écrins', 'Valais', 'Wallis')", { allowBlank: false }),
@@ -34,8 +34,7 @@ function formatAreaDetail(area: AreaDetail, lang?: Lang): string {
   lines.push(...formatLanguageLine(area.locales, lang));
   lines.push(`\n**Type**: ${area.area_type}`);
 
-  lines.push(...formatUserText("summary", "Summary", locale?.summary));
-  lines.push(...formatUserText("description", "Description", locale?.description));
+  lines.push(...formatUserTexts(locale, SUMMARY_AND_DESCRIPTION));
 
   return lines.join("\n");
 }
