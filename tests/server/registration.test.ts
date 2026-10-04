@@ -36,6 +36,9 @@ const TOOL_NAMES = [
   "get_article",
 ];
 
+// Claude Code truncates tool descriptions and server instructions at 2048 characters.
+const MAX_TEXT_LENGTH = 2048;
+
 const TOOL_TITLES: Record<string, string> = {
   search_routes: "Search routes",
   get_route: "Get route details",
@@ -92,6 +95,16 @@ describe("tool registration", () => {
       expect(tool.description, tool.name).toContain(LANG_NOTE);
       expect(tool.inputSchema.properties, tool.name).toHaveProperty("lang");
       expect(tool.inputSchema.required ?? [], tool.name).not.toContain("lang");
+    }
+  });
+
+  // #211: Claude Code cuts tool descriptions at 2048 characters, losing their last sentences.
+  it("keeps every tool description under 2048 characters", async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+
+    for (const tool of tools) {
+      expect(tool.description?.length, tool.name).toBeLessThan(MAX_TEXT_LENGTH);
     }
   });
 
@@ -161,6 +174,14 @@ describe("server instructions", () => {
     expect(instructions).toContain("default fr");
     expect(instructions).toContain(`falls back to ${LANG_ORDER.join(", ")}`);
     expect(instructions).not.toContain("French");
+  });
+
+  // #211: Claude Code cuts server instructions at 2048 characters, like tool descriptions.
+  it("stay under 2048 characters", async () => {
+    const client = await connect();
+    const instructions = client.getInstructions() ?? "";
+
+    expect(instructions.length).toBeLessThan(MAX_TEXT_LENGTH);
   });
 
   it("describe the handling of user-written text: markers, demoted headings, cap, images and links", async () => {

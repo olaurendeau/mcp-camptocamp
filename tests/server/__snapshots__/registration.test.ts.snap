@@ -397,12 +397,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "string",
       },
       "date_from": {
-        "description": "Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it",
+        "description": "Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it. An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.",
         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
         "type": "string",
       },
       "date_to": {
-        "description": "Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it",
+        "description": "Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it. An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.",
         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
         "type": "string",
       },
@@ -455,12 +455,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "integer",
       },
       "period_end": {
-        "description": "Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30)",
+        "description": "Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range.",
         "pattern": "^\\d{2}-\\d{2}$",
         "type": "string",
       },
       "period_start": {
-        "description": "First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01)",
+        "description": "First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range.",
         "pattern": "^\\d{2}-\\d{2}$",
         "type": "string",
       },
