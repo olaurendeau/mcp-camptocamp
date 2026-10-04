@@ -4,7 +4,7 @@ RUN_IT := $(COMPOSE) run --rm -it dev
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install ci check test test-hooks test-watch coverage lint typecheck format build pack docker-build login whoami publish-prep publish shell
+.PHONY: help install ci check test test-contract test-hooks test-watch coverage lint typecheck format build pack docker-build login whoami publish-prep publish shell
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -20,6 +20,9 @@ ci: ## Installe les dépendances depuis package-lock.json
 
 test: ci ## Lance les tests
 	$(RUN) npm test
+
+test-contract: ci ## Lance les tests de contrat contre l'API Camptocamp réelle (réseau requis)
+	$(RUN) npm run test:contract
 
 test-hooks: ## Teste le hook guard des agents (sur l'hôte : bash + jq)
 	tests/hooks/guard.test.sh
