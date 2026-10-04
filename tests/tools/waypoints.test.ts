@@ -808,3 +808,618 @@ describe("get_waypoint hut details", () => {
     }
   });
 });
+
+/** The lines under `heading`, up to the next blank line. */
+function section(result: string, heading: string): string[] {
+  const lines = result.split("\n");
+  const start = lines.indexOf(heading);
+  if (start === -1) return [];
+  const end = lines.findIndex((line, i) => i > start && line === "");
+  return lines.slice(start + 1, end === -1 ? undefined : end);
+}
+
+type Ratings = Record<string, string>;
+
+// An item of a live GET /waypoints/{id} associations.all_routes (2026-10-04): the typed fields and a few of the
+// untyped ones the API sends (version, quality, type); geometry and areas dropped. Locales are the live ones.
+function allRoute(
+  id: number,
+  locales: Array<[lang: string, prefix: string, title: string]>,
+  activities: string[],
+  [elevationMax, heightDiffUp]: [number | null, number | null],
+  ratings: Ratings = {},
+) {
+  return {
+    document_id: id,
+    version: 3,
+    locales: locales.map(([lang, title_prefix, title]) => ({ version: 1, lang, title, summary: null, title_prefix })),
+    quality: "fine",
+    activities,
+    elevation_max: elevationMax,
+    height_diff_up: heightDiffUp,
+    height_diff_difficulties: null,
+    risk_rating: null,
+    ...ratings,
+    type: "r",
+  };
+}
+
+const fr = (prefix: string, title: string): Array<[string, string, string]> => [["fr", prefix, title]];
+const POURRI = "Mont Pourri";
+const POCCARD = "Brèche Poccard";
+const ESPRIT = "Aiguille du Saint-Esprit";
+const climb = (global: string, engagement: string, equipment: string, free: string, required: string): Ratings => ({
+  global_rating: global,
+  engagement_rating: engagement,
+  equipment_rating: equipment,
+  rock_free_rating: free,
+  rock_required_rating: required,
+});
+const ski = (toponeige: string | null, labandeSki: string, labandeGlobal: string): Ratings => ({
+  ...(toponeige && { ski_rating: toponeige, ski_exposition: "E2" }),
+  labande_ski_rating: labandeSki,
+  labande_global_rating: labandeGlobal,
+});
+
+// The 27 routes of hut 104151 in live order (GET /waypoints/104151?lang=fr, 2026-10-04): total 27.
+const routes104151 = [
+  allRoute(1678194, fr("", "Tour du Mont Pourri en 5 jours"), ["hiking"], [2690, 2560], { hiking_rating: "T2" }),
+  allRoute(
+    1257165,
+    fr("", " Contrefort Dômes de la Sache et des Platières, couloir N (couloir Sandro)"),
+    ["skitouring", "ice_climbing"],
+    [3500, 2000],
+    {
+      ...ski("5.2", "S5", "TD"),
+      ski_exposition: "E3",
+      global_rating: "TD",
+      engagement_rating: "III",
+      risk_rating: "X3",
+      equipment_rating: "P4+",
+      ice_rating: "3+",
+    },
+  ),
+  allRoute(917458, fr(POURRI, "Tour du Mont Pourri"), ["hiking"], [2935, 2400], { hiking_rating: "T3" }),
+  allRoute(604501, fr(POURRI, "Tour du Mont Pourri"), ["hiking"], [2713, 2900]),
+  allRoute(
+    305854,
+    [
+      ["es", POCCARD, "lettre à elise"],
+      ["fr", POCCARD, "Lettre à Élise"],
+    ],
+    ["mountain_climbing"],
+    [3250, null],
+    climb("TD", "II", "P1", "6b+", "6a"),
+  ),
+  allRoute(
+    305718,
+    fr(POCCARD, "les caprices de diva"),
+    ["mountain_climbing"],
+    [3250, null],
+    climb("TD", "II", "P1+", "6a", "6a"),
+  ),
+  allRoute(
+    305717,
+    fr(POCCARD, "Les Jardins de Bagatelle"),
+    ["mountain_climbing"],
+    [3250, null],
+    climb("TD", "II", "P2", "6a", "5c"),
+  ),
+  allRoute(
+    293679,
+    fr(ESPRIT, "Voie Delphin Blanc"),
+    ["mountain_climbing"],
+    [3419, 1050],
+    climb("TD-", "III", "P3", "6a", "5c"),
+  ),
+  allRoute(
+    234791,
+    fr(POURRI, "travesía integral Sache/ pourri/turia por el glaciar de Potieres"),
+    ["mountain_climbing", "snow_ice_mixed"],
+    [3779, 1850],
+    { ...climb("AD+", "III", "P4", "3b", "3b"), risk_rating: "X2", exposition_rock_rating: "E4" },
+  ),
+  allRoute(153901, fr("Col de la Chal", "4- Refuge du Mont-Pourri >> Bourg-Saint-Maurice"), ["hiking"], [2548, 180]),
+  allRoute(153900, fr("Col de la Grassaz", "Refuge de la Glière - Refuge du Mont-Pourri"), ["hiking"], [2637, 919]),
+  allRoute(
+    140061,
+    fr(POCCARD, "Merci la vie"),
+    ["mountain_climbing"],
+    [3225, 800],
+    climb("TD", "II", "P1+", "6a+", "6a"),
+  ),
+  allRoute(58018, fr(POCCARD, "sunset boulevard"), ["mountain_climbing"], [3170, 800], {
+    ...climb("ED-", "II", "P2", "6c", "6b"),
+    aid_rating: "A0",
+  }),
+  allRoute(57969, fr(POCCARD, "du pain du vin du bouquetin"), ["mountain_climbing"], [3000, 700], {
+    ...climb("TD+", "II", "P1+", "6b", "6a+"),
+    exposition_rock_rating: "E4",
+  }),
+  allRoute(57803, fr(POCCARD, "toutinox"), ["mountain_climbing"], [3250, 900], climb("TD+", "I", "P1", "6b", "6a+")),
+  allRoute(57802, fr(ESPRIT, "Gourmandine"), ["rock_climbing"], [2570, 200], climb("D+", "II", "P1+", "5c", "5c")),
+  allRoute(
+    56869,
+    fr("Dôme de la Sache", "Traversée Dôme des Platières → Dôme de la Sache"),
+    ["snow_ice_mixed"],
+    [3601, 1300],
+    {
+      global_rating: "AD-",
+    },
+  ),
+  allRoute(55890, fr(ESPRIT, "Traversée Col des Roches - Grand Col"), ["snow_ice_mixed"], [3419, 1200], {
+    global_rating: "PD",
+    engagement_rating: "II",
+  }),
+  allRoute(
+    55834,
+    fr(POURRI, "Versant W - Glacier du Geay → Grand Col (par le Col des Roches)"),
+    ["snow_ice_mixed"],
+    [3779, 1425],
+    { global_rating: "PD", engagement_rating: "II", equipment_rating: "P1" },
+  ),
+  allRoute(
+    55817,
+    fr(POCCARD, "Reve d'ocean"),
+    ["mountain_climbing"],
+    [3050, 1498],
+    climb("TD", "II", "P1", "6a", "5c"),
+  ),
+  allRoute(55737, fr("Dôme des Platières", "Face N de droite et arête W"), ["snow_ice_mixed"], [3473, 1100], {
+    global_rating: "PD+",
+  }),
+  allRoute(
+    54975,
+    [
+      ["it", POURRI, "Cresta N"],
+      ["en", POURRI, "Northern ridge"],
+      ["es", POURRI, "arista N"],
+      ["de", POURRI, "Nordgrat"],
+      ["fr", POURRI, "Arête N"],
+    ],
+    ["mountain_climbing", "snow_ice_mixed"],
+    [3779, 1400],
+    { global_rating: "PD+", engagement_rating: "III", rock_free_rating: "3c" },
+  ),
+  allRoute(54085, fr(POURRI, "Versant W par le Glacier du Geay"), ["skitouring"], [3779, 1425], ski("4.1", "S4", "AD")),
+  allRoute(50912, fr("Col des Roches", "Glacier du Geay"), ["skitouring"], [3443, 1280], ski(null, "S2", "PD+")),
+  allRoute(50694, fr("Dôme des Platières", "Face N"), ["skitouring", "snow_ice_mixed"], [3473, 1917], {
+    ...ski("4.3", "S5", "D+"),
+    global_rating: "AD",
+    engagement_rating: "III",
+    equipment_rating: "P4",
+  }),
+  allRoute(
+    49739,
+    fr("Dôme de la Sache", "Traversée Dôme des Platières → Glacier S de la Gurraz"),
+    ["skitouring"],
+    [3601, 1400],
+    ski("3.1", "S3", "AD-"),
+  ),
+  allRoute(46624, fr(POURRI, "Traverse via Grand Col"), ["skitouring"], [3779, 1900], ski("3.3", "S4", "AD+")),
+];
+
+// Trimmed from the live GET /waypoints/104151?lang=fr response (2026-10-04): texts, geometry and areas dropped,
+// recent_outings left out; books, routes and articles are empty lists there.
+const hutWithRoutes104151 = {
+  document_id: 104151,
+  locales: [{ lang: "fr", title: "Refuge du Mont Pourri" }],
+  waypoint_type: "hut",
+  elevation: 2373,
+  associations: {
+    all_routes: { documents: routes104151, total: 27 },
+    books: [],
+    routes: [],
+    articles: [],
+    waypoints: [],
+    waypoint_children: [],
+    images: [],
+    xreports: [],
+  },
+};
+
+// A book of GET /waypoints/37355 associations.books (2026-10-04), as the API sends it.
+function book(id: number, title: string, author: string, activities: string[], bookTypes: string[]) {
+  return {
+    document_id: id,
+    version: 2,
+    locales: [{ version: 2, lang: "fr", title, summary: null }],
+    quality: "medium",
+    author,
+    activities,
+    book_types: bookTypes,
+    available_langs: ["fr"],
+    protected: false,
+    type: "b",
+  };
+}
+
+// An item of GET /waypoints/37355 associations.recent_outings (2026-10-04): the fr locale, the typed fields and
+// the range areas (the live items also carry the country, the department, geometry, img_count…).
+function outing(
+  id: number,
+  title: string,
+  activities: string[],
+  [dateStart, dateEnd]: [string, string],
+  [condition, gain]: [string | null, number],
+  [global, engagement]: [string, string],
+  ranges: Array<[number, string]>,
+  [author, userId]: [string, number],
+) {
+  return {
+    document_id: id,
+    version: 1,
+    locales: [{ version: 1, lang: "fr", title, summary: null }],
+    quality: "fine",
+    activities,
+    condition_rating: condition,
+    date_end: dateEnd,
+    date_start: dateStart,
+    elevation_max: 4810,
+    height_diff_up: gain,
+    public_transport: false,
+    global_rating: global,
+    engagement_rating: engagement,
+    areas: ranges.map(([areaId, areaTitle]) => ({
+      document_id: areaId,
+      locales: [{ lang: "fr", title: areaTitle }],
+      area_type: "range",
+      type: "a",
+    })),
+    author: { name: author, user_id: userId },
+    type: "o",
+  };
+}
+
+const MB: [number, string] = [14410, "Mont-Blanc"];
+const GREES: [number, string] = [14424, "Alpes Grées - Charbonnel"];
+const BOSSES = "Mont Blanc : Arête des Bosses";
+const BIONNASSAY = "Mont Blanc : Traversée Aiguille de Bionnassay → Mont Blanc depuis le refuge Durier";
+const BROUILLARD = "Mont Blanc : Arête Intégrale du Brouillard";
+const SIM = ["snow_ice_mixed"];
+
+// Trimmed from the live GET /waypoints/37355?lang=fr response (2026-10-04): the Mont Blanc summit with only its
+// fr locale, no text, geometry or areas, and all_routes cut to its first 2 routes (the API sends all 39).
+const summit37355 = {
+  document_id: 37355,
+  locales: [{ lang: "fr", title: "Mont Blanc" }],
+  waypoint_type: "summit",
+  elevation: 4805,
+  associations: {
+    all_routes: {
+      total: 39,
+      documents: [
+        allRoute(1897538, fr("Mont Blanc", "Abominette "), SIM, [null, null], {
+          global_rating: "TD",
+          engagement_rating: "IV",
+          ice_rating: "4",
+          mixed_rating: "M5+",
+        }),
+        allRoute(1893205, fr("Pointe Louis Amédée", "Himalamiage "), [...SIM, "mountain_climbing"], [4806, 1600], {
+          global_rating: "ED-",
+          engagement_rating: "IV",
+          ice_rating: "4+",
+          mixed_rating: "M4+",
+          rock_required_rating: "5c",
+          aid_rating: "A1",
+        }),
+      ],
+    },
+    books: [
+      book(
+        136059,
+        "Les 4000 des Alpes",
+        "Helmut Dumler, Willi P. Burkhardt",
+        ["mountain_climbing", ...SIM],
+        ["historical", "novel"],
+      ),
+      book(
+        171952,
+        "Guida dei Monti d'Italia - Monte Bianco vol. 1",
+        "Gino Buscaini",
+        ["mountain_climbing", ...SIM, "hiking", "skitouring", "rock_climbing", "ice_climbing"],
+        ["historical", "topo", "environment"],
+      ),
+      book(176597, "Mont Blanc 4808 m - 5 Voies Pour Le Sommet", "François Damilano", SIM, ["topo"]),
+      book(
+        209293,
+        "La chaîne du Mont Blanc, Guide Vallot : I - Mont-Blanc - Trélatête",
+        "Lucien Devies, Pierre Henry",
+        ["mountain_climbing", ...SIM],
+        ["topo"],
+      ),
+      book(
+        390824,
+        "Mont-blanc, premières ascensions (1770-1904)",
+        "Collectif",
+        ["mountain_climbing", ...SIM],
+        ["historical"],
+      ),
+      book(711391, "A la conquête des sommets - Cinquante montagnes pour autant de défis", "Joseph Poindexter", SIM, [
+        "topo",
+        "novel",
+      ]),
+    ],
+    recent_outings: {
+      total: 1743,
+      documents: [
+        outing(
+          1955437,
+          BOSSES,
+          SIM,
+          ["2026-09-28", "2026-09-28"],
+          ["excellent", 1000],
+          ["PD-", "III"],
+          [MB],
+          ["Nicolas 38500", 1677883],
+        ),
+        outing(
+          1954253,
+          "Mont Blanc : Arête des Bosses. Déco Dôme du Goûter ",
+          [...SIM, "paragliding"],
+          ["2026-09-25", "2026-09-26"],
+          ["excellent", 1000],
+          ["PD-", "III"],
+          [MB],
+          ["ClemAz", 330227],
+        ),
+        outing(
+          1953539,
+          "Mont Blanc : One push & fly ",
+          [...SIM, "paragliding"],
+          ["2026-09-19", "2026-09-19"],
+          ["excellent", 1000],
+          ["PD-", "III"],
+          [MB],
+          ["Tintin des alpes", 1439941],
+        ),
+        outing(
+          1950909,
+          "Mont Blanc : Arête des Bosses en one shot",
+          [...SIM, "mountain_climbing"],
+          ["2026-09-13", "2026-09-13"],
+          ["excellent", 1000],
+          ["PD-", "III"],
+          [MB],
+          ["Alex38CH", 1242223],
+        ),
+        outing(
+          1951136,
+          BIONNASSAY,
+          [...SIM, "mountain_climbing"],
+          ["2026-09-13", "2026-09-13"],
+          ["good", 1600],
+          ["AD", "IV"],
+          [MB],
+          ["PY", 986448],
+        ),
+        outing(
+          1949205,
+          BOSSES,
+          [...SIM, "hiking"],
+          ["2026-09-06", "2026-09-06"],
+          ["excellent", 3600],
+          ["PD-", "III"],
+          [MB],
+          ["lagopède", 455914],
+        ),
+        outing(
+          1948120,
+          BOSSES,
+          SIM,
+          ["2026-09-03", "2026-09-04"],
+          ["average", 1000],
+          ["PD-", "III"],
+          [MB],
+          ["MartinBNT", 1941392],
+        ),
+        outing(
+          1934345,
+          BROUILLARD,
+          ["mountain_climbing"],
+          ["2026-07-28", "2026-07-31"],
+          [null, 3500],
+          ["D", "V"],
+          [MB, GREES],
+          ["Pioche73", 1737347],
+        ),
+        outing(
+          1930996,
+          BIONNASSAY,
+          SIM,
+          ["2026-07-22", "2026-07-23"],
+          ["good", 1600],
+          ["AD", "IV"],
+          [MB],
+          ["Sebhublartpunk8.6", 1788058],
+        ),
+        outing(
+          1929496,
+          BROUILLARD,
+          ["mountain_climbing", ...SIM],
+          ["2026-07-18", "2026-07-20"],
+          ["good", 3500],
+          ["D", "V"],
+          [MB, GREES],
+          ["Merwan", 1476052],
+        ),
+      ],
+    },
+  },
+};
+
+describe("get_waypoint associations", () => {
+  it("lists the 27 routes of hut 104151 in search_routes format, fr locale and summit name first", async () => {
+    mockGetWaypoint.mockResolvedValueOnce(hutWithRoutes104151);
+
+    const result = await handleGetWaypoint({ id: 104151 });
+    const routes = section(result, "## Routes (27 of 27)");
+
+    expect(routes).toHaveLength(27);
+    expect(routes.slice(0, 5)).toEqual([
+      "- [1678194] Tour du Mont Pourri en 5 jours (hiking) | Max elevation: 2690m | Elevation gain: 2560m | " +
+        "Hiking rating: T2",
+      "- [1257165] Contrefort Dômes de la Sache et des Platières, couloir N (couloir Sandro) (skitouring, " +
+        "ice_climbing) | Max elevation: 3500m | Elevation gain: 2000m | Ski rating (Toponeige): 5.2 | Ski exposure: E3 | " +
+        "Labande: S5 / TD | Global rating: TD | Engagement: III | Risk rating: X3 | Equipment: P4+ | Ice rating: 3+",
+      "- [917458] Mont Pourri : Tour du Mont Pourri (hiking) | Max elevation: 2935m | Elevation gain: 2400m | " +
+        "Hiking rating: T3",
+      "- [604501] Mont Pourri : Tour du Mont Pourri (hiking) | Max elevation: 2713m | Elevation gain: 2900m",
+      "- [305854] Brèche Poccard : Lettre à Élise (mountain_climbing) | Max elevation: 3250m | Global rating: TD | " +
+        "Engagement: II | Equipment: P1 | Rock free rating: 6b+ | Rock required rating: 6a",
+    ]);
+    expect(routes).toContain(
+      "- [54975] Mont Pourri : Arête N (mountain_climbing, snow_ice_mixed) | Max elevation: 3779m | " +
+        "Elevation gain: 1400m | Global rating: PD+ | Engagement: III | Rock free rating: 3c",
+    );
+    expect(routes.at(-1)).toBe(
+      "- [46624] Mont Pourri : Traverse via Grand Col (skitouring) | Max elevation: 3779m | Elevation gain: 1900m | " +
+        "Ski rating (Toponeige): 3.3 | Ski exposure: E2 | Labande: S4 / AD+",
+    );
+    expect(result).not.toContain("More: search_routes");
+    expect(result).not.toContain("## Associated books");
+    expect(result).not.toContain("## Recent outings");
+    expect(result).not.toContain("null");
+    expect(result).not.toContain("undefined");
+  });
+
+  it("prints the first 50 of 60 routes and says where to find the rest", async () => {
+    const documents = Array.from({ length: 60 }, (_, i) =>
+      allRoute(900000 + i, fr("Crag", `Route ${i + 1}`), ["rock_climbing"], [1200, null], { rock_free_rating: "6a" }),
+    );
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 104000,
+      locales: [{ lang: "fr", title: "Crag" }],
+      waypoint_type: "climbing_outdoor",
+      elevation: 1200,
+      associations: { all_routes: { documents, total: 60 } },
+    });
+
+    const result = await handleGetWaypoint({ id: 104000 });
+    const lines = result.split("\n");
+    const start = lines.indexOf("## Routes (50 of 60)");
+
+    expect(start).toBeGreaterThan(-1);
+    expect(lines[start + 1]).toBe(
+      "- [900000] Crag : Route 1 (rock_climbing) | Max elevation: 1200m | Rock free rating: 6a",
+    );
+    expect(lines[start + 50]).toBe(
+      "- [900049] Crag : Route 50 (rock_climbing) | Max elevation: 1200m | Rock free rating: 6a",
+    );
+    expect(lines.slice(start + 51)).toEqual(["More: search_routes with waypoint_id=104000"]);
+  });
+
+  it("prints all 50 routes without a More line when there are exactly 50", async () => {
+    const documents = Array.from({ length: 50 }, (_, i) =>
+      allRoute(900000 + i, fr("Crag", `Route ${i + 1}`), [], [null, null]),
+    );
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 104000,
+      locales: [{ lang: "fr", title: "Crag" }],
+      waypoint_type: "climbing_outdoor",
+      associations: { all_routes: { documents, total: 50 } },
+    });
+
+    const result = await handleGetWaypoint({ id: 104000 });
+
+    expect(section(result, "## Routes (50 of 50)")).toHaveLength(50);
+    expect(result.split("\n").at(-1)).toBe("- [900049] Crag : Route 50");
+  });
+
+  it("lists the 6 books of summit 37355 in search_books format", async () => {
+    mockGetWaypoint.mockResolvedValueOnce(summit37355);
+
+    const books = section(await handleGetWaypoint({ id: 37355 }), "## Associated books");
+
+    expect(books).toEqual([
+      "- [136059] Les 4000 des Alpes | Author: Helmut Dumler, Willi P. Burkhardt | Types: historical, novel | " +
+        "Activities: mountain_climbing, snow_ice_mixed",
+      "- [171952] Guida dei Monti d'Italia - Monte Bianco vol. 1 | Author: Gino Buscaini | " +
+        "Types: historical, topo, environment | Activities: mountain_climbing, snow_ice_mixed, hiking, skitouring, " +
+        "rock_climbing, ice_climbing",
+      "- [176597] Mont Blanc 4808 m - 5 Voies Pour Le Sommet | Author: François Damilano | Types: topo | " +
+        "Activities: snow_ice_mixed",
+      "- [209293] La chaîne du Mont Blanc, Guide Vallot : I - Mont-Blanc - Trélatête | " +
+        "Author: Lucien Devies, Pierre Henry | Types: topo | Activities: mountain_climbing, snow_ice_mixed",
+      "- [390824] Mont-blanc, premières ascensions (1770-1904) | Author: Collectif | Types: historical | " +
+        "Activities: mountain_climbing, snow_ice_mixed",
+      "- [711391] A la conquête des sommets - Cinquante montagnes pour autant de défis | Author: Joseph Poindexter | " +
+        "Types: topo, novel | Activities: snow_ice_mixed",
+    ]);
+  });
+
+  it("lists the 10 recent outings of 1743 of summit 37355 and ends with where to find more", async () => {
+    mockGetWaypoint.mockResolvedValueOnce(summit37355);
+
+    const result = await handleGetWaypoint({ id: 37355 });
+    const outings = section(result, "## Recent outings (10 of 1743)");
+
+    expect(outings).toHaveLength(11);
+    expect(outings[0]).toBe(
+      `- [1955437] ${BOSSES} (snow_ice_mixed) | 2026-09-28 | Conditions: excellent | Max elevation: 4810m | ` +
+        "Elevation gain: 1000m | Global rating: PD- | Engagement: III | Areas: Mont-Blanc [14410] | Author: Nicolas 38500",
+    );
+    expect(outings[7]).toBe(
+      `- [1934345] ${BROUILLARD} (mountain_climbing) | 2026-07-28 → 2026-07-31 | Max elevation: 4810m | ` +
+        "Elevation gain: 3500m | Global rating: D | Engagement: V | " +
+        "Areas: Mont-Blanc [14410], Alpes Grées - Charbonnel [14424] | Author: Pioche73",
+    );
+    expect(outings[10]).toBe("More: search_outings with waypoint_id=37355");
+    expect(result.endsWith("\nMore: search_outings with waypoint_id=37355")).toBe(true);
+  });
+
+  it("prints Routes, Associated books then Recent outings after the user-written text", async () => {
+    mockGetWaypoint.mockResolvedValueOnce({
+      ...summit37355,
+      locales: [{ lang: "fr", title: "Mont Blanc", description: "Point culminant des Alpes." }],
+    });
+
+    const result = await handleGetWaypoint({ id: 37355 });
+
+    expect(result.split("\n").filter((line) => line.startsWith("## "))).toEqual([
+      "## Description",
+      "## Routes (2 of 39)",
+      "## Associated books",
+      "## Recent outings (10 of 1743)",
+    ]);
+    expect(section(result, "## Routes (2 of 39)")).toEqual([
+      "- [1897538] Mont Blanc : Abominette (snow_ice_mixed) | Global rating: TD | Engagement: IV | Ice rating: 4 | " +
+        "Mixed rating: M5+",
+      "- [1893205] Pointe Louis Amédée : Himalamiage (snow_ice_mixed, mountain_climbing) | Max elevation: 4806m | " +
+        "Elevation gain: 1600m | Global rating: ED- | Engagement: IV | Rock required rating: 5c | Aid rating: A1 | " +
+        "Ice rating: 4+ | Mixed rating: M4+",
+      "More: search_routes with waypoint_id=37355",
+    ]);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["null lists", { all_routes: null, books: null, recent_outings: null }],
+    [
+      "empty lists",
+      { all_routes: { documents: [], total: 0 }, books: [], recent_outings: { documents: [], total: 0 } },
+    ],
+  ])("prints no association section when associations are %s", async (_label, associations) => {
+    mockGetWaypoint.mockResolvedValueOnce({
+      document_id: 1350803,
+      locales: [{ lang: "fr", title: "Portbou" }],
+      waypoint_type: "access",
+      elevation: 0,
+      associations,
+    });
+
+    const result = await handleGetWaypoint({ id: 1350803 });
+
+    expect(result.split("\n").filter((line) => line.startsWith("## "))).toEqual([]);
+    expect(result).not.toContain("More:");
+  });
+
+  it("tells the LLM about the routes, books and recent outings and how to list more", () => {
+    const tool = waypointToolDefinitions.find((t) => t.name === "get_waypoint");
+
+    expect(tool?.description).toContain("search_routes with waypoint_id");
+    expect(tool?.description).toContain("search_outings with waypoint_id");
+    expect(tool?.description).toContain("the books that cover it");
+  });
+});

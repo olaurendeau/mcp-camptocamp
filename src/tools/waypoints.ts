@@ -3,7 +3,17 @@ import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
 import { searchWaypoints, getWaypoint } from "../api/camptocamp.js";
 import type { WaypointDetail } from "../api/camptocamp.js";
-import { pickLocale, pickTitle, isPresent, formatHeader, formatWaypointLine, formatAreasSection } from "./format.js";
+import {
+  pickLocale,
+  pickTitle,
+  isPresent,
+  formatHeader,
+  formatWaypointLine,
+  formatAreasSection,
+  formatRouteLine,
+  formatBookLine,
+  formatRecentOutings,
+} from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 import { CUSTODIANSHIPS, WAYPOINT_TYPES, enumValue } from "./enums.js";
 
@@ -92,7 +102,33 @@ function formatWaypointDetail(waypoint: WaypointDetail): string {
   lines.push(...formatUserText("access", "Access", locale?.access));
   lines.push(...formatUserText("access_period", "Access period", locale?.access_period));
 
+  lines.push(...formatWaypointAssociations(waypoint));
+
   return lines.join("\n");
+}
+
+// A crag can have hundreds of routes (~40 KB); the rest are one search_routes call away (decision Q2 on #58).
+const MAX_ROUTES = 50;
+
+// The routes, books and recent outings of a waypoint. An empty or missing list prints no section.
+function formatWaypointAssociations(waypoint: WaypointDetail): string[] {
+  const associations = waypoint.associations;
+  const lines: string[] = [];
+
+  const routes = associations?.all_routes;
+  if (routes && routes.documents.length > 0) {
+    const shown = routes.documents.slice(0, MAX_ROUTES);
+    lines.push(`\n## Routes (${shown.length} of ${routes.total})`, ...shown.map(formatRouteLine));
+    if (routes.total > shown.length) lines.push(`More: search_routes with waypoint_id=${waypoint.document_id}`);
+  }
+
+  const books = associations?.books ?? [];
+  if (books.length > 0) lines.push("\n## Associated books", ...books.map(formatBookLine));
+
+  lines.push(
+    ...formatRecentOutings(associations?.recent_outings, `search_outings with waypoint_id=${waypoint.document_id}`),
+  );
+  return lines;
 }
 
 export async function handleSearchWaypoints(input: SearchWaypointsInput): Promise<string> {
@@ -138,7 +174,7 @@ export const waypointToolDefinitions = [
     name: "get_waypoint",
     title: "Get waypoint details",
     description:
-      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, capacity (for huts, gîtes and camp sites: places outside the wardened period, then places when wardened; for a bivouac: its number of places), custodianship, phones and website, summary, description, access, access period (free text, as written), and the areas it belongs to (range, admin_limits, country). " +
+      "Get full details of a specific waypoint from Camptocamp.org by its ID, including altitude, GPS coordinates, capacity (for huts, gîtes and camp sites: places outside the wardened period, then places when wardened; for a bivouac: its number of places), custodianship, phones and website, summary, description, access, access period (free text, as written), the areas it belongs to (range, admin_limits, country), then its routes (at most 50, in search_routes format; a 'More: search_routes with waypoint_id=N' line follows when there are more), the books that cover it, and its most recent outings with their total ('More: search_outings with waypoint_id=N' lists them all). " +
       CUSTODIANSHIP_NOTE +
       " Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,
