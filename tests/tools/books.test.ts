@@ -1165,3 +1165,43 @@ describe("handleGetBook", () => {
     await expect(handleGetBook({ id: 999999999 })).rejects.toThrow("Camptocamp API error: 404 Not Found");
   });
 });
+
+// AC4.3 on #153: a malformed item is one placeholder line; the rest of the book and its lists are shown.
+describe("malformed list items", () => {
+  const PLACEHOLDER = "(not shown: Camptocamp sent this item in an unexpected format)";
+
+  it("print a placeholder line in the routes, waypoints and articles of get_book", async () => {
+    mockGetBook.mockResolvedValueOnce({
+      document_id: 14643,
+      locales: [{ lang: "fr", title: "Le topo de la Vanoise -  Tarentaise - Beaufortain" }],
+      author: "James Merel, Philippe Deslandes",
+      associations: {
+        routes: [
+          { document_id: 54085, locales: [{ lang: "fr", title: "Versant W", title_prefix: "Mont Pourri" }] },
+          { document_id: 55834, locales: null },
+        ],
+        waypoints: [{ document_id: 37916, locales: [{ lang: "fr", title: "Mont Pourri" }], waypoint_type: null }],
+        articles: [{ locales: [{ lang: "fr", title: "Glaciers" }] }],
+      },
+    } as never);
+
+    const lines = (await handleGetBook({ id: 14643 })).split("\n");
+
+    expect(lines).toContain("**Author**: James Merel, Philippe Deslandes");
+    expect(lines).toContain("- [54085] Mont Pourri : Versant W");
+    expect(lines).toContain(`- [55834] ${PLACEHOLDER}`);
+    expect(lines).toContain(`- [37916] ${PLACEHOLDER}`);
+    expect(lines.at(-1)).toBe("- (not shown: Camptocamp sent an item in an unexpected format)");
+  });
+
+  it("print a placeholder line in search_books, the counts unchanged", async () => {
+    const [first, second] = MONT_BLANC_SEARCH.documents;
+    mockSearchBooks.mockResolvedValueOnce({ documents: [first, { ...second, document_id: "x" }], total: 2 } as never);
+
+    const lines = (await search({ query: "mont blanc" })).split("\n");
+
+    expect(lines[0]).toBe("Found 2 book(s). Showing 2 from offset 0:");
+    expect(lines.some((line) => line.startsWith("- [373877] Mont Blanc Classique & Plaisir"))).toBe(true);
+    expect(lines).toContain("- (not shown: Camptocamp sent an item in an unexpected format)");
+  });
+});

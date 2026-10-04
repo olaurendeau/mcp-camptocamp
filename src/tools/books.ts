@@ -12,6 +12,7 @@ import {
   formatWaypointLine,
   formatTitledLine,
   formatBookLine,
+  formatListItems,
 } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 import { ACTIVITIES, BOOK_TYPES, enumValue } from "./enums.js";
@@ -62,17 +63,17 @@ function formatBookDetail(book: BookDetail): string {
 
   const routes = book.associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...routes.map(formatAssociatedRouteLine));
+    lines.push("\n## Associated routes", ...formatListItems(routes, formatAssociatedRouteLine));
   }
 
   const waypoints = book.associations?.waypoints;
   if (waypoints && waypoints.length > 0) {
-    lines.push("\n## Associated waypoints", ...waypoints.map((waypoint) => formatWaypointLine(waypoint)));
+    lines.push("\n## Associated waypoints", ...formatListItems(waypoints, (waypoint) => formatWaypointLine(waypoint)));
   }
 
   const articles = book.associations?.articles;
   if (articles && articles.length > 0) {
-    lines.push("\n## Associated articles", ...articles.map(formatTitledLine));
+    lines.push("\n## Associated articles", ...formatListItems(articles, formatTitledLine));
   }
 
   return lines.join("\n");
@@ -91,7 +92,7 @@ export async function handleSearchBooks(input: SearchBooksInput): Promise<string
     total: response.total,
     offset,
     limit,
-    lines: response.documents.map(formatBookLine),
+    lines: formatListItems(response.documents, formatBookLine),
     filters,
   });
 }

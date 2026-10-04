@@ -12,7 +12,10 @@ import {
   formatHeader,
   formatAssociatedRouteLine,
   formatOutingLine,
+  formatListItems,
+  formatMalformed,
 } from "./format.js";
+import { isMalformed } from "../api/schemas.js";
 import { formatRatingLines } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
@@ -92,7 +95,10 @@ function formatOutingDetail(outing: OutingDetail): string {
   if (isPresent(outing.participant_count)) lines.push(`**Participants**: ${outing.participant_count}`);
   const users = outing.associations?.users;
   if (users && users.length > 0) {
-    const accounts = users.map((user) => `${user.name} (user ID: ${user.document_id})`);
+    // An inline list: a malformed account is its placeholder without the "- " of a list line.
+    const accounts = users.map((user) =>
+      isMalformed(user) ? formatMalformed(user) : `${user.name} (user ID: ${user.document_id})`,
+    );
     lines.push(`**Participants with a Camptocamp account**: ${accounts.join(", ")}`);
   }
 
@@ -113,7 +119,7 @@ function formatOutingDetail(outing: OutingDetail): string {
 
   const routes = outing.associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...routes.map(formatAssociatedRouteLine));
+    lines.push("\n## Associated routes", ...formatListItems(routes, formatAssociatedRouteLine));
   }
 
   return lines.join("\n");
@@ -150,7 +156,7 @@ function formatOutingList(response: OutingListResponse, params: SearchOutingsInp
     total: response.total,
     offset: params.offset,
     limit: params.limit,
-    lines: response.documents.map(formatOutingLine),
+    lines: formatListItems(response.documents, formatOutingLine),
     filters: describeFilters(params),
     notes: params.period_start !== undefined ? [PERIOD_NOTE] : [],
     order: ", most recent first",

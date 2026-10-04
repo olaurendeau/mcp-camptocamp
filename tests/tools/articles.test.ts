@@ -1005,3 +1005,44 @@ describe("handleGetArticle", () => {
     await expect(handleGetArticle({ id: 999999999 })).rejects.toThrow("Camptocamp API error: 404 Not Found");
   });
 });
+
+// AC4.3 on #153: a malformed item is one placeholder line in each of the five association lists.
+describe("malformed list items", () => {
+  const PLACEHOLDER = "(not shown: Camptocamp sent this item in an unexpected format)";
+  const broken = (document_id: number) => ({ document_id, locales: [{ lang: "fr", title: null }] });
+
+  it("print a placeholder line in the routes, waypoints, articles, outings and books of get_article", async () => {
+    mockGetArticle.mockResolvedValueOnce({
+      document_id: 469577,
+      locales: [{ lang: "fr", title: "Ski de randonnée en Vanoise", description: "Texte." }],
+      article_type: "collab",
+      associations: {
+        routes: [broken(54085)],
+        waypoints: [broken(37916)],
+        articles: [broken(405598)],
+        outings: [broken(1757161)],
+        books: [{ document_id: 14643, locales: [{ lang: "fr", title: "Le topo de la Vanoise" }] }, broken(472409)],
+      },
+    } as never);
+
+    const result = await handleGetArticle({ id: 469577 });
+
+    expect(result).toContain("**Type**: collab");
+    expect(result).toContain("Texte.");
+    for (const id of [54085, 37916, 405598, 1757161, 472409]) expect(result).toContain(`\n- [${id}] ${PLACEHOLDER}`);
+    expect(result).toContain("\n## Associated books\n- [14643] Le topo de la Vanoise\n- [472409]");
+  });
+
+  it("print a placeholder line in search_articles, the counts unchanged", async () => {
+    const [first, ...rest] = CRAMPONS_SEARCH.documents;
+    mockSearchArticles.mockResolvedValueOnce({
+      documents: [{ ...first, locales: "crampons" }, ...rest],
+      total: CRAMPONS_SEARCH.total,
+    } as never);
+
+    const lines = (await search({ query: "crampons" })).split("\n");
+
+    expect(lines[0]).toBe(`Found ${CRAMPONS_SEARCH.total} article(s). Showing ${rest.length + 1} from offset 0:`);
+    expect(lines).toContain(`- [${first.document_id}] ${PLACEHOLDER}`);
+  });
+});

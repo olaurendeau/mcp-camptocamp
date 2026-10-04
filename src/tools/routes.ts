@@ -14,6 +14,7 @@ import {
   formatBookLine,
   formatTitledLine,
   formatRecentOutings,
+  formatListItems,
 } from "./format.js";
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
@@ -183,13 +184,13 @@ function formatRouteAssociations(route: RouteDetail): string[] {
 
   section(
     "Associated waypoints",
-    associations?.waypoints?.map((waypoint) =>
+    formatListItems(associations?.waypoints ?? [], (waypoint) =>
       formatWaypointLine(waypoint, { main: waypoint.document_id === route.main_waypoint_id }),
     ),
   );
-  section("Associated routes", associations?.routes?.map(formatAssociatedRouteLine));
-  section("Associated books", associations?.books?.map(formatBookLine));
-  section("Associated articles", associations?.articles?.map(formatTitledLine));
+  section("Associated routes", formatListItems(associations?.routes ?? [], formatAssociatedRouteLine));
+  section("Associated books", formatListItems(associations?.books ?? [], formatBookLine));
+  section("Associated articles", formatListItems(associations?.articles ?? [], formatTitledLine));
   lines.push(...formatRecentOutings(associations?.recent_outings, `search_outings with route_id=${route.document_id}`));
   return lines;
 }
@@ -254,7 +255,7 @@ export async function handleSearchRoutes(input: SearchRoutesInput): Promise<stri
     total: response.total,
     offset: input.offset,
     limit: input.limit,
-    lines: response.documents.map(formatRouteLine),
+    lines: formatListItems(response.documents, formatRouteLine),
     filters: describeFilters(options),
   });
 }

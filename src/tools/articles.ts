@@ -11,6 +11,7 @@ import {
   formatAssociatedRouteLine,
   formatWaypointLine,
   formatTitledLine,
+  formatListItems,
 } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
@@ -67,12 +68,12 @@ function formatArticleDetail(article: ArticleDetail): string {
 
   const routes = associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...routes.map(formatAssociatedRouteLine));
+    lines.push("\n## Associated routes", ...formatListItems(routes, formatAssociatedRouteLine));
   }
 
   const waypoints = associations?.waypoints;
   if (waypoints && waypoints.length > 0) {
-    lines.push("\n## Associated waypoints", ...waypoints.map((waypoint) => formatWaypointLine(waypoint)));
+    lines.push("\n## Associated waypoints", ...formatListItems(waypoints, (waypoint) => formatWaypointLine(waypoint)));
   }
 
   const titled: Array<[string, Associations["articles"]]> = [
@@ -82,7 +83,7 @@ function formatArticleDetail(article: ArticleDetail): string {
   ];
   for (const [kind, documents] of titled) {
     if (documents && documents.length > 0) {
-      lines.push(`\n## Associated ${kind}`, ...documents.map(formatTitledLine));
+      lines.push(`\n## Associated ${kind}`, ...formatListItems(documents, formatTitledLine));
     }
   }
 
@@ -99,7 +100,7 @@ export async function handleSearchArticles(input: SearchArticlesInput): Promise<
     total: response.total,
     offset,
     limit,
-    lines: response.documents.map(formatArticleSearchLine),
+    lines: formatListItems(response.documents, formatArticleSearchLine),
     filters: [`query "${query}"`],
   });
 }

@@ -364,3 +364,18 @@ describe("areaToolDefinitions", () => {
     expect(description).toContain("search_routes, search_waypoints and search_outings");
   });
 });
+
+describe("malformed search documents (AC4.3 on #153)", () => {
+  it("print a placeholder line, the counts unchanged", async () => {
+    mockSearchAreas.mockResolvedValueOnce({
+      documents: [ecrins, { ...valaisCanton, area_type: null }],
+      total: 2,
+    } as never);
+
+    const lines = (await search({ query: "valais" })).split("\n");
+
+    expect(lines[0]).toBe("Found 2 area(s). Showing 2 from offset 0:");
+    expect(lines).toContain("- [14403] Écrins (range)");
+    expect(lines).toContain("- [14384] (not shown: Camptocamp sent this item in an unexpected format)");
+  });
+});
