@@ -65,8 +65,34 @@ jobs:
         with:
           context: .
           push: false
+          load: true
+          tags: mcp-camptocamp:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Smoke test (MCP initialize + tools/list over stdio)
+        env:
+          EXPECTED_TOOLS: 13
+        run: |
+          USER_NAME=$(docker image inspect --format '{{.Config.User}}' mcp-camptocamp:ci)
+          if [ "$USER_NAME" != "node" ]; then
+            echo "::error::Image runs as '$USER_NAME', expected 'node'"
+            exit 1
+          fi
+          # Same stdio setup as the Claude Desktop config, without network, writable filesystem or capabilities
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci-smoke","version":"0"}}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | timeout 30 docker run --rm -i --network none --read-only --cap-drop ALL mcp-camptocamp:ci \
+            > responses.jsonl
+          jq -c 'select(.id == 1) | .result.serverInfo' responses.jsonl
+          TOOLS=$(jq 'select(.id == 2) | .result.tools | length' responses.jsonl)
+          echo "Tools listed: ${TOOLS:-0} / $EXPECTED_TOOLS"
+          if [ "${TOOLS:-0}" -ne "$EXPECTED_TOOLS" ]; then
+            cat responses.jsonl
+            echo "::error::tools/list returned ${TOOLS:-0} tools, expected $EXPECTED_TOOLS"
+            exit 1
+          fi
 
   audit:
     runs-on: ubuntu-latest
