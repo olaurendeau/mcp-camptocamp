@@ -19,6 +19,13 @@ function enumList<T extends string>(values: readonly [T, ...T[]], description: s
   return z.array(enumValue(values)).min(1).optional().describe(description);
 }
 
+// The longest scale value is 4 characters ("M12+"); the cap keeps an invalid value short in the error that echoes it.
+const MAX_RATING_LENGTH = 8;
+
+function ratingBound(description: string) {
+  return z.string().max(MAX_RATING_LENGTH).optional().describe(description);
+}
+
 function heightDiffUp(bound: string) {
   return z
     .number()
@@ -45,14 +52,8 @@ export const searchRoutesSchema = z.object({
         `ski_rating is the Toponeige ski rating). Valid values per system, easiest first: ${RATING_SCALES}. ` +
         "Routes without a value for the chosen rating are excluded.",
     ),
-  rating_min: z
-    .string()
-    .optional()
-    .describe("Easiest rating to include, from the scale of rating_system (e.g. '3.1' for ski_rating)"),
-  rating_max: z
-    .string()
-    .optional()
-    .describe("Hardest rating to include, from the scale of rating_system (e.g. 'AD' for global_rating)"),
+  rating_min: ratingBound("Easiest rating to include, from the scale of rating_system (e.g. '3.1' for ski_rating)"),
+  rating_max: ratingBound("Hardest rating to include, from the scale of rating_system (e.g. 'AD' for global_rating)"),
   height_diff_up_min: heightDiffUp("Lowest"),
   height_diff_up_max: heightDiffUp("Highest"),
   route_types: enumList(ROUTE_TYPES, `Route types, matching any of: ${ROUTE_TYPES.join(", ")}`),

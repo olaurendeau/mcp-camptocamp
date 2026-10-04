@@ -352,7 +352,18 @@ describe("search_routes field inputs", () => {
       "route_types",
       "must be one of: return_same_way, loop, loop_hut, traverse, raid, expedition",
     ],
-    ["an unknown rating system", { rating_system: "rating", rating_min: "AD" }, "rating_system", "must be one of: "],
+    [
+      "an unknown rating system",
+      { rating_system: "rating", rating_min: "AD" },
+      "rating_system",
+      "must be one of: ski_rating, ski_exposition, labande_ski_rating, labande_global_rating, global_rating, ",
+    ],
+    [
+      "a rating bound over 8 characters",
+      { rating_system: "global_rating", rating_min: "AD".repeat(5) },
+      "rating_min",
+      '"maximum": 8',
+    ],
     ["a negative elevation gain", { height_diff_up_min: -1 }, "height_diff_up_min", "too_small"],
   ])("rejects %s without calling Camptocamp", async (_label, args, field, message) => {
     const fetchMock = stubFetch();

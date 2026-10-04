@@ -759,6 +759,7 @@ const vanoiseSkiRoutes = {
       [3355, 1500],
       ["3.1", "E1", "S3", "AD-"],
     ),
+    // Verbatim: Camptocamp has elevation_min 2558 and elevation_max 1400 for this route (also GET /routes/1512979, 2026-10-04).
     skiRoute(1512979, ["Mont Jovet", "Couloirs N"], [1400, 1200], ["3.3", "E1", "S2", "AD-"]),
     skiRoute(1491351, ["Pointe de la Vélière", "Couloir S (couloir amada)"], [2467, 1100], ["3.3", "E3", "S3", "D"]),
     skiRoute(1406657, ["Aiguille Pers", "Versant NW - Épaule N  "], [3200, 1350], ["3.2", "E2", "S4", "AD"]),
@@ -942,6 +943,10 @@ describe("search_routes filters", () => {
     expect(searchRoutesSchema.safeParse({ configuration: [] }).success).toBe(false);
     expect(searchRoutesSchema.safeParse({ activity: "skiing" }).success).toBe(false);
     expect(searchRoutesSchema.safeParse({ rating_system: "rating" }).success).toBe(false);
+    for (const bound of ["rating_min", "rating_max"]) {
+      expect(searchRoutesSchema.safeParse({ [bound]: "M".repeat(9) }).success, bound).toBe(false);
+      expect(searchRoutesSchema.safeParse({ [bound]: "M".repeat(8) }).success, bound).toBe(true);
+    }
   });
 
   it("searches the routes of a waypoint for an activity (AC4.5)", async () => {

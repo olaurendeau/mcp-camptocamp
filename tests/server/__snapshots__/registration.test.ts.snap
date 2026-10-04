@@ -332,10 +332,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
       },
       "rating_max": {
         "description": "Hardest rating to include, from the scale of rating_system (e.g. 'AD' for global_rating)",
+        "maxLength": 8,
         "type": "string",
       },
       "rating_min": {
         "description": "Easiest rating to include, from the scale of rating_system (e.g. '3.1' for ski_rating)",
+        "maxLength": 8,
         "type": "string",
       },
       "rating_system": {
