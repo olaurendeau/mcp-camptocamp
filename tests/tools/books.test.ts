@@ -1246,6 +1246,58 @@ describe("get_book lang", () => {
   });
 });
 
+// AC1.7 on #210: get_book names the sections written only in other languages.
+describe("get_book Text in other languages", () => {
+  // Book 14592 of GET /books/14592 (2026-10-05): its es and fr locales, each text cut after its first line or
+  // sentence, punctuation as sent; associations left out. Only fr has a summary.
+  const rebuffat = {
+    document_id: 14592,
+    locales: [
+      {
+        lang: "es",
+        title: "El Macizo del Mont Blanc: Las 100 Mejores Ascensiones",
+        summary: null,
+        description: "Existe una traducción española de la obra de Gaston Rébuffat, por la editorial RM (1976).",
+      },
+      {
+        lang: "fr",
+        title: "Le massif du Mont-Blanc - Les 100 plus belles courses",
+        summary: "Ouvrage de référence pour le Massif du Mont-Blanc.",
+        description: "[img=291319 right no_border no_legend/]\r",
+      },
+    ],
+    author: "Gaston Rébuffat",
+    editor: "Denoël",
+    activities: ["mountain_climbing", "snow_ice_mixed"],
+    book_types: ["topo"],
+    publication_date: "1973",
+  };
+
+  it("names the summary book 14592 has only in fr, right after the URL line", async () => {
+    mockGetBook.mockResolvedValueOnce(rebuffat);
+
+    const result = await handleGetBook({ id: 14592, lang: "es" });
+
+    expect(result.split("\n").slice(0, 5)).toEqual([
+      "# El Macizo del Mont Blanc: Las 100 Mejores Ascensiones (ID: 14592)",
+      "**URL**: https://www.camptocamp.org/books/14592",
+      "**Text in other languages**: summary (fr)",
+      "",
+      "**Author**: Gaston Rébuffat",
+    ]);
+    expect(result).not.toContain("## Summary");
+    expect(result).not.toContain("Ouvrage de référence");
+  });
+
+  it("prints no Text line in fr", async () => {
+    mockGetBook.mockResolvedValueOnce(rebuffat);
+
+    const result = await handleGetBook({ id: 14592 });
+
+    expect(result).not.toContain("Text in other languages");
+  });
+});
+
 // #200 (from the #202 review): search_books parses lang with the real list and names each book in it.
 describe("search_books lang", () => {
   // Derived from GET /books?q=Mont Blanc&pl=fr and &pl=en (2026-10-04), one locale each: both locales merged
