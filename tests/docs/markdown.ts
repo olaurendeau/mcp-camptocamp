@@ -280,6 +280,11 @@ export function checkSources(text: string): string[] {
   return problems;
 }
 
+/** The content of the file at `path`, or undefined if it is missing or not a file. */
+function readExistingFile(path: string): string | undefined {
+  return existsSync(path) && statSync(path).isFile() ? readFileSync(path, "utf8") : undefined;
+}
+
 const LAST_VERIFIED = /^Last verified: (\d{4}-\d{2}-\d{2}) against official docs$/m;
 const MATRIX_COLUMNS = ["Client", "Works?", "Page", "Last verified"];
 
@@ -291,9 +296,15 @@ export function section(text: string, title: string): string | undefined {
 
 /**
  * Problems with the `## Support matrix` of the docs index `file` (content `text`): its columns, a page link and
- * the page's own `Last verified` date in each row, and a row for each of `pages`.
+ * the page's own `Last verified` date in each row, and a row for each of `pages`. `readPage` returns a page's
+ * content, or undefined when it is missing; an anchor-only link (`#…`) points at `file` itself, as in `checkLinks`.
  */
-export function checkSupportMatrix(file: string, text: string, pages: string[]): string[] {
+export function checkSupportMatrix(
+  file: string,
+  text: string,
+  pages: string[],
+  readPage: (path: string) => string | undefined = readExistingFile,
+): string[] {
   const body = section(text, "Support matrix");
   if (body === undefined) {
     return ['no "## Support matrix" section'];
@@ -322,9 +333,11 @@ export function checkSupportMatrix(file: string, text: string, pages: string[]):
     if (target === undefined) {
       return [`row "${client}": no link to a page`];
     }
-    const resolved = resolve(dirname(file), target.replace(/#.*/, ""));
+    const path = decodeURIComponent(target.replace(/#.*/, ""));
+    const resolved = path === "" ? file : resolve(dirname(file), path);
     linked.add(resolved);
-    const verified = existsSync(resolved) ? LAST_VERIFIED.exec(readFileSync(resolved, "utf8"))?.[1] : undefined;
+    const content = resolved === file ? text : readPage(resolved);
+    const verified = content === undefined ? undefined : LAST_VERIFIED.exec(content)?.[1];
     return verified === date
       ? []
       : [`row "${client}": Last verified ${date}, but ${relative(ROOT, resolved)} says ${verified ?? "nothing"}`];

@@ -308,41 +308,59 @@ describe("docs checks fail on bad fixtures", () => {
     ).toEqual([]);
   });
 
-  it("a support matrix that is missing, has other columns, a row without a page link or another date", () => {
-    const head = "## Support matrix\n\n| Client | Works? | Page | Last verified |\n| --- | --- | --- | --- |";
-    const gettingStarted = join(DOCS, "getting-started.md");
-    const troubleshooting = join(DOCS, "troubleshooting.md");
+  const pageA = join(DOCS, "a.md");
+  const pageB = join(DOCS, "clients", "b.md");
+  const fixturePages: Partial<Record<string, string>> = {
+    [pageA]: "# A\n\nLast verified: 2026-03-01 against official docs\n",
+    [pageB]: "# B\n\nLast verified: 2026-03-02 against official docs\n",
+  };
+  const readFixture = (path: string): string | undefined => fixturePages[path];
+  const matrixHead = "## Support matrix\n\n| Client | Works? | Page | Last verified |\n| --- | --- | --- | --- |";
 
-    expect(checkSupportMatrix(INDEX, "## Clients", [])).toEqual(['no "## Support matrix" section']);
-    expect(checkSupportMatrix(INDEX, "## Support matrix\n\n| Client | Page |\n| --- | --- |", [])).toEqual([
-      "expected the columns Client, Works?, Page, Last verified, got Client, Page",
-    ]);
-    const rows = [
-      head,
-      "| A | Yes | none | 2026-10-04 |",
-      "| B | Yes | [page](getting-started.md#prerequisites) | 2026-01-01 |",
-      "| C | Yes | [page](getting-started.md) |",
+  it("a support matrix that is missing, or has other columns", () => {
+    expect(checkSupportMatrix(INDEX, "## Clients", [], readFixture)).toEqual(['no "## Support matrix" section']);
+    expect(checkSupportMatrix(INDEX, "## Support matrix\n\n| Client | Page |\n| --- | --- |", [], readFixture)).toEqual(
+      ["expected the columns Client, Works?, Page, Last verified, got Client, Page"],
+    );
+  });
+
+  it("a row without a page link, another date, a missing cell, a missing page, and a page without a row", () => {
+    const text = [
+      matrixHead,
+      "| A | Yes | none | 2026-03-01 |",
+      "| B | Yes | [page](clients/b.md#setup) | 2026-01-01 |",
+      "| C | Yes | [page](a.md) |",
+      "| D | Yes | [page](no-such-page.md) | 2026-03-01 |",
     ].join("\n");
-    expect(checkSupportMatrix(INDEX, rows, [gettingStarted, troubleshooting])).toEqual([
+
+    expect(checkSupportMatrix(INDEX, text, [pageA, pageB], readFixture)).toEqual([
       'row "A": no link to a page',
-      'row "B": Last verified 2026-01-01, but docs/getting-started.md says 2026-10-04',
+      'row "B": Last verified 2026-01-01, but docs/clients/b.md says 2026-03-02',
       'row "C": expected 4 cells, got 3',
-      "docs/troubleshooting.md: no row links this page",
+      'row "D": Last verified 2026-03-01, but docs/no-such-page.md says nothing',
+      "docs/a.md: no row links this page",
     ]);
+  });
+
+  it("an anchor-only link reads the index itself, without opening its folder", () => {
+    const text = [matrixHead, "| A | Yes | [here](#support-matrix) | 2026-03-01 |"].join("\n");
+
+    expect(checkSupportMatrix(INDEX, text, [], readFixture)).toEqual([
+      'row "A": Last verified 2026-03-01, but docs/README.md says nothing',
+    ]);
+    expect(checkSupportMatrix(INDEX, `${text}\n\nLast verified: 2026-03-01 against official docs`, [])).toEqual([]);
   });
 
   it("accepts a support matrix whose rows link the pages with their Last verified date", () => {
     const text = [
-      "## Support matrix",
-      "",
-      "| Client | Works? | Page | Last verified |",
-      "| --- | --- | --- | --- |",
-      "| A | Yes | [Getting started](getting-started.md#prerequisites) | 2026-10-04 |",
+      matrixHead,
+      "| A | Yes | [A](a.md) | 2026-03-01 |",
+      "| B | Yes | [B](clients/b.md#setup) | 2026-03-02 |",
       "",
       "## Next",
     ].join("\n");
 
-    expect(checkSupportMatrix(INDEX, text, [join(DOCS, "getting-started.md")])).toEqual([]);
+    expect(checkSupportMatrix(INDEX, text, [pageA, pageB], readFixture)).toEqual([]);
   });
 });
 
