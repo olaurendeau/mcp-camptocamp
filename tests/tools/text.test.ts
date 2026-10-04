@@ -117,6 +117,13 @@ describe("formatUserText", () => {
     );
   });
 
+  // Accepted side effect of D6 on #153 (no confusables table): bracketed non-Latin text shaped like a
+  // marker (words of 3 or 5, then 4, 7 and 4 letters) gets its "[" turned into "(". Change only with a
+  // new decision.
+  it("turns the bracket of non-Latin text shaped like a marker into (", () => {
+    expect(body("Avant [абв гдеж зийклмн опрс] après.")).toBe("Avant (абв гдеж зийклмн опрс] après.");
+  });
+
   it.each([["[Mont Blanc]"], ["[привет мир]"], ["[end of season]"]])("leaves %j unchanged", (text) => {
     expect(body(`Avant ${text} après.`)).toBe(`Avant ${text} après.`);
   });
