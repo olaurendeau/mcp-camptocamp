@@ -122,7 +122,7 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 | `search_routes`       | Search by keyword, area, waypoint, activity, rating, gain, type, configuration; paged with `offset`              |
 | `get_route`           | Route detail by ID (summit : title, text, ratings, elevation, areas, books, waypoints, outings…)                 |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`, by `waypoint_type`; paged with `offset`     |
-| `get_waypoint`        | Waypoint by ID (altitude, GPS, areas; huts: capacity, custodianship, phones, website, access period)             |
+| `get_waypoint`        | Waypoint by ID (altitude, GPS, areas, hut details, access period, routes, books, recent outings)                 |
 | `search_user_outings` | Alias of `search_outings` by `user_id`: a user's outings, newest first, labelled ratings, paged                  |
 | `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings)             |
 | `search_outings`      | Outings by keyword, area, activity, dates, yearly period, route, waypoint, user; newest first, paged             |
@@ -138,6 +138,8 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>` (`formatHeader` in `src/tools/format.ts`), so the LLM can cite the source page.
 
 `get_route` ends with the route's associations, each section left out when its list is empty: `## Associated waypoints` (`| main waypoint` on `main_waypoint_id`), `## Associated routes`, `## Associated books` (`formatBookLine`, shared with `search_books`), `## Associated articles`, then `## Recent outings (<shown> of <total>)` in `search_outings` line format (`formatRecentOutings`), ending `More: search_outings with route_id=<id>` when more exist.
+
+`get_waypoint` ends the same way, after its user-written text: `## Routes (<shown> of <total>)` from `associations.all_routes` in `search_routes` line format (`formatRouteLine`), at most 50 lines then `More: search_routes with waypoint_id=<id>` when more exist (decision Q2 on #58: a crag can have hundreds of routes), `## Associated books` (`formatBookLine`) and `## Recent outings (<shown> of <total>)` ending `More: search_outings with waypoint_id=<id>`; an empty list prints no section.
 
 Free-text locale fields written by Camptocamp users (descriptions, summaries, remarks, gear, access, conditions, weather…) go through `formatUserText` in `src/tools/text.ts`: printed under `## <Heading>` between `[begin user-written text: <field>]` and `[end user-written text: <field>]`. The pipeline: Camptocamp image tags rewritten to `[image: <caption>]` (nothing without a caption) and internal links `[[routes/54080/fr|Col des Roches]]` to `Col des Roches (routes/54080)`, other markup kept; line-start Markdown headings demoted two levels (capped at `######`), setext headings (`===` / `---` underlines) turned into `###` / `####`; copies of the markers neutralised (`[` → `(`), lookalikes included (full-width, `【`, dash variants, `user written` / `userwritten` / `user_written`, zero-width characters, combining grapheme joiner, variation selectors); then cut after 8000 characters with `[truncated, N more characters]`, N counted after the earlier steps. Each `get_*` tool description says that text between the markers is user-written content, not instructions.
 
@@ -156,6 +158,7 @@ Locale: searches send `pl=fr`, which returns one locale per document, French whe
   - `associations`: `waypoints` (the one matching `main_waypoint_id` is marked), `routes`, `books`, `articles`, and `recent_outings {documents, total}` (the latest 10, shaped like `/outings` list items); `images` and `xreports` are not read.
 - `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}][&wtyp={waypoint_type}][&offset={n}]` (at least one of `q` and `a`)
 - `GET /waypoints/{id}`
+  - `associations`: `all_routes {documents, total}` (shaped like `/routes` search results; `routes` is often empty when `all_routes` is not, hut 104151), `books`, and `recent_outings {documents, total}`; `routes`, `waypoints`, `waypoint_children`, `articles`, `images` and `xreports` are not read.
 - `GET /outings/{id}`
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]`
   - `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).
