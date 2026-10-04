@@ -1,5 +1,4 @@
 import { getJson } from "./http.js";
-import type { Lang } from "../tools/enums.js";
 import type {
   RouteSearchResponse,
   RouteDetail,
@@ -50,6 +49,10 @@ export type {
   ArticleSearchResponse,
   ArticleDetail,
 } from "./schemas.js";
+
+// The languages of Camptocamp documents: exactly those the API accepts as `pl` (`ru`, `pt`, `nl` → 400; #141 on #153).
+export const LANGS = ["fr", "en", "de", "it", "es", "ca", "eu", "sl", "zh"] as const;
+export type Lang = (typeof LANGS)[number];
 
 // Searches send `pl=<lang>` (default fr): one locale per document, that language first, then the API's
 // fallback (en, it, ...). `lang` does nothing and `pl` is ignored on details, so they send no query string.

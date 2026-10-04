@@ -22,7 +22,7 @@ import {
 } from "../../src/api/camptocamp.js";
 import { outingDetailSchema, routeDetailSchema } from "../../src/api/schemas.js";
 import { wellFormed } from "./well-formed.js";
-import type { Lang } from "../../src/tools/enums.js";
+import type { Lang } from "../../src/api/camptocamp.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);

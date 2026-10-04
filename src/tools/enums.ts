@@ -64,9 +64,9 @@ export const BOOK_TYPES = [
   "magazine",
 ] as const;
 
-// The languages of Camptocamp documents: exactly those the API accepts as `pl` (`ru`, `pt`, `nl` → 400; #141 on #153).
-export const LANGS = ["fr", "en", "de", "it", "es", "ca", "eu", "sl", "zh"] as const;
-export type Lang = (typeof LANGS)[number];
+// The languages of Camptocamp documents, defined with the API client that sends them as `pl`.
+export { LANGS } from "../api/camptocamp.js";
+export type { Lang } from "../api/camptocamp.js";
 
 /** One value of `values`; anything else fails with "must be one of: <values>". */
 export function enumValue<T extends string>(values: readonly [T, ...T[]]) {
