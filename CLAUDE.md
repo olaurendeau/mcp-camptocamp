@@ -161,7 +161,7 @@ Locale: searches send `pl=fr`, which returns one locale per document, French whe
   - `associations`: `waypoints` (the one matching `main_waypoint_id` is marked), `routes`, `books`, `articles`, and `recent_outings {documents, total}` (the latest 10, shaped like `/outings` list items); `images` and `xreports` are not read.
 - `GET /waypoints?limit=10&pl=fr[&q={query}][&a={area_id}][&wtyp={waypoint_type}][&offset={n}]` (at least one of `q` and `a`)
 - `GET /waypoints/{id}`
-  - `associations`: `all_routes {documents, total}` (shaped like `/routes` search results; `routes` is often empty when `all_routes` is not, hut 104151), `books`, and `recent_outings {documents, total}`; `routes`, `waypoints`, `waypoint_children`, `articles`, `images` and `xreports` are not read.
+  - `associations`: `all_routes {documents, total}` (shaped like `/routes` search results; there is no `routes` key, hut 104151), `books`, and `recent_outings {documents, total}`; `waypoints`, `waypoint_children`, `articles`, `images` and `xreports` are not read.
 - `GET /outings/{id}`
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl=fr[&q={query}][&a={area_id}][&act={activity}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]`
   - `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).

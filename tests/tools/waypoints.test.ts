@@ -1000,7 +1000,8 @@ const routes104151 = [
 ];
 
 // Trimmed from the live GET /waypoints/104151?lang=fr response (2026-10-04): texts, geometry and areas dropped,
-// recent_outings left out; books, routes and articles are empty lists there.
+// recent_outings left out (the hut has 266), waypoints and images emptied; books and articles are empty lists
+// there, and associations has no routes key.
 const hutWithRoutes104151 = {
   document_id: 104151,
   locales: [{ lang: "fr", title: "Refuge du Mont Pourri" }],
@@ -1009,7 +1010,6 @@ const hutWithRoutes104151 = {
   associations: {
     all_routes: { documents: routes104151, total: 27 },
     books: [],
-    routes: [],
     articles: [],
     waypoints: [],
     waypoint_children: [],
