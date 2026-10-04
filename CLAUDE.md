@@ -56,6 +56,9 @@ make check
 # Run tests
 docker compose run --rm dev npm test
 
+# Live contract tests against the real Camptocamp API (not part of npm test or make check)
+make test-contract
+
 # Watch mode during development
 docker compose run --rm dev npm run test:watch
 
