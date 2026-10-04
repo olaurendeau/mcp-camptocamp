@@ -14,6 +14,7 @@ import {
   formatRouteLine,
   formatBookLine,
   formatRecentOutings,
+  formatListItems,
 } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 import { CUSTODIANSHIPS, WAYPOINT_TYPES, enumValue } from "./enums.js";
@@ -125,12 +126,12 @@ function formatWaypointAssociations(waypoint: WaypointDetail): string[] {
   const routes = associations?.all_routes;
   if (routes && routes.documents.length > 0) {
     const shown = routes.documents.slice(0, MAX_ROUTES);
-    lines.push(`\n## Routes (${shown.length} of ${routes.total})`, ...shown.map(formatRouteLine));
+    lines.push(`\n## Routes (${shown.length} of ${routes.total})`, ...formatListItems(shown, formatRouteLine));
     if (routes.total > shown.length) lines.push(`More: search_routes with waypoint_id=${waypoint.document_id}`);
   }
 
   const books = associations?.books ?? [];
-  if (books.length > 0) lines.push("\n## Associated books", ...books.map(formatBookLine));
+  if (books.length > 0) lines.push("\n## Associated books", ...formatListItems(books, formatBookLine));
 
   lines.push(
     ...formatRecentOutings(associations?.recent_outings, `search_outings with waypoint_id=${waypoint.document_id}`),
@@ -157,7 +158,7 @@ export async function handleSearchWaypoints(input: SearchWaypointsInput): Promis
     total: response.total,
     offset,
     limit,
-    lines: response.documents.map((waypoint) => formatWaypointLine(waypoint)),
+    lines: formatListItems(response.documents, (waypoint) => formatWaypointLine(waypoint)),
     filters,
   });
 }

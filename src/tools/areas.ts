@@ -3,7 +3,7 @@ import { documentId, searchOffset, searchQuery } from "./inputs.js";
 import { assertResultWindow, formatSearchPage, PAGING_NOTE } from "./paging.js";
 import { searchAreas, getArea } from "../api/camptocamp.js";
 import type { AreaDetail } from "../api/camptocamp.js";
-import { pickLocale, pickTitle, formatHeader, formatAreaLine } from "./format.js";
+import { pickLocale, pickTitle, formatHeader, formatAreaLine, formatListItems } from "./format.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchAreasSchema = z.object({
@@ -48,7 +48,7 @@ export async function handleSearchAreas(input: SearchAreasInput): Promise<string
     total: response.total,
     offset,
     limit,
-    lines: response.documents.map((area) => formatAreaLine(area)),
+    lines: formatListItems(response.documents, formatAreaLine),
     filters,
   });
 }

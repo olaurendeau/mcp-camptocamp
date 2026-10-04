@@ -1,10 +1,12 @@
 // Formatting helpers shared by the tool handlers. Parameter types come from the shared response
 // schemas and are structural, so any response shape with the fields a helper reads (search result,
 // detail, association) can be passed.
+import { isMalformed } from "../api/schemas.js";
 import type {
   AreaSummary,
   BookSearchResult,
   Locale,
+  MalformedItem,
   OutingListItem,
   OutingListResponse,
   RouteAssociation,
@@ -30,6 +32,22 @@ export function pickLocale<T extends { lang: string }>(locales: T[]): T | undefi
 
 export function pickTitle(locales: Locale[]): string {
   return pickLocale(locales)?.title ?? "Untitled";
+}
+
+// A list as tolerantArray parses it: each item is well-formed or a MalformedItem.
+export type ListOf<T> = readonly (T | MalformedItem)[];
+
+// The placeholder of a malformed item, without the "- " of a list line (#129, decision D2 on #153).
+export function formatMalformed(item: MalformedItem): string {
+  return item.document_id === undefined
+    ? "(not shown: Camptocamp sent an item in an unexpected format)"
+    : `[${item.document_id}] (not shown: Camptocamp sent this item in an unexpected format)`;
+}
+
+// One line per item, in API order: `format` for a well-formed item, a placeholder line for a malformed one,
+// so the counts printed next to a list still match its lines.
+export function formatListItems<T extends object>(items: ListOf<T>, format: (item: T) => string): string[] {
+  return items.map((item) => (isMalformed(item) ? `- ${formatMalformed(item)}` : format(item)));
 }
 
 export function joinList(values?: string[] | null): string | undefined {
@@ -147,7 +165,10 @@ export function formatOutingLine(outing: OutingListItem): string {
 export function formatRecentOutings(recent: OutingListResponse | null | undefined, more: string): string[] {
   if (!recent || recent.documents.length === 0) return [];
   const shown = recent.documents.length;
-  const lines = [`\n## Recent outings (${shown} of ${recent.total})`, ...recent.documents.map(formatOutingLine)];
+  const lines = [
+    `\n## Recent outings (${shown} of ${recent.total})`,
+    ...formatListItems(recent.documents, formatOutingLine),
+  ];
   if (recent.total > shown) lines.push(`More: ${more}`);
   return lines;
 }
@@ -160,7 +181,7 @@ export function formatAreaLine(area: AreaSummary): string {
   return `- [${area.document_id}] ${pickTitle(area.locales)} (${area.area_type})`;
 }
 
-export function formatAreasSection(areas?: AreaSummary[] | null): string[] {
+export function formatAreasSection(areas?: ListOf<AreaSummary> | null): string[] {
   if (!areas || areas.length === 0) return [];
-  return ["\n## Areas", ...areas.map(formatAreaLine)];
+  return ["\n## Areas", ...formatListItems(areas, formatAreaLine)];
 }
