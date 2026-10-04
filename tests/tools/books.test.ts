@@ -733,6 +733,33 @@ describe("handleGetBook", () => {
     );
   });
 
+  it("labels the ratings of associated routes by their grading system", async () => {
+    // Non-null ratings of routes 46381 and 46657 in the live GET /books/1925012 response (2026-10-04).
+    const [brevent, bettey] = BOOK_1925012.associations.routes;
+    const routes = [
+      { ...brevent, ski_rating: "2.3", ski_exposition: "E1", labande_ski_rating: "S3", labande_global_rating: "PD" },
+      {
+        ...bettey,
+        ski_rating: "2.3",
+        ski_exposition: "E1",
+        labande_ski_rating: "S3",
+        labande_global_rating: "PD+",
+        hiking_rating: "T2",
+        snowshoe_rating: "R4",
+      },
+    ];
+    mockGetBook.mockResolvedValueOnce({ ...BOOK_1925012, associations: { routes } });
+
+    const result = await handleGetBook({ id: 1925012 });
+
+    expect(result).toContain(
+      "## Associated routes\n" +
+        "- [46381] Traversée Brévent - Aiguillette des Houches | Ski rating (Toponeige): 2.3 | Ski exposure: E1 | Labande: S3 / PD\n" +
+        "- [46657] Aiguillette des Houches : Depuis le Bettey | Ski rating (Toponeige): 2.3 | Ski exposure: E1 | " +
+        "Labande: S3 / PD+ | Hiking rating: T2 | Snowshoe rating: R4",
+    );
+  });
+
   it("keeps the double space of a free-text ISBN and leaves out null fields", async () => {
     mockGetBook.mockResolvedValueOnce(BOOK_14746);
 

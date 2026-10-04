@@ -2,7 +2,8 @@ import { z } from "zod";
 import { documentId, searchQuery } from "./inputs.js";
 import { searchRoutes, getRoute } from "../api/camptocamp.js";
 import type { RouteSearchResponse, RouteDetail } from "../api/camptocamp.js";
-import { pickLocale, formatHeader, formatRouteName, formatAreasSection } from "./format.js";
+import { pickLocale, formatHeader, formatRouteName, formatRouteLine, formatAreasSection } from "./format.js";
+import { formatRatingLines } from "./ratings.js";
 import { formatUserText, USER_TEXT_NOTE } from "./text.js";
 
 export const searchRoutesSchema = z.object({
@@ -26,15 +27,7 @@ function formatRouteSearchResult(response: RouteSearchResponse, areaId?: number)
 
   const lines: string[] = [`Found ${response.total} route(s)${scope}. Showing ${response.documents.length}:\n`];
 
-  for (const route of response.documents) {
-    const name = formatRouteName(pickLocale(route.locales));
-    const activities = route.activities.join(", ");
-    const elevation = route.elevation_max ? ` | Max elevation: ${route.elevation_max}m` : "";
-    const rating = route.global_rating ? ` | Rating: ${route.global_rating}` : "";
-
-    lines.push(`- [${route.document_id}] ${name} (${activities})${elevation}${rating}`);
-  }
-
+  lines.push(...response.documents.map(formatRouteLine));
   return lines.join("\n");
 }
 
@@ -45,10 +38,7 @@ function formatRouteDetail(route: RouteDetail): string {
   lines.push(...formatHeader(formatRouteName(locale), route.document_id, "routes"));
   lines.push(`\n**Activities**: ${route.activities.join(", ")}`);
 
-  if (route.global_rating) lines.push(`**Global rating**: ${route.global_rating}`);
-  if (route.rock_free_rating) lines.push(`**Rock free rating**: ${route.rock_free_rating}`);
-  if (route.engagement_rating) lines.push(`**Engagement**: ${route.engagement_rating}`);
-  if (route.equipment_rating) lines.push(`**Equipment**: ${route.equipment_rating}`);
+  lines.push(...formatRatingLines(route));
 
   if (route.elevation_max) lines.push(`**Max elevation**: ${route.elevation_max}m`);
   if (route.elevation_min) lines.push(`**Min elevation**: ${route.elevation_min}m`);
@@ -84,7 +74,7 @@ export const routeToolDefinitions = [
     name: "search_routes",
     title: "Search routes",
     description:
-      "Search for mountain routes on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching routes with basic info (ID, name as '<summit> : <route title>', activities, elevation, rating).",
+      "Search for mountain routes on Camptocamp.org by keyword, by area (area_id from search_areas), or both; at least one is required. Returns a list of matching routes with basic info (ID, name as '<summit> : <route title>', activities, max elevation, elevation gain, and every rating labelled by its grading system, e.g. 'Ski rating (Toponeige): 4.1 | Labande: S4 / AD | Global rating: F').",
     inputSchema: searchRoutesSchema,
     handler: handleSearchRoutes,
   },
@@ -92,7 +82,7 @@ export const routeToolDefinitions = [
     name: "get_route",
     title: "Get route details",
     description:
-      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, ratings, elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
+      "Get full details of a specific route from Camptocamp.org by its ID, headed by its name ('<summit> : <route title>'), including description, every rating labelled by its grading system (Toponeige ski rating, Labande, global rating, rock, ice, hiking…), elevation data, gear requirements, and the areas it belongs to (range, admin_limits, country). Area IDs can be passed as area_id to search_routes, search_waypoints and search_outings. The second line is the document's camptocamp.org URL, to cite as the source. " +
       USER_TEXT_NOTE,
     inputSchema: getRouteSchema,
     handler: handleGetRoute,

@@ -7,7 +7,7 @@ import {
   pickTitle,
   joinList,
   formatHeader,
-  formatRouteLine,
+  formatAssociatedRouteLine,
   formatWaypointLine,
   formatTitledLine,
 } from "./format.js";
@@ -73,7 +73,7 @@ function formatBookDetail(book: BookDetail): string {
 
   const routes = book.associations?.routes;
   if (routes && routes.length > 0) {
-    lines.push("\n## Associated routes", ...routes.map(formatRouteLine));
+    lines.push("\n## Associated routes", ...routes.map(formatAssociatedRouteLine));
   }
 
   const waypoints = book.associations?.waypoints;

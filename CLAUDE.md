@@ -14,6 +14,7 @@ src/
 ├── api/
 │   └── camptocamp.ts     # Camptocamp API v6 client (fetch wrapper, typed responses)
 └── tools/
+    ├── ratings.ts        # Rating labels by grading system (RATING_DISPLAY), shared by every route/outing line
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
     ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
@@ -28,6 +29,7 @@ tests/
 ├── hooks/
 │   └── guard.test.sh       # Tests for the agent guard hook (.claude/hooks/guard.sh), run on the host
 └── tools/
+    ├── ratings.test.ts     # Rating label order and Labande joining
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
     ├── outings.test.ts     # Tool handler unit tests
@@ -87,12 +89,12 @@ Sessions in this repo run as the `coordinator` agent (`.claude/settings.json`), 
 
 | Tool                  | Description                                                                                          |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Search routes by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, rating |
-| `get_route`           | Get full route detail by ID (summit : title, description, ratings, elevation data, gear, areas)      |
+| `search_routes`       | Search by keyword and/or `area_id`; returns ID, summit : title, activities, elevation, gain, ratings |
+| `get_route`           | Get full route detail by ID (summit : title, description, ratings by system, elevation, gear, areas) |
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`                                  |
 | `get_waypoint`        | Get waypoint detail by ID (altitude, GPS coordinates, description, areas)                            |
-| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID                               |
-| `get_outing`          | Get outing detail by ID (conditions, weather, participants, associated routes with summit names)     |
+| `search_user_outings` | List outings (trip reports) published by a Camptocamp user, by user ID, with labelled ratings        |
+| `get_outing`          | Get outing detail by ID (ratings, conditions, weather, participants, routes with summit and ratings) |
 | `search_outings`      | Search outings by keyword, area, activity, dates, route, waypoint; newest first, paged with `offset` |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`              |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                   |

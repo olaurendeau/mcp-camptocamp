@@ -8,12 +8,12 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 
 | Outil                 | Description                                                                                               |
 | --------------------- | --------------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Recherche d'itinéraires par mot-clé et/ou `area_id` (ID, sommet : titre, activités, alt., cotation)       |
+| `search_routes`       | Recherche d'itinéraires par mot-clé et/ou `area_id` (ID, sommet : titre, activités, alt., D+, cotations)  |
 | `get_route`           | Détail complet d'un itinéraire par ID (sommet : titre, description, cotations, dénivelé, matériel, zones) |
 | `search_waypoints`    | Recherche des points de passage par nom et/ou zone `area_id` (sommets, refuges, bivouacs…)                |
 | `get_waypoint`        | Détail d'un point de passage par ID (altitude, coordonnées GPS, description, zones)                       |
 | `search_user_outings` | Liste les sorties (comptes rendus) publiées par un utilisateur Camptocamp, par ID utilisateur             |
-| `get_outing`          | Détail d'une sortie par ID (conditions, météo, participants, itinéraires associés avec leur sommet)       |
+| `get_outing`          | Détail d'une sortie par ID (cotations, conditions, météo, participants, itinéraires et leurs cotations)   |
 | `search_outings`      | Recherche des sorties récentes (mot-clé, zone, activité, dates, itinéraire, point) ; paginée par `offset` |
 | `search_areas`        | Recherche des zones (massif, département/canton, pays) par nom ; ID réutilisable en `area_id`             |
 | `get_area`            | Détail d'une zone par ID (type, résumé, description)                                                      |
@@ -25,6 +25,8 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 Chaque outil `get_*` commence par le titre et l'ID du document, suivis de son lien camptocamp.org (`**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>`) à citer comme source.
 
 Les textes libres écrits par les contributeurs (description, résumé, remarques, matériel, accès, conditions, météo…) sont imprimés entre `[begin user-written text: <champ>]` et `[end user-written text: <champ>]`, avec leurs titres Markdown abaissés de deux niveaux et une coupe à 8000 caractères (`[truncated, N more characters]`). La description de chaque outil `get_*` précise que ce texte est du contenu écrit par les utilisateurs, pas des instructions.
+
+Chaque cotation d'itinéraire ou de sortie est nommée par son système, jamais par un simple `Rating` : `Ski rating (Toponeige): 4.1 | Ski exposure: E2 | Labande: S4 / AD | Global rating: F`, puis engagement, risque, équipement, rocher, artif, glace, mixte, via ferrata, randonnée, raquettes et VTT.
 
 ## Installation
 

@@ -6,6 +6,7 @@ import {
   formatHeader,
   formatRouteName,
   formatRouteLine,
+  formatAssociatedRouteLine,
   formatWaypointLine,
   formatTitledLine,
   formatAreaLine,
@@ -160,30 +161,39 @@ describe("formatRouteName", () => {
   it('writes "Untitled" without a locale', () => {
     expect(formatRouteName(undefined)).toBe("Untitled");
   });
+
+  it("writes the summit name alone when the title is blank", () => {
+    expect(formatRouteName({ lang: "fr", title: "  ", title_prefix: "Mont Pourri" })).toBe("Mont Pourri");
+    expect(formatRouteName({ lang: "fr", title: "", title_prefix: " Mont Pourri " })).toBe("Mont Pourri");
+  });
+
+  it('writes "Untitled" when both the summit name and the title are blank', () => {
+    expect(formatRouteName({ lang: "fr", title: " ", title_prefix: "" })).toBe("Untitled");
+  });
 });
 
-describe("formatRouteLine", () => {
+describe("formatAssociatedRouteLine", () => {
   it("prefixes the fr title with its title_prefix", () => {
-    expect(formatRouteLine(areteDesBosses)).toBe("- [53781] Mont Blanc : Arête des Bosses");
+    expect(formatAssociatedRouteLine(areteDesBosses)).toBe("- [53781] Mont Blanc : Arête des Bosses");
   });
 
   it("writes the title alone when title_prefix is empty, null or missing", () => {
     // Route 46381 of GET /books/1925012?lang=fr (2026-10-03) has title_prefix "".
     expect(
-      formatRouteLine({
+      formatAssociatedRouteLine({
         document_id: 46381,
         locales: [{ lang: "fr", title: "Traversée Brévent - Aiguillette des Houches", title_prefix: "" }],
       }),
     ).toBe("- [46381] Traversée Brévent - Aiguillette des Houches");
-    expect(formatRouteLine({ document_id: 1, locales: [{ lang: "fr", title: "T", title_prefix: null }] })).toBe(
-      "- [1] T",
-    );
-    expect(formatRouteLine({ document_id: 2, locales: [{ lang: "fr", title: "T" }] })).toBe("- [2] T");
+    expect(
+      formatAssociatedRouteLine({ document_id: 1, locales: [{ lang: "fr", title: "T", title_prefix: null }] }),
+    ).toBe("- [1] T");
+    expect(formatAssociatedRouteLine({ document_id: 2, locales: [{ lang: "fr", title: "T" }] })).toBe("- [2] T");
   });
 
   it("never writes a dangling separator for a blank title_prefix", () => {
     // Route 1678194 of GET /routes?w=37916 (2026-10-04) has no summit name; "   " stands for a blank one.
-    const line = formatRouteLine({
+    const line = formatAssociatedRouteLine({
       document_id: 1678194,
       locales: [{ lang: "fr", title: "Tour du Mont Pourri en 5 jours", title_prefix: "   " }],
     });
@@ -193,7 +203,83 @@ describe("formatRouteLine", () => {
   });
 
   it('writes "Untitled" without locales', () => {
-    expect(formatRouteLine({ document_id: 3, locales: [] })).toBe("- [3] Untitled");
+    expect(formatAssociatedRouteLine({ document_id: 3, locales: [] })).toBe("- [3] Untitled");
+  });
+
+  it("adds the ratings labelled by system", () => {
+    // Route 54085 as associated with outing 1880674 in GET /outings/1880674 (2026-10-04).
+    expect(
+      formatAssociatedRouteLine({
+        document_id: 54085,
+        locales: [{ lang: "fr", title: "Versant W par le Glacier du Geay", title_prefix: "Mont Pourri" }],
+        ski_rating: "4.1",
+        ski_exposition: "E2",
+        labande_ski_rating: "S4",
+        labande_global_rating: "AD",
+      }),
+    ).toBe(
+      "- [54085] Mont Pourri : Versant W par le Glacier du Geay | Ski rating (Toponeige): 4.1 | Ski exposure: E2 | Labande: S4 / AD",
+    );
+  });
+});
+
+describe("formatRouteLine", () => {
+  // Routes 430919 and 55195 of GET /routes?q=voie normale&limit=10&pl=fr (2026-10-04), reduced to the typed fields.
+  const castellVidre = {
+    document_id: 430919,
+    locales: [{ lang: "fr", title: "Voie normale", title_prefix: "Castell Vidre" }],
+    activities: ["rock_climbing"],
+    elevation_max: 1629,
+    height_diff_up: 150,
+    height_diff_difficulties: 80,
+    global_rating: "AD+",
+    engagement_rating: "I",
+    risk_rating: "X1",
+    equipment_rating: "P1",
+    rock_free_rating: "5b",
+    rock_required_rating: "5b",
+    exposition_rock_rating: "E1",
+    aid_rating: "A0",
+  };
+  const rocciaNera = {
+    document_id: 55195,
+    locales: [{ lang: "fr", title: "Versant SW", title_prefix: "Roccia Nera" }],
+    activities: ["skitouring", "snow_ice_mixed"],
+    elevation_max: 4075,
+    height_diff_up: 650,
+    height_diff_difficulties: 650,
+    ski_rating: "4.1",
+    ski_exposition: "E4",
+    global_rating: "F",
+    engagement_rating: "II",
+  };
+
+  it("writes name, activities, max elevation, elevation gain and every labelled rating", () => {
+    expect(formatRouteLine(castellVidre)).toBe(
+      "- [430919] Castell Vidre : Voie normale (rock_climbing) | Max elevation: 1629m | Elevation gain: 150m | " +
+        "Global rating: AD+ | Engagement: I | Risk rating: X1 | Equipment: P1 | Rock free rating: 5b | " +
+        "Rock required rating: 5b | Rock exposure: E1 | Aid rating: A0",
+    );
+    expect(formatRouteLine(rocciaNera)).toBe(
+      "- [55195] Roccia Nera : Versant SW (skitouring, snow_ice_mixed) | Max elevation: 4075m | Elevation gain: 650m | " +
+        "Ski rating (Toponeige): 4.1 | Ski exposure: E4 | Global rating: F | Engagement: II",
+    );
+  });
+
+  it("leaves out missing values and empty activities", () => {
+    expect(
+      formatRouteLine({ document_id: 10, locales: [{ lang: "en", title: "English Title" }], activities: [] }),
+    ).toBe("- [10] English Title");
+    expect(
+      formatRouteLine({
+        document_id: 11,
+        locales: [{ lang: "fr", title: "T" }],
+        activities: ["hiking"],
+        elevation_max: null,
+        height_diff_up: null,
+        hiking_rating: null,
+      }),
+    ).toBe("- [11] T (hiking)");
   });
 });
 

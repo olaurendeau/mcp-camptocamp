@@ -750,6 +750,31 @@ describe("handleGetArticle", () => {
     );
   });
 
+  it("labels the ratings of associated routes by their grading system", async () => {
+    // Non-null ratings of routes 45148 and 53804 in the live GET /articles/302774 response (2026-10-04).
+    const [portalet, midiPlan] = ARTICLE_302774.associations.routes;
+    const routes = [
+      {
+        ...portalet,
+        ski_rating: "5.1",
+        ski_exposition: "E3",
+        labande_ski_rating: "S5",
+        labande_global_rating: "TD-",
+        global_rating: "AD-",
+      },
+      { ...midiPlan, global_rating: "AD", engagement_rating: "III", equipment_rating: "P3" },
+    ];
+    mockGetArticle.mockResolvedValueOnce({ ...ARTICLE_302774, associations: { routes } });
+
+    const result = await handleGetArticle({ id: 302774 });
+
+    expect(result).toContain(
+      "\n## Associated routes\n" +
+        "- [45148] Le Portalet : Face N | Ski rating (Toponeige): 5.1 | Ski exposure: E3 | Labande: S5 / TD- | Global rating: AD-\n" +
+        "- [53804] Traversée Midi - Plan | Global rating: AD | Engagement: III | Equipment: P3",
+    );
+  });
+
   it("lists waypoints, routes, articles and outings in order", async () => {
     mockGetArticle.mockResolvedValueOnce(ARTICLE_218311);
 
