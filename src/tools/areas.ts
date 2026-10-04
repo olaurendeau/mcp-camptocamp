@@ -3,7 +3,15 @@ import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searc
 import { assertResultWindow, formatSearchPage, PAGING_NOTE, quote } from "./paging.js";
 import { searchAreas, getArea } from "../api/camptocamp.js";
 import type { AreaDetail } from "../api/camptocamp.js";
-import { pickLocale, pickTitle, formatHeader, formatAreaLine, formatListItems, formatLanguageLine } from "./format.js";
+import {
+  pickLocale,
+  pickTitle,
+  formatHeader,
+  formatAreaLine,
+  formatListItems,
+  formatLanguageLine,
+  formatOtherLanguagesLine,
+} from "./format.js";
 import type { Lang } from "./enums.js";
 import { formatUserTexts, SUMMARY_AND_DESCRIPTION, USER_TEXT_NOTE } from "./text.js";
 
@@ -32,6 +40,7 @@ function formatAreaDetail(area: AreaDetail, lang?: Lang): string {
 
   lines.push(...formatHeader(pickTitle(area.locales, lang), area.document_id, "areas"));
   lines.push(...formatLanguageLine(area.locales, lang));
+  lines.push(...formatOtherLanguagesLine(area.locales, locale, SUMMARY_AND_DESCRIPTION));
   lines.push(`\n**Type**: ${area.area_type}`);
 
   lines.push(...formatUserTexts(locale, SUMMARY_AND_DESCRIPTION));
