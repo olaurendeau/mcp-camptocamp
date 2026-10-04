@@ -34,8 +34,9 @@ export const FIXTURE_SETTERS = [
 // The mock methods that drop the implementation: replaced so that the parsing comes back after them.
 export const RESETTERS = ["mockReset", "mockRestore"] as const;
 
-// The mock methods left as they are: they only clear the recorded calls or name the mock.
-export const NOT_REDIRECTED = ["mockClear", "mockName"] as const;
+// The mock methods left as they are: they only clear the recorded calls or name the mock, and
+// Symbol.dispose (a `using` block) calls mockRestore, which is replaced.
+export const NOT_REDIRECTED: readonly (string | symbol)[] = ["mockClear", "mockName", Symbol.dispose];
 
 /**
  * Makes the mocked API function parse whatever it resolves through `schema`, as getJson does at
@@ -47,7 +48,11 @@ export const NOT_REDIRECTED = ["mockClear", "mockName"] as const;
  * `mockReturnValue[Once]`, `mockThrow[Once]`, `withImplementation`…) is redirected to the fixture
  * mock, and `mockReset`/`mockRestore` (also called by `vi.resetAllMocks` and by disposing of the mock)
  * keep the parsing. So no way of setting a fixture skips the schema; a guard test fails when vitest
- * adds a `mock*`/`with*` method that none of the lists above handles. `schema` must output exactly the mocked function's resolved type.
+ * adds a `mock*`/`with*` or Symbol-keyed method that none of the lists above handles. `schema` must
+ * output exactly the mocked function's resolved type.
+ *
+ * The replacement `mockRestore` skips vitest's own restore step: a `vi.spyOn` spy passed here would
+ * not get its original method back. Pass only `vi.fn()` or `vi.mock` module mocks.
  */
 export function throughSchema<T extends ApiFunction, S extends z.ZodTypeAny>(
   mocked: Mock<T>,

@@ -130,16 +130,24 @@ describe("throughSchema", () => {
     await expect(mock(37355)).resolves.toEqual(parsed);
   });
 
-  it.each([
-    ["vi.resetAllMocks", () => vi.resetAllMocks()],
-    ["vi.restoreAllMocks", () => vi.restoreAllMocks()],
-  ])("keeps parsing after %s", async (_, resetAll) => {
+  it("keeps parsing after vi.resetAllMocks, which drops the fixture", async () => {
     const mock = getSummit();
     mock.mockResolvedValue(fixture);
 
-    resetAll();
+    vi.resetAllMocks();
 
+    await expect(mock(37355)).rejects.toThrow(z.ZodError);
     mock.mockResolvedValueOnce(fixture);
+    await expect(mock(37355)).resolves.toEqual(parsed);
+  });
+
+  // Since vitest 3, vi.restoreAllMocks only puts back vi.spyOn spies: a vi.fn() mock keeps its fixture.
+  it("keeps the fixture and the parsing after vi.restoreAllMocks", async () => {
+    const mock = getSummit();
+    mock.mockResolvedValue(fixture);
+
+    vi.restoreAllMocks();
+
     await expect(mock(37355)).resolves.toEqual(parsed);
   });
 
@@ -155,20 +163,21 @@ describe("throughSchema", () => {
   });
 
   // A vitest upgrade that adds a way of setting what a mock returns must not open a way around the schema.
-  it("handles every mock*/with* method of vi.fn(), redirected or explicitly not", () => {
-    const methods = (mock: object) => mock as Record<string, unknown>;
+  it("handles every mock*/with* and Symbol-keyed method of vi.fn(), redirected or explicitly not", () => {
+    const methods = (mock: object) => mock as Record<PropertyKey, unknown>;
     const fresh = vi.fn<GetSummit>();
-    const names = Object.keys(fresh).filter((name) => /^(mock|with)[A-Z]/.test(name));
-    const originals = Object.fromEntries(names.map((name) => [name, methods(fresh)[name]]));
+    const keys = Reflect.ownKeys(fresh).filter((key) =>
+      typeof key === "symbol" ? typeof methods(fresh)[key] === "function" : /^(mock|with)[A-Z]/.test(key),
+    );
+    const originals = new Map(keys.map((key) => [key, methods(fresh)[key]]));
 
     throughSchema(fresh, summitSchema);
 
-    const replaced: readonly string[] = [...FIXTURE_SETTERS, ...RESETTERS];
-    const kept: readonly string[] = NOT_REDIRECTED;
-    expect(names.length).toBeGreaterThan(0);
-    expect([...replaced, ...kept].sort()).toEqual([...names].sort());
-    for (const name of replaced) expect(methods(fresh)[name], name).not.toBe(originals[name]);
-    for (const name of kept) expect(methods(fresh)[name], name).toBe(originals[name]);
+    const replaced: readonly (string | symbol)[] = [...FIXTURE_SETTERS, ...RESETTERS];
+    expect(keys).toContain(Symbol.dispose);
+    expect(new Set([...replaced, ...NOT_REDIRECTED])).toEqual(new Set(keys));
+    for (const key of replaced) expect(methods(fresh)[key], String(key)).not.toBe(originals.get(key));
+    for (const key of NOT_REDIRECTED) expect(methods(fresh)[key], String(key)).toBe(originals.get(key));
   });
 
   it("wires a function of the mocked API module", async () => {
