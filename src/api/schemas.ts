@@ -81,6 +81,13 @@ export const authorSchema = z.object({
 // only its Author line is left out.
 const optionalAuthorSchema = authorSchema.nullish().catch(null);
 
+// A Camptocamp account linked to an outing (associations.users). Its locales carry no title, only lang and version.
+export const userAssociationSchema = z.object({
+  document_id: z.number(),
+  name: z.string(),
+});
+export type UserAssociation = z.infer<typeof userAssociationSchema>;
+
 function searchResponseSchema<T extends z.ZodTypeAny>(document: T) {
   return z.object({ documents: z.array(document), total: z.number() });
 }
@@ -241,8 +248,14 @@ export const outingDetailSchema = z.object({
   ...ratingFields,
   condition_rating: z.string().nullish(),
   participant_count: z.number().nullish(),
-  author: optionalAuthorSchema,
-  associations: z.object({ routes: z.array(routeAssociationSchema).nullish() }).nullish(),
+  // No `author` key here: the API only sets it on list items (search_outings). `users` are the accounts
+  // linked to the outing, in API order, and the first one is not necessarily its author (outing 1757161).
+  associations: z
+    .object({
+      routes: z.array(routeAssociationSchema).nullish(),
+      users: z.array(userAssociationSchema).nullish(),
+    })
+    .nullish(),
 });
 
 export const outingListResponseSchema = searchResponseSchema(outingListItemSchema);

@@ -26,10 +26,8 @@ jobs:
       # Stricter than the PR gate (high): a moderate or worse advisory in what users install fails the run.
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=moderate
-      # vitest 2 pulls in known dev-only advisories (2 critical, 1 high, 3 moderate through vite, esbuild
-      # and @vitest/mocker; the Vitest UI and the Vite dev server are unused). No audit level passes them,
-      # so this step reports without failing the run until #138 upgrades vitest. Then remove continue-on-error.
-      - name: Audit all dependencies (report only until #138)
+      # Dev dependencies too, at the PR gate's level: a high or critical advisory in the toolchain fails the run.
+      # Runs even when the production audit fails, so one run reports both.
+      - name: Audit all dependencies
         if: ${{ !cancelled() }}
-        continue-on-error: true
         run: npm audit --audit-level=high

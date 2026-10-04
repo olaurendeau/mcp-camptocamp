@@ -12,9 +12,9 @@ Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www
 | `get_route`           | Détail par ID (sommet : titre, textes, cotations, D+, orientations, durée, zones, topos, points, sorties) |
 | `search_waypoints`    | Points de passage par nom et/ou zone `area_id`, filtrables par type (sommet, refuge, bivouac…) ; paginée  |
 | `get_waypoint`        | Détail d'un point par ID (altitude, GPS, zones, infos refuge, accès, itinéraires, topos, sorties)         |
-| `search_user_outings` | Alias de `search_outings` par `user_id` : sorties d'un utilisateur, cotations nommées ; paginée           |
-| `get_outing`          | Détail d'une sortie par ID (cotations, conditions, météo, participants, itinéraires et leurs cotations)   |
-| `search_outings`      | Sorties récentes : mot-clé, zone, activité, dates, période annuelle, itinéraire, point, auteur ; paginée  |
+| `search_user_outings` | Alias de `search_outings` par `user_id` : sorties où figure l'utilisateur, pas que les siennes ; paginée  |
+| `get_outing`          | Détail d'une sortie par ID (cotations, conditions, météo, participants et leurs comptes, itinéraires)     |
+| `search_outings`      | Sorties récentes : mot-clé, zone, activité, dates, période, itinéraire, point, participant ; paginée      |
 | `search_areas`        | Recherche des zones (massif, département/canton, pays) par nom ; ID réutilisable en `area_id` ; paginée   |
 | `get_area`            | Détail d'une zone par ID (type, résumé, description)                                                      |
 | `search_books`        | Livres par titre uniquement (auteur/ISBN peu fiables), filtrables par type et activité ; paginée          |
@@ -36,6 +36,8 @@ Les recherches paginées (`search_routes`, `search_waypoints`, `search_outings`,
 
 `get_waypoint` liste ensuite, avec leurs ID, les itinéraires du point au format de `search_routes` (`## Routes (27 of 27)` ; au plus 50, suivis de `More: search_routes with waypoint_id=<id>` quand il y en a davantage), les livres qui le couvrent (`## Associated books`) et ses sorties récentes (`## Recent outings (10 of 1743)`, suivi de `More: search_outings with waypoint_id=<id>`). Une liste vide n'imprime pas de section.
 
+Un point de passage virtuel (`waypoint_type` `virtual`, comme `Ouvertures 2013` qui regroupe les itinéraires ouverts cette année-là) n'a pas d'emplacement réel : ni `get_waypoint`, ni `search_waypoints`, ni les listes de points de `get_route`, `get_book` et `get_article` n'affichent son altitude ou ses coordonnées.
+
 Chaque cotation d'itinéraire ou de sortie est nommée par son système, jamais par un simple `Rating` : `Ski rating (Toponeige): 4.1 | Ski exposure: E2 | Labande: S4 / AD | Global rating: F`, puis engagement, risque, équipement, rocher, artif, glace, mixte, via ferrata, randonnée, raquettes et VTT.
 
 `search_routes` demande au moins un filtre, un seul suffit ; plusieurs se combinent en ET : `query`, `area_id`, `waypoint_id` (itinéraires d'un sommet, refuge…), `activity`, `rating_system` avec `rating_min` et/ou `rating_max` (un système par appel, bornes incluses ; les itinéraires sans cette cotation sont exclus), `height_diff_up_min` / `height_diff_up_max` (D+ en mètres), `route_types` et `configuration` (l'une des valeurs données). Une cotation hors de l'échelle du système ou une valeur hors liste est refusée avant tout appel, avec la liste des valeurs valides : l'API l'ignorerait sans rien dire. L'en-tête rappelle les filtres (`Filters: area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1, elevation gain 1000 → 1500m`) et la réponse se termine par `Next page: offset=N` tant qu'il reste des résultats.
@@ -46,7 +48,7 @@ Chaque cotation d'itinéraire ou de sortie est nommée par son système, jamais 
 
 ### npm (recommandé)
 
-Prérequis : [Node.js](https://nodejs.org/) 18+
+Prérequis : [Node.js](https://nodejs.org/) 22+ (la CI teste Node 22 et 24)
 
 **Claude Desktop** — ajouter dans la configuration :
 
@@ -127,11 +129,11 @@ La publication est automatisée : le tag `vX.Y.Z` déclenche le workflow `publis
 
 ## Stack technique
 
-- **Runtime** : Node.js 22 + TypeScript
+- **Runtime** : Node.js 22+ (CI sur 22 et 24) + TypeScript
 - **MCP SDK** : `@modelcontextprotocol/sdk`
 - **Transport** : stdio
 - **Tests** : Vitest
-- **Docker** : image multi-stage (`node:22-alpine`)
+- **Docker** : image multi-stage (`node:22-alpine`), multi-arch (amd64, arm64), exécutée par un utilisateur non-root (`node`)
 
 ## Licence
 

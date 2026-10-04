@@ -295,7 +295,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "integer",
       },
       "user_id": {
-        "description": "Camptocamp user ID of the outings' author (the number in their profile URL)",
+        "description": "Camptocamp user ID (the number in their profile URL): outings this user is listed on as a participant, not only those they wrote",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991,
         "type": "integer",
@@ -459,7 +459,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "integer",
       },
       "user_id": {
-        "description": "Camptocamp user ID of the outings' author (the number in their profile URL)",
+        "description": "Camptocamp user ID (the number in their profile URL): outings this user is listed on as a participant, not only those they wrote",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991,
         "type": "integer",

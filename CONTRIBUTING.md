@@ -5,7 +5,7 @@ Tout changement arrive sur `main` par une pull request qui passe la CI et une re
 ## Cycle d'une PR
 
 1. **Branche** depuis `main` : `feat/…`, `fix/…`, `chore/…`, `docs/…`.
-2. **Code + tests.** `make check` doit passer en local : il lance le job `checks` de la CI : format, lint, types, couverture, build et tests du hook (`make test-hooks`). Les autres checks (`docker`, `audit`, `pr-size`, `pr-title`) ne tournent qu'en CI.
+2. **Code + tests.** `make check` doit passer en local : il lance les étapes du job `checks` de la CI sous Node 22 : format, lint, types, couverture, build et tests du hook (`make test-hooks`). En CI, ces étapes tournent sous Node 22 et 24 (`checks (node 22)`, `checks (node 24)`), les versions couvertes par `engines.node` ; le check `checks` ne passe que si les deux passent. Les autres checks (`docker`, `audit`, `pr-size`, `pr-title`) ne tournent qu'en CI.
 3. **PR** avec un titre [Conventional Commits](https://www.conventionalcommits.org/) (`feat: add search_outings tool`). Le titre devient le message du commit squashé sur `main`.
 4. **CI** : tous les checks requis passent au vert.
 5. **Revue agent** : un agent _qui n'a pas écrit le code_ relit la PR et pose le status `agent-review` sur le commit de tête (voir plus bas).
@@ -31,7 +31,7 @@ Une PR qui dépasse 1000 lignes se découpe : d'abord le refactoring préparatoi
 ### Suivi des dépendances
 
 - **Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) propose chaque lundi les mises à jour npm, GitHub Actions et Docker. Les montées mineures et correctives npm sont groupées (une PR pour la production, une pour le dev) ; chaque montée majeure npm arrive seule et reste une décision de l'humain. Les mises à jour de sécurité arrivent sans délai, une PR chacune. Une PR Dependabot suit le même cycle que les autres : checks requis, revue agent, merge par le coordinateur.
-- **Audit hebdomadaire** ([`.github/workflows/audit.yml`](.github/workflows/audit.yml), lundi et à la demande, jamais requis) : échoue sur toute vulnérabilité _moderate_ ou plus en production. L'audit complet (dépendances de dev comprises) est seulement informatif tant que vitest 2 traîne des alertes connues ([#138](https://github.com/olaurendeau/mcp-camptocamp/issues/138)) ; il deviendra bloquant (seuil _high_) avec cette montée de version.
+- **Audit hebdomadaire** ([`.github/workflows/audit.yml`](.github/workflows/audit.yml), lundi et à la demande, jamais requis) : échoue sur toute vulnérabilité _moderate_ ou plus en production. L'audit complet (dépendances de dev comprises) échoue sur toute vulnérabilité _high_ ou plus.
 
 ## Équipe d'agents
 
