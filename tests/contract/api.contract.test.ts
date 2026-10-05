@@ -167,6 +167,17 @@ describe("searches (AC8.2, AC8.3)", () => {
     expect(wellFormed(outing.associations?.users).map((user) => user.document_id)).toEqual([466185, 944173]);
   });
 
+  // get_outing prints `**Partial trip**: yes` from partial_trip; a renamed key would silently drop the line.
+  it("outing 219347 is a partial trip; 1924138 and 669600 send a boolean or null", async () => {
+    expect((await getOuting(219347)).partial_trip).toBe(true);
+    for (const id of [1924138, 669600]) {
+      const { partial_trip } = await getOuting(id);
+      expect(partial_trip === null || typeof partial_trip === "boolean", `outing ${id}: ${String(partial_trip)}`).toBe(
+        true,
+      );
+    }
+  });
+
   // `period=2020-06-01,2020-06-30`: the same days in every year.
   // An outing may start or end outside June (05-30 → 06-02): it only has to overlap a June.
   it("outings at waypoint 37916 in the period 06-01 → 06-30, each overlapping June, fewer than all its outings", async () => {
