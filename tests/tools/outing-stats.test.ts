@@ -3,6 +3,7 @@ import type { z } from "zod";
 import {
   COUNTS_NOTE,
   collectMatchingOutings,
+  collectOutingSets,
   handleOutingStats,
   outingStatsSchema,
   outingStatsToolDefinitions,
@@ -205,6 +206,162 @@ describe("collectMatchingOutings", () => {
 
     await expect(collectMatchingOutings({})).rejects.toThrow("Camptocamp API error: 503");
     expect(mockSearchOutings).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The page at `offset` of route `route`'s search matching `total` outings, with IDs that tell the routes apart.
+function routePage(route: number, total: number, offset: number): OutingListResponse {
+  const count = Math.max(0, Math.min(100, total - offset));
+  const documents = Array.from({ length: count }, (_, i) => outing(route * 10_000 + offset + i + 1));
+  return { total, documents } as unknown as OutingListResponse;
+}
+
+// Answers each route's search with its pages, after 1 ms so that calls overlap, and tracks the calls in flight.
+function serveRoutes(totals: Record<number, number>) {
+  const tracker = { inFlight: 0, maxInFlight: 0 };
+  mockSearchOutings.mockImplementation(async (params?: OutingSearchParams) => {
+    tracker.inFlight++;
+    tracker.maxInFlight = Math.max(tracker.maxInFlight, tracker.inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    tracker.inFlight--;
+    const route = params?.route_id ?? 0;
+    return routePage(route, totals[route] ?? 0, params?.offset ?? 0);
+  });
+  return tracker;
+}
+
+const reads = () => mockSearchOutings.mock.calls.map(([params]) => [params?.route_id, params?.offset]);
+const routeIds = (route: number, total: number) => Array.from({ length: total }, (_, i) => route * 10_000 + i + 1);
+
+describe("collectOutingSets", () => {
+  it("reads every set's first page before checking the totals, then the other pages", async () => {
+    const tracker = serveRoutes({ 54513: 61, 54684: 30, 1148298: 250 });
+    const checkTotals = vi.fn((totals: number[]) => {
+      expect(totals).toEqual([61, 30, 250]);
+      expect(reads()).toEqual([
+        [54513, 0],
+        [54684, 0],
+        [1148298, 0],
+      ]);
+      expect(tracker.inFlight).toBe(0);
+    });
+
+    const results = await collectOutingSets(
+      [{ route_id: 54513 }, { route_id: 54684, lang: "fr" }, { route_id: 1148298 }],
+      checkTotals,
+    );
+
+    expect(checkTotals).toHaveBeenCalledTimes(1);
+    expect(reads()).toEqual([
+      [54513, 0],
+      [54684, 0],
+      [1148298, 0],
+      [1148298, 100],
+      [1148298, 200],
+    ]);
+    expect(mockSearchOutings.mock.calls[1]).toEqual([
+      { route_id: 54684, lang: "fr", limit: 100, offset: 0, tiebreak_by_id: true },
+    ]);
+    expect(results.map((result) => result.total)).toEqual([61, 30, 250]);
+    expect(results.map(ids)).toEqual([routeIds(54513, 61), routeIds(54684, 30), routeIds(1148298, 250)]);
+  });
+
+  it("reads nothing more when checkTotals refuses the totals", async () => {
+    serveRoutes({ 1: 900, 2: 800, 3: 400 });
+
+    await expect(
+      collectOutingSets([{ route_id: 1 }, { route_id: 2 }, { route_id: 3 }], (totals) => {
+        if (totals.reduce((a, b) => a + b) > 2000) throw new Error("2,100 outings: too many");
+      }),
+    ).rejects.toThrow("2,100 outings: too many");
+    expect(reads()).toEqual([
+      [1, 0],
+      [2, 0],
+      [3, 0],
+    ]);
+  });
+
+  it("reads 4 first pages at most 3 at a time", async () => {
+    const tracker = serveRoutes({ 1: 10, 2: 20, 3: 30, 4: 40 });
+    let inFlightAtCheck = -1;
+
+    await collectOutingSets([{ route_id: 1 }, { route_id: 2 }, { route_id: 3 }, { route_id: 4 }], () => {
+      inFlightAtCheck = tracker.inFlight;
+    });
+
+    expect(reads()).toEqual([
+      [1, 0],
+      [2, 0],
+      [3, 0],
+      [4, 0],
+    ]);
+    expect(tracker.maxInFlight).toBe(3);
+    expect(inFlightAtCheck).toBe(0);
+  });
+
+  it("reads 25 pages across sets with at most 3 requests in flight", async () => {
+    const totals = { 1: 1000, 2: 800, 3: 450, 4: 200 };
+    const tracker = serveRoutes(totals);
+    let maxBeforeCheck = 0;
+
+    const results = await collectOutingSets(
+      [{ route_id: 1 }, { route_id: 2 }, { route_id: 3 }, { route_id: 4 }],
+      () => {
+        maxBeforeCheck = tracker.maxInFlight;
+        tracker.maxInFlight = 0;
+      },
+    );
+
+    expect(mockSearchOutings).toHaveBeenCalledTimes(25);
+    expect(maxBeforeCheck).toBe(3);
+    expect(tracker.maxInFlight).toBe(3);
+    expect(results.map(ids)).toEqual(Object.entries(totals).map(([route, total]) => routeIds(Number(route), total)));
+  });
+
+  it("reads no page when there is no set", async () => {
+    const checkTotals = vi.fn();
+
+    await expect(collectOutingSets([], checkTotals)).resolves.toEqual([]);
+    expect(checkTotals).toHaveBeenCalledWith([]);
+    expect(mockSearchOutings).not.toHaveBeenCalled();
+  });
+
+  it("fails when a later page of any set reports another total", async () => {
+    mockSearchOutings.mockImplementation((params?: OutingSearchParams) => {
+      const route = params?.route_id ?? 0;
+      const offset = params?.offset ?? 0;
+      return Promise.resolve(routePage(route, route === 2 && offset === 100 ? 151 : 150, offset));
+    });
+
+    await expect(collectOutingSets([{ route_id: 1 }, { route_id: 2 }], () => undefined)).rejects.toThrow(
+      "Camptocamp's results changed while counting; call again",
+    );
+  });
+
+  it("fails when any set's pages repeat an outing", async () => {
+    mockSearchOutings.mockImplementation((params?: OutingSearchParams) => {
+      const route = params?.route_id ?? 0;
+      const offset = params?.offset ?? 0;
+      const response = routePage(route, 150, offset);
+      if (route === 3 && offset === 100) response.documents[0] = routePage(3, 150, 99).documents[0];
+      return Promise.resolve(response);
+    });
+
+    await expect(
+      collectOutingSets([{ route_id: 1 }, { route_id: 2 }, { route_id: 3 }], () => undefined),
+    ).rejects.toThrow("results changed");
+  });
+
+  it("fails when any set's pages hold fewer outings than its total", async () => {
+    mockSearchOutings.mockImplementation((params?: OutingSearchParams) => {
+      const route = params?.route_id ?? 0;
+      const offset = params?.offset ?? 0;
+      return Promise.resolve(route === 1 && offset === 0 ? routePage(1, 60, 20) : routePage(route, 60, offset));
+    });
+
+    await expect(collectOutingSets([{ route_id: 1 }, { route_id: 2 }], () => undefined)).rejects.toThrow(
+      "results changed",
+    );
   });
 });
 
