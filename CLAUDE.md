@@ -160,7 +160,7 @@ The user-facing reference of each tool (purpose, generated inputs, output format
 | `search_waypoints`    | Search waypoints (summits, huts, bivouacs) by name and/or `area_id`, by `waypoint_type`; paged with `offset`     |
 | `get_waypoint`        | Waypoint by ID (altitude, GPS, areas, hut details, access period, routes, books, recent outings)                 |
 | `search_user_outings` | Alias of `search_outings` by `user_id`: outings the user is listed on, written or not; newest first, paged       |
-| `get_outing`          | Outing by ID (ratings, conditions, weather, participants, linked accounts, routes; no author: see search lines)  |
+| `get_outing`          | Outing by ID (ratings, conditions, partial trip, weather, participants, accounts, routes; no author, see search) |
 | `search_outings`      | Outings by keyword, area, activity, reported rating/conditions/elevation, dates, period, routes, waypoint, user  |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                               |
