@@ -230,4 +230,5 @@ The result lines do not say which of the routes an outing is linked to: `get_out
 - [`search_routes`](search_routes.md): find the `route_id` of a route.
 - [`search_waypoints`](search_waypoints.md): find the `waypoint_id` of a summit or hut.
 - [`get_outing`](get_outing.md): read the full report from an ID in the results.
+- [`get_outings`](get_outings.md): read up to 10 reports from the results in one call (not in v1.3.0).
 - [`search_user_outings`](search_user_outings.md): list a user's outings with only `user_id`.

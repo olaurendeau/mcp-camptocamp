@@ -82,7 +82,7 @@ Output, captured from v1.3.0 on 2026-10-04 with both commands:
 13
 ```
 
-The version should be 1.3.0 or later, and the server should list 13 tools.
+The version should be 1.3.0 or later, and the server should list 13 tools, or 14 from the release after v1.3.0, which adds `get_outings`.
 
 ## Connect a client
 

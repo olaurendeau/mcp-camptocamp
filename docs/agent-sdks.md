@@ -44,7 +44,7 @@ Changes from the source:
 
 Like the source, the example uses `async with` and `await`, so run it inside an `async` function, for example with `asyncio.run(...)`.
 
-**Tool approval.** `MCPServerStdio` accepts `require_approval`, which turns on approval policies for the server's tools: `"always"`, `"never"`, a map from tool name to policy, or a grouped object. With `require_approval="never"`, no call to the 13 tools waits for approval. They only read Camptocamp.
+**Tool approval.** `MCPServerStdio` accepts `require_approval`, which turns on approval policies for the server's tools: `"always"`, `"never"`, a map from tool name to policy, or a grouped object. With `require_approval="never"`, no call to the 13 tools (14 from the release after v1.3.0) waits for approval. They only read Camptocamp.
 
 ## OpenAI Agents SDK (JavaScript)
 

@@ -137,9 +137,9 @@ describe("README", () => {
       .split("\n")
       .filter((line) => /\(docs\/tools\/(?!README\.md\))/.test(line));
 
-    expect(toolLinks).toHaveLength(13);
+    expect(toolLinks).toHaveLength(14);
     expect(toolLinks.sort()).toEqual(names.map((name) => `docs/tools/${name}.md`).sort());
-    expect(lines).toHaveLength(13);
+    expect(lines).toHaveLength(14);
   });
 
   it("has no per-tool behaviour paragraph: tools are named only in the Tools section (AC15)", () => {

@@ -126,6 +126,42 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
     ],
     "type": "object",
   },
+  "get_outings": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "ids": {
+        "description": "Up to 10 outing IDs from Camptocamp (e.g. [1924138, 1917601]), printed in this order; a repeated ID is read once",
+        "items": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
+        "maxItems": 10,
+        "minItems": 1,
+        "type": "array",
+      },
+      "lang": {
+        "description": "Language of titles and texts, one of: fr, en, de, it, es, ca, eu, sl, zh (default fr)",
+        "enum": [
+          "fr",
+          "en",
+          "de",
+          "it",
+          "es",
+          "ca",
+          "eu",
+          "sl",
+          "zh",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "ids",
+    ],
+    "type": "object",
+  },
   "get_route": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "additionalProperties": false,

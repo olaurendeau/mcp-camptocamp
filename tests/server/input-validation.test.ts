@@ -32,6 +32,7 @@ const ID_FIELDS: IdField[] = [
   { tool: "get_route", field: "id", args: (id) => ({ id }), response: ROUTE },
   { tool: "get_waypoint", field: "id", args: (id) => ({ id }), response: WAYPOINT },
   { tool: "get_outing", field: "id", args: (id) => ({ id }), response: OUTING },
+  { tool: "get_outings", field: "ids[0]", args: (id) => ({ ids: [id] }), response: OUTING },
   { tool: "get_area", field: "id", args: (id) => ({ id }), response: AREA },
   { tool: "get_book", field: "id", args: (id) => ({ id }), response: BOOK },
   { tool: "get_article", field: "id", args: (id) => ({ id }), response: ARTICLE },
@@ -291,6 +292,36 @@ describe("search_outings field inputs", () => {
     const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
     expect(params.get("limit")).toBe("10");
     expect(params.get("offset")).toBe("0");
+  });
+});
+
+// AC1.5 on #255: get_outings takes 1 to 10 IDs, checked before any request.
+describe("get_outings ids", () => {
+  it.each<[string, Record<string, unknown>, string]>([
+    ["no IDs", { ids: [] }, "must list at least 1 ID at ids"],
+    ["11 IDs", { ids: Array.from({ length: 11 }, (_, i) => 1924130 + i) }, "must list at most 10 IDs at ids"],
+    ["a negative ID", { ids: [1924138, -1] }, "Number must be greater than 0 at ids[1]"],
+    ["an ID that is not a list", { ids: 1924138 }, "Expected array, received number at ids"],
+    ["a missing ids", {}, "Required at ids"],
+  ])("rejects %s naming the field without calling Camptocamp", async (_label, args, issue) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_outings", arguments: args });
+
+    expect(validationIssues(result, "get_outings")).toEqual([issue]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts 10 IDs and sends one request per ID", async () => {
+    const ids = Array.from({ length: 10 }, (_, i) => 1924130 + i);
+    const fetchMock = stubFetch(...ids.map((id) => jsonResponse({ ...OUTING, document_id: id })));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_outings", arguments: { ids } });
+
+    expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
+    expect(fetchMock).toHaveBeenCalledTimes(10);
   });
 });
 
@@ -766,32 +797,33 @@ describe("search_outings rating, condition and elevation filters", () => {
 describe("get_* lang input", () => {
   const DETAIL_CASES = ID_FIELDS.filter((f) => f.tool.startsWith("get_")).map((f) => [f.tool, f] as const);
 
-  it("covers the six get_* tools", () => {
+  it("covers the seven get_* tools", () => {
     expect(DETAIL_CASES.map(([tool]) => tool)).toEqual([
       "get_route",
       "get_waypoint",
       "get_outing",
+      "get_outings",
       "get_area",
       "get_book",
       "get_article",
     ]);
   });
 
-  it.each(DETAIL_CASES)("%s refuses lang ru without calling Camptocamp", async (tool) => {
+  it.each(DETAIL_CASES)("%s refuses lang ru without calling Camptocamp", async (tool, { args }) => {
     const fetchMock = stubFetch();
     const client = await connect();
 
-    const result = await client.callTool({ name: tool, arguments: { id: ACCEPTED_ID, lang: "ru" } });
+    const result = await client.callTool({ name: tool, arguments: { ...args(ACCEPTED_ID), lang: "ru" } });
 
     expect(validationIssues(result, tool)).toEqual(["must be one of: fr, en, de, it, es, ca, eu, sl, zh at lang"]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it.each(DETAIL_CASES)("%s accepts lang de and sends no query string", async (tool, { response }) => {
+  it.each(DETAIL_CASES)("%s accepts lang de and sends no query string", async (tool, { args, response }) => {
     const fetchMock = stubFetch(jsonResponse(response));
     const client = await connect();
 
-    const result = await client.callTool({ name: tool, arguments: { id: ACCEPTED_ID, lang: "de" } });
+    const result = await client.callTool({ name: tool, arguments: { ...args(ACCEPTED_ID), lang: "de" } });
 
     expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
     expect(new URL(fetchMock.mock.calls[0][0] as string).search).toBe("");

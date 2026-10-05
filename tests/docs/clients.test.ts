@@ -180,7 +180,7 @@ describe("Mistral Vibe Code page", () => {
   it("allows each registered tool once with permission = always, and no other tool", async () => {
     const tools = await registeredTools();
 
-    expect(tools).toHaveLength(13);
+    expect(tools).toHaveLength(14);
     expect(checkVibePermissions(read(VIBE), tools)).toEqual([]);
   });
 

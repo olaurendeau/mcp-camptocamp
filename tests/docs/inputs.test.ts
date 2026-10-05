@@ -258,9 +258,9 @@ describe("tool pages", () => {
 });
 
 describe("registered tools", () => {
-  it("renders the schema of all 13 registered tools", async () => {
+  it("renders the schema of all 14 registered tools", async () => {
     const tools = await listRegisteredTools();
-    expect(tools).toHaveLength(13);
+    expect(tools).toHaveLength(14);
     for (const tool of tools) {
       expect(renderInputs(tool)).toContain(`| \`lang\` | string | no |`);
     }
