@@ -1,7 +1,7 @@
 import { connect as netConnect, type Socket } from "node:net";
 import { describe, it, expect, vi } from "vitest";
 import { jsonResponse } from "../server/helpers.js";
-import { HOST, areaDocument, callTool, postMcp, send, startTestServer } from "./helpers.js";
+import { HOST, MCP_HEADERS, areaDocument, callTool, postMcp, rpc, send, startTestServer } from "./helpers.js";
 
 /** A fetch stub whose calls stay pending until the test resolves them, in call order. */
 function pendingFetch() {
@@ -34,6 +34,23 @@ async function startedHealthCheck(port: number): Promise<{ socket: Socket; finis
       return response;
     },
   };
+}
+
+/**
+ * A raw connection that POSTs a batch of 99 tools/list and one get_area: about 5 MB of response, written only once
+ * the get_area fetch answers. `stalled` resolves at its first chunk, after which the client stops reading.
+ */
+async function slowReader(port: number): Promise<{ socket: Socket; stalled: Promise<unknown> }> {
+  const messages = Array.from({ length: 99 }, (_, i) => rpc("tools/list", {}, i));
+  const body = JSON.stringify([...messages, callTool("get_area", { id: 14403 }, 99)]);
+  const socket = netConnect(port, "127.0.0.1");
+  await new Promise((resolve) => socket.once("connect", resolve));
+  const head = Object.entries({ ...MCP_HEADERS, "content-length": String(Buffer.byteLength(body)) })
+    .map(([name, value]) => `${name}: ${value}\r\n`)
+    .join("");
+  socket.write(`POST /mcp HTTP/1.1\r\n${head}\r\n${body}`);
+  const stalled = new Promise((resolve) => socket.once("data", resolve)).then(() => socket.pause());
+  return { socket, stalled };
 }
 
 describe("HTTP server shutdown", () => {
@@ -96,5 +113,34 @@ describe("HTTP server shutdown", () => {
       error: { code: -32000, message: "Server shutting down" },
       id: null,
     });
+  });
+
+  it("stops waiting 1 s after the deadline for a client that stopped reading, once the 503s are sent", async () => {
+    const { fetchMock, resolvers } = pendingFetch();
+    const server = await startTestServer();
+    const reader = await slowReader(server.port);
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    const inFlight = postMcp(server.port, callTool("get_area", { id: 14404 }));
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let stopped = false;
+    const shutdown = server.shutdown().then(() => (stopped = true));
+    resolvers[0](jsonResponse(areaDocument(14403, "Écrins"))); // the batch's response starts during the drain
+    await reader.stalled;
+    await vi.advanceTimersByTimeAsync(8_000);
+    const result = await inFlight;
+    expect(result.status).toBe(503);
+    expect(result.json).toMatchObject({ error: { message: "Server shutting down" } });
+    expect(stopped).toBe(false); // the batch's response is still stuck in the slow reader's connection
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await shutdown; // resolves once the server has closed, so the slow reader's connection too
+    expect(stopped).toBe(true);
+    reader.socket.destroy();
   });
 });

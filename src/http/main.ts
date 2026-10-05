@@ -52,7 +52,7 @@ async function startUpstreamAndServer(config: HttpConfig, proc: HttpProcess): Pr
   }
   let stopped: Promise<void> | undefined;
   const shutdown = () =>
-    (stopped ??= started.shutdown().then(() => {
+    (stopped ??= started.shutdown().finally(() => {
       configureUpstream(undefined);
     }));
   return { ...started, shutdown };

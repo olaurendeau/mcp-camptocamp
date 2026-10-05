@@ -36,6 +36,10 @@ class Limiter {
 
   constructor(private readonly concurrency: number) {}
 
+  get queued(): number {
+    return this.waiters.length;
+  }
+
   acquire(signal: AbortSignal | undefined): Promise<void> {
     if (signal?.aborted) return Promise.reject(abortReason(signal));
     if (this.active < this.concurrency) {
@@ -88,6 +92,11 @@ export function configureUpstream(config: UpstreamConfig | undefined): void {
   configured = config !== undefined;
   limiter = config ? new Limiter(config.concurrency) : undefined;
   operatorContact = config?.operatorContact;
+}
+
+/** For tests: how many Camptocamp requests wait for a slot right now (0 while no cap is configured). */
+export function queuedUpstreamRequests(): number {
+  return limiter?.queued ?? 0;
 }
 
 export function userAgent(): string {
