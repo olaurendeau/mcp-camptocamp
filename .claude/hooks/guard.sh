@@ -35,12 +35,15 @@ deny() {
 # Then split into one simple command per line, so each rule and its exemptions see one command at a time.
 # The split follows the shell: it never cuts inside quotes, and the code the shell runs from a command
 # ($(…), `…`, <(…), sh -c '…', eval "…") becomes its own command, replaced by $() or "" in the outer one.
+# A removed heredoc leaves <<HEREDOC_<n> in its command; its body follows the commands, as a line starting with \x01.
 segments=$(perl -e '
   local $/; $_ = <STDIN>;
   s/\\\n//g;
-  s{^([^\n]*?)(?<!<)<<(?!<)-?[ \t]*([\x27"]?)(\w+)\2([^\n]*)\n.*?^[ \t]*\3[ \t]*$}{
-    my ($whole, $line) = ($&, "$1$4");
-    $line =~ /(?:^|[\s|;&(\/])(?:ba|z|da|k)?sh(?:\s|$)/ ? $whole : $line
+  my @bodies;
+  s{^([^\n]*?)(?<!<)<<(?!<)-?[ \t]*([\x27"]?)(\w+)\2([^\n]*)\n(.*?)^[ \t]*\3[ \t]*$}{
+    my ($whole, $pre, $post, $body) = ($&, $1, $4, $5);
+    if ("$pre$post" =~ /(?:^|[\s|;&(\/])(?:ba|z|da|k)?sh(?:\s|$)/) { $whole }
+    else { push @bodies, $body =~ s/\n/ /gr; "$pre<<HEREDOC_$#bodies $post" }
   }gsme;
   # A double-quoted text still runs its $(…) and `…`, so it stays and the split below extracts them.
   my $q = qr/"(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27/s;
@@ -111,7 +114,12 @@ segments=$(perl -e '
   }
   split_cmd($_);
   print "$_\n" for @out;
+  print "\x01$_\n" for @bodies;
 ' <<<"$raw")
+heredocs=()
+while IFS= read -r line; do
+  case $line in $'\x01'*) heredocs+=("${line#?}") ;; esac
+done <<<"$segments"
 
 # Global options may sit between the program and its subcommand (git -C <path> push, git -c k=v tag,
 # npm --otp 123456 publish, make -C . publish), and their value may be quoted.
@@ -158,8 +166,10 @@ get="${method}GET"
 api_refs='git/refs([/"'\''[:space:]?]|$)'
 api_releases='/releases([/"'\''[:space:]?]|$)'
 create_ref='createRef[[:space:]]*\('
-move_ref='(updateRefs?|deleteRef)[[:space:]]*\('
-# A body read from stdin (--input -, -d @-) may come from a heredoc, which is not part of any command.
+# updateRef and deleteRef take a refId, so the command never names their target; updateRefs names its refs.
+move_ref_by_id='(updateRef|deleteRef)[[:space:]]*\('
+move_refs='updateRefs[[:space:]]*\('
+# A body read from stdin: --input -, -d @-.
 stdin_body='(--input[[:space:]=]+|@)-(["'\''[:space:]]|$)'
 
 has() { grep -Eq -- "$2" <<<"$1"; }
@@ -167,12 +177,19 @@ has_i() { grep -Eiq -- "$2" <<<"$1"; }
 has_p() { perl -e 'exit($ARGV[0] =~ /$ARGV[1]/ ? 0 : 1)' -- "$1" "$2"; }
 # An API call that changes something: POST/PUT/PATCH/DELETE, and not forced back to GET.
 api_writes() { { has "$1" "$write" || has "$1" "${method}DELETE"; } && ! has "$1" "$get"; }
-# What an API call sends: its own command, plus the raw command line when the body comes from stdin.
-sends() { if has "$1" "$stdin_body"; then printf '%s\n%s\n' "$1" "$raw"; else printf '%s\n' "$1"; fi; }
-# The API call names only branches, in a field, the path or its stdin body; another command's refs/heads/ does not count.
-branch_only() { local text; text=$(sends "$1"); has "$text" 'refs/heads/' && ! has "$text" 'refs/tags'; }
+# What an API call sends: its own command, with its own heredoc body or here-string when it reads stdin.
+# Fails when stdin comes from a file or a pipe, which the hook cannot read.
+sends() {
+  local n
+  if ! has "$1" "$stdin_body" || has "$1" '<<<'; then printf '%s\n' "$1"; return 0; fi
+  n=$(perl -ne 'print $1 if /<<HEREDOC_(\d+)/' <<<"$1")
+  [ -n "$n" ] && printf '%s\n%s\n' "$1" "${heredocs[$n]:-}"
+}
+# The API call names only branches, in a field, the path or its own stdin body; another command's refs/heads/ does not count.
+branch_only() { local text; text=$(sends "$1") || return 1; has "$text" 'refs/heads/' && ! has "$text" 'refs/tags'; }
 
 while IFS= read -r seg; do
+  case $seg in $'\x01'*) continue ;; esac
   if has "$seg" "$publish" || { has "$seg" "$api_releases" && api_writes "$seg"; }; then
     deny "Manual publication (npm/pnpm/yarn publish, make publish, mcp-publisher publish, gh release create/upload/edit/delete, writes to …/releases through the API) is blocked for every agent. Publication happens only through publish.yml, triggered by the coordinator pushing tag vX.Y.Z on main."
   fi
@@ -188,11 +205,12 @@ while IFS= read -r seg; do
     fi
   fi
   # GraphQL: updateRef/updateRefs/deleteRef move or delete a ref, createRef creates one, like PATCH/DELETE and POST.
-  if has "$seg" 'graphql' && ! branch_only "$seg"; then
-    if has "$(sends "$seg")" "$move_ref"; then
-      deny "No agent moves or deletes a tag through the API (GraphQL updateRef/updateRefs/deleteRef outside refs/heads/): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
+  # The mutation may sit in a variable set by another command or in a heredoc, so look for it in the raw command.
+  if has "$seg" 'graphql'; then
+    if has "$raw" "$move_ref_by_id" || { has "$raw" "$move_refs" && ! branch_only "$seg"; }; then
+      deny "No agent moves or deletes a tag through the API (GraphQL updateRef/deleteRef, or updateRefs outside refs/heads/): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
     fi
-    if [ "$agent" != "coordinator" ] && has "$(sends "$seg")" "$create_ref"; then
+    if [ "$agent" != "coordinator" ] && has "$raw" "$create_ref" && ! branch_only "$seg"; then
       deny "Only the coordinator creates version tags (GraphQL createRef outside refs/heads/), on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
     fi
   fi

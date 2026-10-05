@@ -344,19 +344,45 @@ for role in coordinator developer pr-reviewer ""; do
 done
 
 # The refs/heads/ exemption covers its own command only: a branch push does not exempt the next API write
+# A body on stdin only counts from the command's own heredoc or here-string; from a file or a pipe it is unknown.
+# A mutation set in a variable by another command still counts.
 BRANCH_THEN='git push origin HEAD:refs/heads/feat/x && '
+GQL_DELETE_BODY='{"query":"mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }"}'
+MOVE_FORMS=(
+  "${BRANCH_THEN}gh api -X PATCH \"repos/o/r/git/refs/\$REF\" -f sha=abc -F force=true"
+  "${BRANCH_THEN}gh api -X DELETE \"repos/o/r/git/refs/\$REF\""
+  "${BRANCH_THEN}gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+  "$(lines "${BRANCH_THEN}gh api graphql --input - <<EOF" "$GQL_DELETE_BODY" 'EOF')"
+  "$(lines 'gh api graphql --input - <<EOF' "$GQL_DELETE_BODY" 'EOF' '# refs/heads/')"
+  "${BRANCH_THEN}gh api -X PATCH \"repos/o/r/git/refs/\$REF\" --input - <<<'{\"sha\":\"abc\",\"force\":true}'"
+  "${BRANCH_THEN}curl -X DELETE https://api.github.com/repos/o/r/git/refs/\$REF -d @-"
+  "Q='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'; gh api graphql -f query=\"\$Q\""
+  "$(lines "Q='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { clientMutationId } }'" 'gh api graphql -f query="$Q"')"
+  # updateRef and deleteRef take a refId: the command never names their target, so no refs/heads/ exempts them
+  "gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }' -f x=refs/heads/y"
+  "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { clientMutationId } }' # refs/heads/feat/x"
+)
+CREATE_FORMS=(
+  "${BRANCH_THEN}gh api repos/o/r/git/refs --input ref.json"
+  "${BRANCH_THEN}gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \$name, oid: \"abc\"}) { ref { name } } }' -f name=v1.0.5"
+  "${BRANCH_THEN}gh api repos/o/r/git/refs --input - < ref.json"
+  "${BRANCH_THEN}cat ref.json | gh api repos/o/r/git/refs --input -"
+  'gh api repos/o/r/git/refs --input - < ref.json # refs/heads/'
+  "$(lines 'cat > /tmp/b.json <<EOF' "$REST_BRANCH_BODY" 'EOF' 'gh api repos/o/r/git/refs --input - < /tmp/b.json')"
+)
 for role in coordinator developer pr-reviewer ""; do
-  check deny  "$role" "${BRANCH_THEN}gh api -X PATCH \"repos/o/r/git/refs/\$REF\" -f sha=abc -F force=true"
-  check deny  "$role" "${BRANCH_THEN}gh api -X DELETE \"repos/o/r/git/refs/\$REF\""
-  check deny  "$role" "${BRANCH_THEN}gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+  for cmd in "${MOVE_FORMS[@]}"; do
+    check deny "$role" "$cmd"
+  done
   check allow "$role" "${BRANCH_THEN}gh api repos/o/r/git/refs -f ref=refs/heads/feat/y -f sha=abc"
   check allow "$role" "$(lines 'gh api repos/o/r/git/refs --input - <<EOF' "$REST_BRANCH_BODY" 'EOF')"
+  check allow "$role" "gh api repos/o/r/git/refs --input - <<<'$REST_BRANCH_BODY'"
 done
-check allow coordinator "${BRANCH_THEN}gh api repos/o/r/git/refs --input ref.json"
-check allow coordinator "${BRANCH_THEN}gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \$name, oid: \"abc\"}) { ref { name } } }' -f name=v1.0.5"
-for role in developer pr-reviewer ""; do
-  check deny "$role" "${BRANCH_THEN}gh api repos/o/r/git/refs --input ref.json"
-  check deny "$role" "${BRANCH_THEN}gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \$name, oid: \"abc\"}) { ref { name } } }' -f name=v1.0.5"
+for cmd in "${CREATE_FORMS[@]}"; do
+  check allow coordinator "$cmd"
+  for role in developer pr-reviewer ""; do
+    check deny "$role" "$cmd"
+  done
 done
 
 # make with options or other targets before publish
