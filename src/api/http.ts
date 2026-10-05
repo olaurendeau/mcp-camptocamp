@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { VERSION } from "../version.js";
+import { userAgent, withUpstreamSlot } from "./upstream.js";
 
 export const BASE_URL = "https://api.camptocamp.org";
 
@@ -9,10 +9,6 @@ const TIMEOUT_MS = 15_000;
 const TIMED_OUT = `request timed out after ${TIMEOUT_MS / 1000} s`;
 const MAX_BODY_BYTES = 10 * 1024 * 1024; // the largest known response, area 14067, is about 1.1 MB
 const TOO_LARGE = "too large (over 10 MiB)";
-const HEADERS = {
-  "User-Agent": `mcp-camptocamp/${VERSION} (+https://github.com/olaurendeau/mcp-camptocamp)`,
-  Accept: "application/json",
-};
 
 export type DocumentType = "route" | "waypoint" | "outing" | "area" | "book" | "article";
 
@@ -29,15 +25,26 @@ class HttpStatusError extends Error {}
 class BodyTooLargeError extends Error {}
 
 // The only place that calls the Camptocamp API: every endpoint goes through here.
+// In HTTP mode it first waits for an upstream slot (src/api/upstream.ts), outside the timeout below, so a
+// busy server never reads as a Camptocamp API error; in stdio there is no slot to wait for.
+export function getJson<S extends z.ZodTypeAny>(request: JsonRequest<S>): Promise<z.infer<S>> {
+  return withUpstreamSlot((contextSignal) => fetchWithTimeout(request, contextSignal));
+}
+
 // A global setTimeout (not AbortSignal.timeout, which fake timers cannot drive) aborts the request
-// after 15 s; it covers the fetch, the body read and its validation.
-export async function getJson<S extends z.ZodTypeAny>(request: JsonRequest<S>): Promise<z.infer<S>> {
+// after 15 s; it covers the fetch, the body read and its validation. The request's context signal, in HTTP
+// mode, aborts it too; withUpstreamSlot then replaces whatever error that gave with the context's reason.
+async function fetchWithTimeout<S extends z.ZodTypeAny>(
+  request: JsonRequest<S>,
+  contextSignal: AbortSignal | undefined,
+): Promise<z.infer<S>> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
   }, TIMEOUT_MS);
+  const signal = contextSignal ? AbortSignal.any([controller.signal, contextSignal]) : controller.signal;
   try {
-    return await fetchJson(request, controller.signal);
+    return await fetchJson(request, signal);
   } catch (error) {
     // Once our timer has fired, whatever failed (fetch, body read) failed because of it, except an
     // HttpStatusError: its message already says the timeout hit while reading the error body, and keeps
@@ -59,7 +66,7 @@ async function fetchJson<S extends z.ZodTypeAny>(
   let response: Response;
   try {
     response = await fetch(query ? `${BASE_URL}${path}?${query}` : `${BASE_URL}${path}`, {
-      headers: HEADERS,
+      headers: { "User-Agent": userAgent(), Accept: "application/json" },
       signal,
     });
   } catch (error) {

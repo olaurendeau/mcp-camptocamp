@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { configureUpstream } from "../../src/api/upstream.js";
 import { MAX_PARALLEL_REQUESTS, mapWithConcurrency } from "../../src/tools/concurrency.js";
+import { handleGetOutings } from "../../src/tools/outings.js";
+import { collectMatchingOutings } from "../../src/tools/outing-stats.js";
 
 // A call that stays in flight until the test settles it, so the test controls the completion order.
 interface Pending {
@@ -117,5 +120,74 @@ describe("mapWithConcurrency", () => {
     await expect(mapWithConcurrency([1], limit, () => Promise.resolve(1))).rejects.toThrow(
       `limit must be a positive integer, got ${String(limit)}`,
     );
+  });
+});
+
+// AC7.1 on #277: the process-wide upstream cap (HTTP mode) also holds the parallel calls of one tool call.
+describe("tools that read several documents, under an upstream cap of 2", () => {
+  const mockFetch = vi.fn();
+
+  afterEach(() => {
+    configureUpstream(undefined);
+    vi.unstubAllGlobals();
+  });
+
+  // Answers each request after a few milliseconds, with the body built from its URL, counting the pending ones.
+  function slowFetch(body: (url: URL) => unknown) {
+    let pending = 0;
+    let maxPending = 0;
+    mockFetch.mockImplementation(async (url: string) => {
+      pending++;
+      maxPending = Math.max(maxPending, pending);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      pending--;
+      return new Response(JSON.stringify(body(new URL(url))), { status: 200, statusText: "OK" });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    return { maxPending: () => maxPending };
+  }
+
+  // Shaped like GET /outings/1924138 (2026-10-05), with only the required fields and a title.
+  function outingDetail(id: number) {
+    return {
+      document_id: id,
+      locales: [{ lang: "fr", title: `Sortie ${String(id)}` }],
+      activities: ["mountain_climbing"],
+    };
+  }
+
+  it("get_outings with 10 IDs never has more than 2 requests pending", async () => {
+    configureUpstream({ concurrency: 2 });
+    const fetches = slowFetch((url) => outingDetail(Number(url.pathname.split("/").at(-1))));
+    const ids = Array.from({ length: 10 }, (_, i) => 1924130 + i);
+
+    const output = await handleGetOutings({ ids });
+
+    expect(mockFetch).toHaveBeenCalledTimes(10);
+    expect(fetches.maxPending()).toBe(2);
+    for (const id of ids) expect(output).toContain(`Sortie ${String(id)}`);
+    expect(output).not.toContain("Error:");
+  });
+
+  it("collecting 5 pages of outings never has more than 2 requests pending", async () => {
+    configureUpstream({ concurrency: 2 });
+    // Shaped like the items of GET /outings?sort=-date_end,-id&limit=100 (2026-10-05), without the optional fields.
+    const fetches = slowFetch((url) => {
+      const offset = Number(url.searchParams.get("offset"));
+      return {
+        total: 500,
+        documents: Array.from({ length: 100 }, (_, i) => ({
+          document_id: offset + i + 1,
+          locales: [{ lang: "fr", title: "Mont Blanc : Arête de l'Innominata" }],
+          activities: ["mountain_climbing"],
+        })),
+      };
+    });
+
+    const result = await collectMatchingOutings({ activity: "mountain_climbing" });
+
+    expect(mockFetch).toHaveBeenCalledTimes(5);
+    expect(fetches.maxPending()).toBe(2);
+    expect(result.documents).toHaveLength(500);
   });
 });

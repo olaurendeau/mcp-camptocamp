@@ -406,6 +406,26 @@ describe("getJson response size cap", () => {
   });
 });
 
+// Stdio never calls configureUpstream: no cap, no queue, the same User-Agent as before the HTTP mode.
+describe("getJson without configureUpstream", () => {
+  it("lets 20 concurrent calls reach fetch at once", async () => {
+    let answer: (() => void) | undefined;
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    mockFetch.mockImplementation(async () => {
+      await answered;
+      return jsonResponse({}, { status: 200, statusText: "OK" });
+    });
+
+    const requests = Array.from({ length: 20 }, (_, i) => getJson({ path: `/routes/${String(i)}`, schema: anySchema }));
+
+    expect(mockFetch).toHaveBeenCalledTimes(20);
+    answer?.();
+    await Promise.all(requests);
+  });
+});
+
 describe("getJson request headers", () => {
   it("sends the User-Agent with the package.json version and asks for JSON", async () => {
     const packageVersion = (
