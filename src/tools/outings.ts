@@ -173,6 +173,8 @@ function formatOutingDetail(outing: OutingDetail, lang?: Lang): string {
 
   lines.push(...formatRatingLines(outing));
   if (outing.condition_rating) lines.push(`**Conditions**: ${outing.condition_rating}`);
+  // Only when ticked: false is the form default and null is unset, so neither says the route was completed (R1).
+  if (outing.partial_trip === true) lines.push("**Partial trip**: yes");
 
   if (isPresent(outing.elevation_max)) lines.push(`**Max elevation**: ${outing.elevation_max}m`);
   if (isPresent(outing.elevation_min)) lines.push(`**Min elevation**: ${outing.elevation_min}m`);
@@ -325,7 +327,7 @@ export const outingToolDefinitions = [
     name: "get_outing",
     title: "Get outing details",
     description:
-      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including every rating labelled by its grading system (e.g. 'Ski rating (Toponeige)', 'Labande', 'Global rating'), description, conditions, weather, participants, and associated routes (named '<summit> : <route title>', followed by their ratings). The second line is the document's camptocamp.org URL, to cite as the source. The outing detail does not carry its author: search_outings result lines end with 'Author: <name>'. 'Participants with a Camptocamp account' lists the Camptocamp accounts linked to the outing, with their user IDs. " +
+      "Get full details of a specific outing (trip report) from Camptocamp.org by its ID, including every rating labelled by its grading system (e.g. 'Ski rating (Toponeige)', 'Labande', 'Global rating'), description, conditions, weather, participants, and associated routes (named '<summit> : <route title>', followed by their ratings). The second line is the document's camptocamp.org URL, to cite as the source. The outing detail does not carry its author: search_outings result lines end with 'Author: <name>'. 'Participants with a Camptocamp account' lists the Camptocamp accounts linked to the outing, with their user IDs. 'Partial trip: yes' means the author ticked \"partial trip\" (only part of the route done); no such line does not mean the route was completed. " +
       `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${USER_TEXT_NOTE}`,
     inputSchema: getOutingSchema,
     handler: handleGetOuting,

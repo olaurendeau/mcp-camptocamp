@@ -279,6 +279,8 @@ export const outingDetailSchema = z.object({
   height_diff_down: z.number().nullish(),
   ...ratingFields,
   condition_rating: z.string().nullish(),
+  // The "Parcours partiel" checkbox: false is the form default and older outings send null (#255 S3).
+  partial_trip: z.boolean().nullish(),
   participant_count: z.number().nullish(),
   // No `author` key here: the API only sets it on list items (search_outings). `users` are the accounts
   // linked to the outing, in API order, and the first one is not necessarily its author (outing 1757161).

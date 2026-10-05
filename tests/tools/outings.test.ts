@@ -496,6 +496,136 @@ describe("get_outing Text in other languages", () => {
   });
 });
 
+// S3 of #255: the "Parcours partiel" checkbox, printed only when ticked; false is the form default, null the old outings'.
+describe("get_outing partial trip", () => {
+  // Derived from GET /outings/219347, /outings/1924138 and /outings/669600 (2026-10-05): the fields get_outing
+  // prints, each text cut after its first sentence or line, nulls kept as sent; associations left out.
+  // partial_trip is as sent: true, false and null.
+  const tentative = {
+    document_id: 219347,
+    locales: [
+      {
+        lang: "fr",
+        title: "Mont Blanc : Tentative arête de l'Innominata",
+        description: "Samedi 16 PM : montée en refuge versant italien.",
+        route_description: null,
+        conditions: null,
+        weather: "Du samedi 16 au dimanche 19 : neige !",
+        timing: null,
+        participants: "Pierre-Yves",
+      },
+    ],
+    activities: ["snow_ice_mixed"],
+    date_start: "1994-07-19",
+    date_end: "1994-07-19",
+    elevation_max: 4810,
+    elevation_min: null,
+    height_diff_up: 3220,
+    height_diff_down: null,
+    global_rating: "D+",
+    condition_rating: "awful",
+    partial_trip: true,
+    participant_count: null,
+  };
+  const innominata2026 = {
+    document_id: 1924138,
+    locales: [
+      {
+        lang: "fr",
+        title: "Mont Blanc : Arête de l'Innominata",
+        description: null,
+        route_description: "L'arête est globalement très sèche.",
+        conditions: null,
+        weather: null,
+        timing: null,
+        participants: null,
+      },
+    ],
+    activities: ["mountain_climbing"],
+    date_start: "2026-07-03",
+    date_end: "2026-07-05",
+    elevation_max: 4810,
+    elevation_min: 1590,
+    height_diff_up: 3220,
+    height_diff_down: 3445,
+    global_rating: "D+",
+    condition_rating: "average",
+    partial_trip: false,
+    participant_count: null,
+  };
+  // 669600 without its partial_trip key, as an outing that lacks it would come.
+  const innominata2015WithoutFlag = {
+    document_id: 669600,
+    locales: [
+      {
+        lang: "fr",
+        title: "Mont Blanc : Arête de l'Innominata",
+        description: "Superbe itinéraire avec du mixte, du rocher et un superbe panorama.",
+        route_description: "Itinéraire: ",
+        conditions: "Conditions du glacier du brouillard pas trop mauvaises pour aller jusqu'à Eccles.",
+        weather: "Bonne",
+        timing: "Itinéraire complet: ",
+        participants: null,
+      },
+    ],
+    activities: ["snow_ice_mixed"],
+    date_start: "2015-08-27",
+    date_end: "2015-08-27",
+    elevation_max: 4810,
+    elevation_min: null,
+    height_diff_up: 3220,
+    height_diff_down: null,
+    global_rating: "D+",
+    condition_rating: "good",
+    participant_count: null,
+  };
+  const innominata2015 = { ...innominata2015WithoutFlag, partial_trip: null };
+
+  it("prints Partial trip: yes right after the Conditions line when the author ticked it (219347)", async () => {
+    mockGetOuting.mockResolvedValueOnce(tentative);
+
+    const lines = (await handleGetOuting({ id: 219347 })).split("\n");
+
+    expect(lines.slice(3, 10)).toEqual([
+      "**Activities**: snow_ice_mixed",
+      "**Date**: 1994-07-19",
+      "**Global rating**: D+",
+      "**Conditions**: awful",
+      "**Partial trip**: yes",
+      "**Max elevation**: 4810m",
+      "**Elevation gain**: 3220m",
+    ]);
+  });
+
+  it("prints Partial trip: yes after the ratings when the outing has no condition rating", async () => {
+    mockGetOuting.mockResolvedValueOnce({ ...tentative, condition_rating: null });
+
+    const result = await handleGetOuting({ id: 219347 });
+
+    expect(result).toContain("**Global rating**: D+\n**Partial trip**: yes\n**Max elevation**: 4810m");
+  });
+
+  it.each([
+    ["false (1924138)", innominata2026],
+    ["null (669600)", innominata2015],
+    ["a missing key", innominata2015WithoutFlag],
+  ])("prints no Partial trip line for %s", async (_case, outing) => {
+    mockGetOuting.mockResolvedValueOnce(outing);
+
+    const result = await handleGetOuting({ id: outing.document_id });
+
+    expect(result).toContain(`**Conditions**: ${outing.condition_rating}\n**Max elevation**: 4810m`);
+    expect(result).not.toMatch(/partial trip/i);
+  });
+
+  it("says in the get_outing description what the line means and what its absence does not", () => {
+    const description = outingToolDefinitions.find((t) => t.name === "get_outing")?.description ?? "";
+
+    expect(description).toContain(`'Partial trip: yes' means the author ticked "partial trip"`);
+    expect(description).toContain("no such line does not mean the route was completed");
+  });
+});
+
 describe("zero values and partial dates", () => {
   it("prints 0 for participant_count, the elevations and the height differences in get_outing", async () => {
     mockGetOuting.mockResolvedValueOnce({

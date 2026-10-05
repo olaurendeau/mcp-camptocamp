@@ -34,6 +34,7 @@ Read one outing (trip report) from its ID: the ratings and conditions its author
 **Participants with a Camptocamp account**: <name> (user ID: <user id>), …
 **<rating system>**: <grade>
 **Conditions**: <condition>
+**Partial trip**: yes
 **Max elevation**: <metres>m
 **Min elevation**: <metres>m
 **Elevation gain**: <metres>m
@@ -57,6 +58,7 @@ Read one outing (trip report) from its ID: the ratings and conditions its author
   - `**Participants with a Camptocamp account**` names the participants linked to a Camptocamp account, with the user ID to pass to [`search_user_outings`](search_user_outings.md). The two lines are independent: the author's count can be lower or higher than the number of linked accounts (outing 1946459 has `**Participants**: 3` and five linked accounts);
   - one line per rating the author reported for that day, labelled with its grading system (`**Ski rating (Toponeige)**`, `**Labande**`, `**Global rating**`, `**Hiking rating**`…);
   - `**Conditions**` is a code from `excellent`, `good`, `average`, `poor`, `awful`, copied verbatim;
+  - `**Partial trip**: yes` means the author ticked "partial trip" ("Parcours partiel" on camptocamp.org): they did only part of the route. It is printed only then. Unticked (`false`, the form default) and unset (`null`, as on many older outings) both print no line, so no line does not mean the route was completed. Outing 219347, a turned-back attempt on the Innominata, has the line; 1924138 (`false`) and 669600 (`null`) have none. This line is not in v1.3.0: it comes with the release after v1.3.0;
   - the elevations are those the author reported.
 - **The text sections**, in this order, each printed only when the text is not blank:
 
@@ -149,6 +151,7 @@ Descente 2 : 11h55 >> 12h45
 - **No author.** The outing detail does not name who wrote it: the result line of [`search_outings`](search_outings.md) ends with `Author: <name>`.
 - **Routes only.** The detail has no areas and no waypoints. The search result line gives the outing's mountain ranges; [`get_route`](get_route.md) gives a route's areas and waypoints.
 - **A missing line means Camptocamp has no value.** Say "not given on Camptocamp"; never fill it from the route or from memory. See [Missing data](../using-with-llms.md#missing-data).
+- **No line says the route was completed.** `**Partial trip**: yes` is the only success-related fact printed, and only when the author ticked it. Without it, say what the report text says; never infer success from it or from the other lines.
 - **Ratings and conditions are those of one day**, as the author reported them. They are not the route's ratings, and they say nothing about the conditions today.
 - **Outings are past reports, not a forecast.** Give the date with what the outing says. The server has no weather forecast and no avalanche bulletin.
 - **Long texts are cut at 8,000 characters.** Read the rest on the camptocamp.org page of the `**URL**` line.
