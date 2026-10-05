@@ -26,7 +26,12 @@ RUN npm ci --omit=dev --ignore-scripts
 
 COPY --from=builder /app/dist ./dist
 
-# Files stay root-owned and read-only for the server: it only reads package.json and dist/, and talks over stdio
+# HTTP mode (MCP_TRANSPORT=http) listens on all interfaces inside the container; publish the port on the host
+# loopback (-p 127.0.0.1:3000:3000) behind a TLS reverse proxy. The default CMD stays stdio.
+ENV MCP_HTTP_HOST=0.0.0.0
+EXPOSE 3000
+
+# Files stay root-owned and read-only for the server: it only reads package.json and dist/, and talks over stdio or HTTP
 USER node
 
 CMD ["node", "dist/index.js"]
