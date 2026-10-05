@@ -118,6 +118,7 @@ jobs:
           fi
       - name: Smoke test (MCP over Streamable HTTP, auth, docker stop)
         run: |
+          set -o pipefail
           CONTAINER=mcp-http-smoke
           MCP=http://127.0.0.1:3000/mcp
           # A throwaway 40-character token, passed by name so it stays off the docker command line
@@ -140,6 +141,8 @@ jobs:
             curl -sS --max-time 10 -X POST "$MCP" -H 'Content-Type: application/json' \
               -H 'Accept: application/json, text/event-stream' "$@"
           }
+          # The Authorization header, for `curl -H @-`: printf is a builtin, so the token stays off every command line
+          auth() { printf 'Authorization: Bearer %s\n' "$MCP_AUTH_TOKENS"; }
 
           docker run -d --name "$CONTAINER" -e MCP_TRANSPORT=http -e MCP_AUTH_TOKENS \
             -p 127.0.0.1:3000:3000 --read-only --cap-drop ALL mcp-camptocamp:ci > /dev/null
@@ -148,27 +151,26 @@ jobs:
             [ "$HEALTH" = 200 ] && break
             sleep 1
           done
-          [ "$HEALTH" = 200 ] || fail "/healthz returned '$HEALTH' after 30 s, expected 200"
+          [ "$HEALTH" = 200 ] || fail "/healthz returned '$HEALTH' after 30 tries, expected 200"
 
           STATUS=$(post -o /dev/null -D headers.txt -w '%{http_code}' -d '{"jsonrpc":"2.0","id":0,"method":"tools/list"}')
           [ "$STATUS" = 401 ] || fail "POST /mcp without a token returned $STATUS, expected 401"
           grep -qi '^WWW-Authenticate: Bearer' headers.txt || fail "401 without a WWW-Authenticate: Bearer header"
 
-          AUTH="Authorization: Bearer $MCP_AUTH_TOKENS"
-          post -H "$AUTH" -o initialize.json \
+          auth | post -H @- -o initialize.json \
             -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-smoke","version":"0"}}}'
           jq -ce '.result.serverInfo | select(.name == "mcp-camptocamp")' initialize.json \
             || { cat initialize.json; fail "initialize over HTTP returned no serverInfo"; }
 
           # The same tool names as the stdio step's responses.jsonl, in any order
-          post -H "$AUTH" -o tools.json -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+          auth | post -H @- -o tools.json -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
           jq -r 'select(.id == 2) | .result.tools[].name' responses.jsonl | sort > tools-stdio.txt
           jq -r '.result.tools[]?.name' tools.json | sort > tools-http.txt
           echo "Tools listed over HTTP: $(wc -l < tools-http.txt) / $(wc -l < tools-stdio.txt) over stdio"
           [ -s tools-stdio.txt ] || fail "No tool names in responses.jsonl from the stdio step"
           diff tools-stdio.txt tools-http.txt || fail "tools/list over HTTP differs from stdio"
 
-          STATUS=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -H "$AUTH" "$MCP")
+          STATUS=$(auth | curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -H @- "$MCP")
           [ "$STATUS" = 405 ] || fail "GET /mcp returned $STATUS, expected 405"
 
           # Node runs as PID 1: SIGTERM must drain (at most 8 s) and exit 0, before docker's 10 s kill
