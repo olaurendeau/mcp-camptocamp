@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { configureUpstream } from "../../src/api/upstream.js";
 import { MAX_PARALLEL_REQUESTS, mapWithConcurrency } from "../../src/tools/concurrency.js";
 import { handleGetOutings } from "../../src/tools/outings.js";
-import { collectMatchingOutings } from "../../src/tools/outing-stats.js";
+import { collectMatchingOutings, collectOutingSets } from "../../src/tools/outing-stats.js";
 
 // A call that stays in flight until the test settles it, so the test controls the completion order.
 interface Pending {
@@ -189,5 +189,34 @@ describe("tools that read several documents, under an upstream cap of 2", () => 
     expect(mockFetch).toHaveBeenCalledTimes(5);
     expect(fetches.maxPending()).toBe(2);
     expect(result.documents).toHaveLength(500);
+  });
+
+  it("collecting 3 sets of outings, 9 pages in all, never has more than 2 requests pending", async () => {
+    configureUpstream({ concurrency: 2 });
+    const totals: Record<string, number> = { "54513": 61, "54684": 300, "1148298": 450 };
+    // Shaped like the items of GET /outings?r=54513&sort=-date_end,-id&limit=100 (2026-10-05), without the
+    // optional fields.
+    const fetches = slowFetch((url) => {
+      const route = url.searchParams.get("r") ?? "";
+      const total = totals[route] ?? 0;
+      const offset = Number(url.searchParams.get("offset"));
+      return {
+        total,
+        documents: Array.from({ length: Math.min(100, total - offset) }, (_, i) => ({
+          document_id: Number(route) * 10_000 + offset + i + 1,
+          locales: [{ lang: "fr", title: "Mont Blanc : Arête de l'Innominata" }],
+          activities: ["mountain_climbing"],
+        })),
+      };
+    });
+
+    const results = await collectOutingSets(
+      [{ route_id: 54513 }, { route_id: 54684 }, { route_id: 1148298 }],
+      () => undefined,
+    );
+
+    expect(mockFetch).toHaveBeenCalledTimes(9);
+    expect(fetches.maxPending()).toBe(2);
+    expect(results.map((result) => result.documents.length)).toEqual([61, 300, 450]);
   });
 });
