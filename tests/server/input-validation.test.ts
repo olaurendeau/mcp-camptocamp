@@ -532,6 +532,40 @@ describe("cross-field rules", () => {
     expect(params.get("period")).toBe("1970-01-01,2020-01-10");
   });
 
+  // AC2.3 on #303: the route-ID sentence is description only; a route search stays one list request.
+  it("search_outings sends one request through MCP for a route_id", async () => {
+    // Trimmed from the live GET /outings?r=54513&limit=1 response (2026-10-05): list items carry no associations.
+    const fetchMock = stubFetch(
+      jsonResponse({
+        total: 61,
+        documents: [
+          {
+            document_id: 1924138,
+            locales: [{ lang: "fr", title: "Mont Blanc : Arête de l'Innominata" }],
+            activities: ["mountain_climbing"],
+            date_start: "2026-07-03",
+            date_end: "2026-07-05",
+            condition_rating: "average",
+            elevation_max: 4810,
+            height_diff_up: 3220,
+            global_rating: "D+",
+            engagement_rating: "IV",
+            areas: [{ document_id: 14410, area_type: "range", locales: [{ lang: "fr", title: "Mont-Blanc" }] }],
+            author: { name: "Anthony Davoine", user_id: 293785 },
+          },
+        ],
+      }),
+    );
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_outings", arguments: { route_id: 54513, limit: 1 } });
+
+    expect(resultText(result)).toContain("- [1924138] Mont Blanc : Arête de l'Innominata (mountain_climbing)");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
+    expect(params.getAll("r")).toEqual(["54513"]);
+  });
+
   // AC2.1 on #255
   it("search_outings sends route_ids as one r through MCP", async () => {
     const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
