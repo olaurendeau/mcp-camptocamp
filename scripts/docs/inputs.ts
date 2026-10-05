@@ -32,6 +32,20 @@ const PROPERTY_KEYWORDS = new Set([
 ]);
 const ITEMS_KEYWORDS = new Set(["type", "enum", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"]);
 const SCALAR_TYPES = new Set(["integer", "string", "boolean", "number"]);
+const NUMBER_TYPES = new Set(["integer", "number"]);
+// Keywords that apply to some types only: JSON Schema ignores them on the others, so rendering them there misleads
+const TYPE_KEYWORDS: Record<string, Set<string>> = {
+  minimum: NUMBER_TYPES,
+  maximum: NUMBER_TYPES,
+  exclusiveMinimum: NUMBER_TYPES,
+  exclusiveMaximum: NUMBER_TYPES,
+  minLength: new Set(["string"]),
+  maxLength: new Set(["string"]),
+  pattern: new Set(["string"]),
+  items: new Set(["array"]),
+  minItems: new Set(["array"]),
+  maxItems: new Set(["array"]),
+};
 
 type Schema = Record<string, unknown>;
 
@@ -52,6 +66,14 @@ export async function listRegisteredTools(): Promise<Tool[]> {
 function checkKeywords(schema: Schema, allowed: Set<string>, where: string): void {
   for (const keyword of Object.keys(schema)) {
     if (!allowed.has(keyword)) throw new Error(`Unsupported JSON Schema keyword "${keyword}" in ${where}`);
+  }
+}
+
+function checkTypeKeywords(schema: Schema, type: string, where: string): void {
+  for (const keyword of Object.keys(schema)) {
+    if (TYPE_KEYWORDS[keyword]?.has(type) === false) {
+      throw new Error(`Unsupported JSON Schema keyword "${keyword}" on type ${type} in ${where}`);
+    }
   }
 }
 
@@ -116,9 +138,12 @@ function typeOf(schema: Schema, where: string): string {
     if (typeof items.type !== "string" || !SCALAR_TYPES.has(items.type)) {
       throw new Error(`Unsupported JSON Schema type in ${where}.items`);
     }
+    checkTypeKeywords(schema, type, where);
+    checkTypeKeywords(items, items.type, `${where}.items`);
     return `array of ${items.type}`;
   }
   if (typeof type !== "string" || !SCALAR_TYPES.has(type)) throw new Error(`Unsupported JSON Schema type in ${where}`);
+  checkTypeKeywords(schema, type, where);
   return type;
 }
 
@@ -127,7 +152,8 @@ function boundsOf(schema: Schema, where: string): string[] {
   const constraints: string[] = [];
   const minimum = numberOf(schema, "minimum", where);
   const rawMaximum = numberOf(schema, "maximum", where);
-  // zod's .int() adds the safe-integer bound, which says nothing to a reader
+  // documentId() bounds IDs with an explicit .max(Number.MAX_SAFE_INTEGER) (src/tools/inputs.ts), which says nothing
+  // to a reader
   const maximum = rawMaximum === Number.MAX_SAFE_INTEGER ? undefined : rawMaximum;
   const exclusiveMinimum = numberOf(schema, "exclusiveMinimum", where);
   const exclusiveMaximum = numberOf(schema, "exclusiveMaximum", where);
@@ -165,7 +191,10 @@ function constraintsOf(schema: Schema, where: string): string[] {
 
 function bulletOf(name: string, schema: Schema, where: string): string {
   const parts: string[] = [];
-  const description = stringOf(schema, "description", where)?.trim();
+  // A line break would end the bullet, so the lines of a multi-line description are joined with a space
+  const description = stringOf(schema, "description", where)
+    ?.trim()
+    .replace(/\s*[\r\n]\s*/g, " ");
   if (description) parts.push(escapeMarkdown(/[.!?]$/.test(description) ? description : `${description}.`));
   const values = valuesOf(schema, where) ?? valuesOf(asSchema(schema.items ?? {}, `${where}.items`), `${where}.items`);
   if (values !== undefined) parts.push(`Values: ${values.map((value) => code(String(value))).join(", ")}`);
