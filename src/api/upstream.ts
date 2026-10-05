@@ -22,7 +22,7 @@ const REPOSITORY = "https://github.com/olaurendeau/mcp-camptocamp";
 
 export interface UpstreamConfig {
   concurrency: number; // the most Camptocamp requests in flight at once, across every client
-  operatorContact?: string; // already checked by the HTTP settings: printable ASCII, no "()" or ";"
+  operatorContact?: string; // already checked by the HTTP settings: printable ASCII, no "()", ";" or "\"
 }
 
 interface Waiter {
@@ -111,7 +111,7 @@ export function runInRequestContext<T>(context: RequestContext, fn: () => T): T 
 /**
  * Runs one Camptocamp request once a slot is free, passing it the current request's signal to abort its fetch
  * with. Throws UpstreamBusyError past 50 waiters or 20 s of waiting, and the context's abort reason once the
- * context is aborted, whatever `fn` failed with. Without configureUpstream or a context it just calls `fn`.
+ * context is aborted, whatever `fn` failed with. With neither configureUpstream nor a context it just calls `fn`.
  */
 export async function withUpstreamSlot<T>(fn: (signal: AbortSignal | undefined) => Promise<T>): Promise<T> {
   const context = requestContext.getStore();

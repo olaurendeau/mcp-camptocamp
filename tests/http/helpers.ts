@@ -1,4 +1,5 @@
 import { request as httpRequest, type IncomingHttpHeaders, type OutgoingHttpHeaders } from "node:http";
+import { createServer as createNetServer } from "node:net";
 import { afterEach, vi } from "vitest";
 import type { HttpConfig } from "../../src/http/config.js";
 import { startHttpServer, type RunningHttpServer } from "../../src/http/server.js";
@@ -45,6 +46,15 @@ export async function startTestServer(
   const server = await startHttpServer(testConfig(overrides), (line) => logs.push(line));
   running.push(server);
   return Object.assign(server, { logs });
+}
+
+/** A port nothing listens on right now. */
+export async function freePort(): Promise<number> {
+  const server = createNetServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as { port: number };
+  await new Promise((resolve) => server.close(resolve));
+  return port;
 }
 
 export interface HttpResult {

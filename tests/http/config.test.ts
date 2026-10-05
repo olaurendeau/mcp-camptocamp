@@ -195,18 +195,20 @@ describe("readHttpConfig", () => {
       }
     });
 
-    it('refuses a contact with "(", ")", ";", a control or non-ASCII character, or over 100 characters', () => {
+    it('refuses a contact with "(", ")", ";", "\\", a control or non-ASCII character, or over 100 characters', () => {
       for (const contact of [
         "ops (team)",
         "ops) x",
         "ops@example.org; admin",
+        "DOMAIN\\ops",
+        "ops@example.org\\",
         "ops\u0007@example.org",
         "ops\t@example.org",
         "opé@example.org",
         "a".repeat(101),
       ]) {
         expect(configError(httpEnv({ MCP_OPERATOR_CONTACT: contact })).message).toBe(
-          'MCP_OPERATOR_CONTACT must be printable ASCII without "(", ")" or ";", at most 100 characters',
+          'MCP_OPERATOR_CONTACT must be printable ASCII without "(", ")", ";" or "\\", at most 100 characters',
         );
       }
     });

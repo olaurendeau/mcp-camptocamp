@@ -1,10 +1,9 @@
 import { spawn } from "node:child_process";
-import { createServer as createNetServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi } from "vitest";
 import { runHttp, type HttpProcess } from "../../src/http/main.js";
 import { VERSION } from "../../src/version.js";
-import { INITIALIZE, TOKEN, rpc, send } from "./helpers.js";
+import { INITIALIZE, TOKEN, freePort, rpc, send } from "./helpers.js";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const HTTP_ENV = { MCP_TRANSPORT: "http", MCP_AUTH_TOKENS: TOKEN };
@@ -24,15 +23,6 @@ function spawnServer(env: Record<string, string>) {
   child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
   const exited = new Promise<number | null>((resolve) => child.once("exit", resolve));
   return { child, stdout: () => stdout, stderr: () => stderr, exited };
-}
-
-/** A port nothing listens on right now. */
-async function freePort(): Promise<number> {
-  const server = createNetServer();
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address() as { port: number };
-  await new Promise((resolve) => server.close(resolve));
-  return port;
 }
 
 describe("CLI", { timeout: 30_000 }, () => {
