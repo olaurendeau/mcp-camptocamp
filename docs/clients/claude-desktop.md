@@ -58,13 +58,13 @@ Keep `-i`: without it, the server gets no input and stops at once (see [Troubles
 
 ## Check that Claude Desktop sees the server
 
-After the restart, click the "Add files, connectors, and more" button at the bottom left of the message box. Move the mouse over "Connectors", click "Manage connectors", then select `camptocamp`. It lists the server's 13 tools (14 from the release after v1.3.0, which adds `get_outings`).
+After the restart, click the "Add files, connectors, and more" button at the bottom left of the message box. Move the mouse over "Connectors", click "Manage connectors", then select `camptocamp`. It lists the server's 13 tools (15 from the release after v1.3.0, which adds `get_outings` and `outing_stats`).
 
 ## Approve the tool calls
 
 The MCP documentation for Claude Desktop says: "All actions require your explicit approval before execution". Claude asks before it calls one of the server's tools, and you can deny the request.
 
-That documentation describes no setting that approves a server's tools in advance, so this page gives none. The 13 tools (14 from the release after v1.3.0) only read public Camptocamp data: they don't change anything on Camptocamp or on your computer.
+That documentation describes no setting that approves a server's tools in advance, so this page gives none. The 13 tools (15 from the release after v1.3.0) only read public Camptocamp data: they don't change anything on Camptocamp or on your computer.
 
 ## Try it
 

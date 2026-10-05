@@ -577,7 +577,7 @@ Never make up an ID: take it from a search result, a list in a `get_*` output, o
 
 - **No weather forecast and no avalanche bulletin.** Outings are reports of past trips. Give their date, and never present them as current conditions, a forecast or an avalanche risk. Send the user to the official weather and avalanche services for that.
 - **No live data**: no hut bookings, opening dates beyond what users wrote, lift times or road closures.
-- **No writing**: the 13 tools (14 from the release after v1.3.0) only read Camptocamp. They cannot publish an outing or edit a route.
+- **No writing**: the 13 tools (15 from the release after v1.3.0) only read Camptocamp. They cannot publish an outing or edit a route.
 - **No data beyond Camptocamp**: a route or summit missing from Camptocamp is not "unknown in the mountains", only absent from Camptocamp. Say so instead of filling the gap.
 
 ## See also

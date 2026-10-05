@@ -1,6 +1,6 @@
 # Claude Code
 
-Claude Code starts this server on your machine as a local stdio server. One command adds it, and one permission rule lets Claude call its 13 tools (14 from the release after v1.3.0) without asking each time.
+Claude Code starts this server on your machine as a local stdio server. One command adds it, and one permission rule lets Claude call its 13 tools (15 from the release after v1.3.0) without asking each time.
 
 ## Prerequisites
 
@@ -71,7 +71,7 @@ claude mcp list
 claude mcp get camptocamp
 ```
 
-`claude mcp list` shows `✔ Connected` next to `camptocamp` when Claude Code could start it, and `✘ Failed to connect` with the failure detail otherwise. Inside Claude Code, `/mcp` shows the server's status and its tool count: 13, or 14 from the release after v1.3.0, which adds `get_outings`.
+`claude mcp list` shows `✔ Connected` next to `camptocamp` when Claude Code could start it, and `✘ Failed to connect` with the failure detail otherwise. Inside Claude Code, `/mcp` shows the server's status and its tool count: 13, or 15 from the release after v1.3.0, which adds `get_outings` and `outing_stats`.
 
 ## Allow the tools without prompts
 
@@ -96,7 +96,7 @@ If the file already has a `permissions.allow` list, add `"mcp__camptocamp"` to i
 
 You can also add the rule from inside Claude Code with `/permissions`, which lists every rule and the settings file it comes from.
 
-The 13 tools (14 from the release after v1.3.0) only read public Camptocamp data: allowing the server lets Claude search and read Camptocamp without asking, not change anything. Some rules to keep in mind:
+The 13 tools (15 from the release after v1.3.0) only read public Camptocamp data: allowing the server lets Claude search and read Camptocamp without asking, not change anything. Some rules to keep in mind:
 
 - The rule uses the server name you gave in `claude mcp add`. If you named the server something other than `camptocamp`, change the rule to match.
 - Claude Code skips an allow rule that is a bare glob, such as `mcp__*`, and an `mcp__` rule with parentheses. Use one of the forms above.
