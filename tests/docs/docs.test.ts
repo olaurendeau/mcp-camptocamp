@@ -312,6 +312,45 @@ describe("docs checks fail on bad fixtures", () => {
     expect(problems.join("\n")).not.toContain(token.slice(0, 8));
   });
 
+  it("a literal MCP_AUTH_TOKENS value as a YAML or JSON value, or after a short entry of a list", () => {
+    const token = "0f".repeat(32);
+    const text = [
+      `      MCP_AUTH_TOKENS: ${token}`,
+      `{ "MCP_AUTH_TOKENS": "${token}" }`,
+      `MCP_AUTH_TOKENS=alice,${token}`,
+      `MCP_AUTH_TOKENS: "bob, ${token}"`,
+      "MCP_AUTH_TOKENS: ${MCP_AUTH_TOKENS} and MCP_AUTH_TOKENS=alice,bob and `MCP_AUTH_TOKENS`: a comma-separated list",
+      `MCP_AUTH_TOKENS=\${OLD},${token} and MCP_AUTH_TOKENS="$OLD, ${token}"`,
+    ].join("\n");
+    const problems = checkTokenLiterals(text);
+
+    expect(problems).toEqual(
+      [1, 2, 3, 4, 6, 6].map((line) => `line ${line}: a literal MCP_AUTH_TOKENS value; use an env var`),
+    );
+    expect(problems.join("\n")).not.toContain(token.slice(0, 8));
+  });
+
+  it("a literal MCP_AUTH_TOKENS value alone on the next, more indented YAML line, but not the next key", () => {
+    const token = "0f".repeat(32);
+    const text = [
+      "    MCP_AUTH_TOKENS:",
+      `      ${token}`,
+      "    MCP_AUTH_TOKENS: >-",
+      `      ${token}`,
+      "    MCP_AUTH_TOKENS: |",
+      `      alice,${token}`,
+      // Compose takes a key without a value from the host; an env file may leave a variable empty.
+      "    MCP_AUTH_TOKENS:",
+      "    MCP_OPERATOR_CONTACT: ops@example.org",
+      "MCP_AUTH_TOKENS=",
+      "MCP_OPERATOR_CONTACT=ops@example.org",
+    ].join("\n");
+    const problems = checkTokenLiterals(text);
+
+    expect(problems).toEqual([1, 3, 5].map((line) => `line ${line}: a literal MCP_AUTH_TOKENS value; use an env var`));
+    expect(problems.join("\n")).not.toContain(token.slice(0, 8));
+  });
+
   it("a wrong image tag in prose", () => {
     expect(checkNames("Run `docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:1.3.0`.")).toEqual([
       'unexpected name "ghcr.io/olaurendeau/mcp-camptocamp:1.3.0"',
@@ -532,8 +571,9 @@ describe("pages", () => {
     const code = fencedBlocks(text)
       .map((block) => block.content.replace(/\\\n\s*/g, ""))
       .join("\n");
-
-    for (const snippet of [
+    const caddyfiles = fencedBlocks(text, "caddyfile").map((block) => block.content);
+    // Only the missing snippets are printed on failure, never the guide's commands, which could hold a literal token.
+    const missing = [
       "openssl rand -hex 32",
       "docker run -d --restart unless-stopped --name camptocamp -e MCP_TRANSPORT=http -e MCP_AUTH_TOKENS " +
         "-e MCP_ALLOWED_HOSTS=mcp.example.org -e MCP_OPERATOR_CONTACT -p 127.0.0.1:3000:3000 --read-only --cap-drop ALL " +
@@ -544,14 +584,12 @@ describe("pages", () => {
       '"method":"initialize"',
       "docker stop -t 10 camptocamp",
       "stop_grace_period: 10s",
-    ]) {
-      expect(code, snippet).toContain(snippet);
-    }
-    expect(fencedBlocks(text, "caddyfile").map((block) => block.content)).toContain(
-      "mcp.example.org\nreverse_proxy 127.0.0.1:3000",
-    );
-    expect(code).toContain("HTTP/2 401");
-    expect(text).toContain("v1.4.0 or later");
+      "HTTP/2 401",
+    ].filter((snippet) => !code.includes(snippet));
+
+    expect(missing).toEqual([]);
+    expect(caddyfiles.includes("mcp.example.org\nreverse_proxy 127.0.0.1:3000"), "Caddyfile").toBe(true);
+    expect(text.includes("v1.4.0 or later"), "v1.4.0 or later").toBe(true);
   });
 
   it("the remote-only page quotes a source for 6 surfaces, links a local alternative, and has no recipe", () => {
