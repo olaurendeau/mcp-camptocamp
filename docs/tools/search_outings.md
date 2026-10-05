@@ -145,7 +145,7 @@ The period matches June of every year: here 2026 and 2025. `get_outing {id: 1912
   | `01-02` → `01-31` | 29297  | 29297                         |
   | `12-20` → `12-31` | 10098  | 10098                         |
 
-  1 January itself is still missed in some years from the release after v1.3.0. 1 January of a leap year lands after `12-31` on that 365.2425-day year, so no period starting on `01-01` returns its outings, however wide. A `01-01` → `01-01` period also misses 1 January of some other years, such as 2025. Measured on the live API on 2026-10-05, the outings of 1 January of one year (`date_from` and `date_to` alone on that day, then with each period, from the release after v1.3.0):
+  1 January itself is still missed in some years from the release after v1.3.0. 1 January of a leap year lands after `12-31` on that 365.2425-day year, so no period starting on `01-01` returns an outing dated on 1 January alone, however wide; `01-01` → `12-31` only returns those that span several days. A `01-01` → `01-01` period also misses 1 January of some other years, such as 2025. Measured on the live API on 2026-10-05, the outings of 1 January of one year (`date_from` and `date_to` alone on that day, then with each period, from the release after v1.3.0):
 
   | Year | Dates only | `01-01` → `01-31` | `01-01` → `01-01` | `01-01` → `12-31` |
   | ---- | ---------- | ----------------- | ----------------- | ----------------- |
@@ -160,7 +160,7 @@ The period matches June of every year: here 2026 and 2025. `get_outing {id: 1912
 
   In v1.3.0, `01-01` → `01-31` returns none of them, in each of these years. From the release after v1.3.0, in the six years other than 2020 and 2024, it returns every outing dated on 1 January alone; the outings it misses span several days. For 1 January, use `date_from` and `date_to`, one year per call, in every version. With v1.3.0, start a January period on `01-02`. An empty result for a period starting on `01-01` does not mean there are no reports.
 
-- **An outing spanning the new year is missed by periods inside its dates.** Camptocamp keeps an outing when its end falls on or after `period_start` and its start on or before `period_end`, all reduced to days of the 365.2425-day year, so a bound can be off by a day. For an outing spanning the new year, the end day comes before the start day, so only a period covering the days between them returns it. Outing 1362640, from 2020-12-17 to 2021-10-28 (route 1276279), measured on the live API on 2026-10-05:
+- **An outing spanning the new year is missed by periods inside its dates.** Camptocamp keeps an outing when its end falls on or after `period_start` and its start on or before `period_end`, all reduced to days of the 365.2425-day year, so a bound can be off by a day. For an outing spanning the new year and lasting less than a year, the end day comes before the start day, so only a period covering the days between them returns it. This does not hold for an outing lasting a year or more, such as 1684833, from 2023-08-15 to 2024-08-16. Outing 1362640, from 2020-12-17 to 2021-10-28 (route 1276279), measured on the live API on 2026-10-05:
   - returned by `10-27` → `12-17`, `10-01` → `12-20`, `03-01` → `12-20` and `06-01` → `12-31`, in v1.3.0 too;
   - not returned by `10-28` → `12-17`, `10-27` → `12-16`, `01-01` → `01-31`, `06-01` → `06-30` or `12-01` → `12-31`;
   - returned by `01-01` → `12-31` from the release after v1.3.0, but not in v1.3.0.
