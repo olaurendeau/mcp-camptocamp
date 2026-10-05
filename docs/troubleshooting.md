@@ -62,6 +62,8 @@ Or raise the client's startup timeout:
 
 - Docker: `docker pull ghcr.io/olaurendeau/mcp-camptocamp:latest`.
 - npx with a global copy: `npm install -g @olaurendeau/mcp-camptocamp`, which installs the latest release, or remove it with `npm uninstall -g @olaurendeau/mcp-camptocamp`.
+- npx with a copy in the project: in that project, `npm update @olaurendeau/mcp-camptocamp` moves it to the newest release its range in `package.json` allows, so `^1.3.0` gets v1.4.0 but an exact `1.3.0` stays. Or remove it with `npm uninstall @olaurendeau/mcp-camptocamp`: npx then runs the latest release. Tried on 2026-10-06 with npm 10.9.9.
+- Node.js older than 22: install [Node.js](https://nodejs.org/en/download) 22 or later. npx then runs the latest release: tried on 2026-10-06, npx ran v1.2.0 under an older Node.js, then v1.4.0 under Node.js 22 with the same npm cache.
 
 ## Docker: the server stops right after it starts
 
@@ -157,6 +159,6 @@ Then start Claude Desktop again. If npx still fails, check that npm is installed
 - Mistral Vibe Code: https://docs.mistral.ai/vibe/code/cli/mcp-servers and https://github.com/mistralai/mistral-vibe
 - Gemini CLI: https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md and, for folder trust, https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/trusted-folders.md
 - docker run: https://docs.docker.com/reference/cli/docker/container/run/
-- npx: https://docs.npmjs.com/cli/v11/commands/npx
+- npx (npm 10, bundled with Node.js 22): https://docs.npmjs.com/cli/v10/commands/npx
 
-Last verified: 2026-10-05 against official docs
+Last verified: 2026-10-06 against official docs
