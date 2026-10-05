@@ -596,7 +596,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "integer",
       },
       "configuration": {
-        "description": "Terrain configurations, matching any of: edge, pillar, face, corridor, goulotte, glacier (edge = arête/ridge)",
+        "description": "Terrain configurations, matching any of: edge, pillar, face, corridor, goulotte, glacier (edge = arête/ridge). Tagging is incomplete: routes without a configuration are excluded, and some ridges are tagged pillar or glacier. For ridges, also search query: 'arête', which matches names only and so also lists routes on summits whose name contains 'arête'",
         "items": {
           "enum": [
             "edge",
@@ -650,7 +650,7 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "integer",
       },
       "query": {
-        "description": "Search query for routes (e.g. 'Mont Blanc voie normale')",
+        "description": "Search query for routes (e.g. 'Mont Blanc voie normale'). Matches route names ('<summit> : <route title>') only, not descriptions",
         "maxLength": 200,
         "type": "string",
       },
