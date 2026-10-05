@@ -28,6 +28,15 @@ Tout changement arrive sur `main` par une pull request qui passe la CI et une re
 
 Une PR qui dépasse 1000 lignes se découpe : d'abord le refactoring préparatoire, puis la fonctionnalité, puis la doc.
 
+### Documentation des outils
+
+Chaque outil MCP a sa page de référence `docs/tools/<outil>.md`. Une PR qui change un outil met sa page à jour dans la même PR :
+
+- **Entrées** : après tout changement du schéma d'entrée, lancer `docker compose run --rm dev npm run docs:tools`, qui régénère le bloc _Inputs_ entre les marqueurs `generated:inputs`. Ce bloc ne s'édite jamais à la main, et `make check` échoue tant qu'il ne correspond pas au schéma enregistré.
+- **Sortie** : quand la sortie change, mettre à jour à la main les sections _Output format_, _Example_ et _Limits_. Un exemple recapturé dit d'où il vient : `captured from vX.Y.Z on <date>`, ou `captured from main at <sha> on <date>, with a local build` tant que la sortie n'est dans aucune release.
+- **Résumé** : la ligne de l'outil dans `README.md` (section _Tools_) et dans l'index `docs/tools/README.md` ne change que si son résumé d'une ligne change. Le README n'a pas de paragraphe par outil : le détail va dans `docs/tools/`.
+- **Nouvel outil** : `npm run docs:tools` crée sa page (_Purpose_, _Inputs_, _Related tools_) ; écrire les autres sections et ajouter l'outil aux deux index, ce que `make check` vérifie.
+
 ### Suivi des dépendances
 
 - **Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) propose chaque lundi les mises à jour npm, GitHub Actions et Docker. Les montées mineures et correctives npm sont groupées (une PR pour la production, une pour le dev) ; chaque montée majeure npm arrive seule et reste une décision de l'humain. Les mises à jour de sécurité arrivent sans délai, une PR chacune. Une PR Dependabot suit le même cycle que les autres : checks requis, revue agent, merge par le coordinateur.
@@ -104,6 +113,13 @@ Une release n'a lieu que quand l'humain la demande : la décision de publier et 
 2. Un `developer` ouvre la PR de bump (`package.json`, `package-lock.json`, `server.json`) : `npm version X.Y.Z --no-git-tag-version` dans le conteneur de dev, puis `server.json` à la main.
 3. Le `coordinator` la merge, comme toute PR.
 4. Le `coordinator` pose le tag `vX.Y.Z` sur le commit de merge de la PR de bump (`gh pr view <N> --json mergeCommit`) et pousse ce seul tag (`git push origin vX.Y.Z`), ce qui déclenche `publish.yml` (npm, GHCR, registre MCP).
+5. Une fois `vX.Y.Z` publiée, un `developer` ouvre une PR `docs:` qui remet à jour ce qui dépend d'une date ou d'une version :
+   - **Pages clients** : pour chaque page qui finit par `Last verified: <date> against official docs` (`docs/clients/*.md`, `docs/agent-sdks.md`, `docs/getting-started.md`, `docs/troubleshooting.md`), relire chaque lien de sa liste _Sources_, corriger la page si la doc officielle a changé, puis mettre la date du jour dans cette ligne et dans la colonne _Last verified_ de la matrice de `docs/README.md` (le test des docs vérifie que les deux dates concordent).
+   - **Mesures** : refaire sur `vX.Y.Z` chaque mesure liée à une version et mettre à jour sa version, sa date et ses chiffres, comme le paragraphe `Measured on v1.3.0` de `docs/clients/claude-code.md` (longueur des instructions et des descriptions d'outils face à la coupure à 2 048 caractères).
+   - **Exemples capturés depuis `main`** : recapturer depuis `vX.Y.Z` chaque exemple `captured from main at <sha>` (`docs/using-with-llms.md`, `docs/tools/*.md`) et le réétiqueter `captured from vX.Y.Z on <date>`.
+   - **Notes de version** : réécrire en `vX.Y.Z or later` les notes sur ce que la release précédente n'avait pas et que `vX.Y.Z` apporte : `not in v1.3.0`, `the release after v1.3.0`, `after v1.3.0`, `comes with the next release` (`docs/`, `docs/system-prompt.md` compris, et la ligne `search_articles` de `README.md`), ainsi que `refused by v1.3.0` (`docs/tools/search_articles.md`) et `v1.3.0 prints the same output without…` (`docs/tools/get_area.md`).
+
+   Pour tout retrouver : `grep -rnE 'Last verified|Measured on v|captured from main|not in v[0-9]|after v[0-9]|next release' docs README.md`, puis `grep -rnF 'v<version précédente>' docs README.md` pour les autres mentions de la version précédente. `vX.Y.Z or later` et `captured from vX.Y.Z` restent vrais et ne changent pas.
 
 ### Prérequis externes (déjà en place)
 
