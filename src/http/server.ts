@@ -190,8 +190,8 @@ export function startHttpServer(config: HttpConfig, log: (line: string) => void)
     }, REQUEST_TIMEOUT_MS);
     // Whether the whole response reached the socket. Neither res.writableFinished nor a plain 'finish' tells: once
     // the socket is destroyed, Node still emits 'finish' from the failed write. A socket already destroyed when
-    // 'finish' comes means the response was cut; this listener runs before Node's own, which destroys the socket
-    // of a delivered Connection: close response.
+    // 'finish' comes means the response was cut. This listener runs before Node's own (resOnFinish), which calls
+    // res.detachSocket() and so sets res.socket to null: a plain once('finish') would log every response as 499.
     let delivered = false;
     res.prependOnceListener("finish", () => {
       delivered = res.socket?.destroyed === false;
