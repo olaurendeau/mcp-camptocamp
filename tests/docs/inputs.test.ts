@@ -183,6 +183,55 @@ describe("renderInputs", () => {
     expect(rendered).toContain("- `q`: a\\*b \\<c\\> \\[d\\] e\\|f \\`g\\` \\_h\\_ \\~i\\~ \\\\.");
   });
 
+  it("collapses the line breaks of a multi-line description so that its bullet stays on one line", () => {
+    const rendered = renderInputs(
+      withProperty("q", { type: "string", description: "Keyword\n\n  - with a dash\r\nand a\ttab\n" }),
+    );
+    expect(rendered).toContain("- `q`: Keyword - with a dash and a\ttab.\n");
+  });
+
+  it("throws on an array keyword on a type other than array", () => {
+    expect(() => renderInputs(withProperty("x", { type: "string", items: { anyOf: [] } }))).toThrow(
+      'Unsupported JSON Schema keyword "items" on type string in search_fixture.x',
+    );
+    expect(() => renderInputs(withProperty("x", { type: "string", items: { type: "string", enum: ["a"] } }))).toThrow(
+      'Unsupported JSON Schema keyword "items" on type string in search_fixture.x',
+    );
+    expect(() => renderInputs(withProperty("x", { type: "integer", minItems: 1 }))).toThrow(
+      'Unsupported JSON Schema keyword "minItems" on type integer in search_fixture.x',
+    );
+    expect(() => renderInputs(withProperty("x", { type: "boolean", maxItems: 1 }))).toThrow(
+      'Unsupported JSON Schema keyword "maxItems" on type boolean in search_fixture.x',
+    );
+  });
+
+  it("throws on a numeric bound on a type other than integer or number, on the array itself or on its items", () => {
+    expect(() =>
+      renderInputs(withProperty("x", { type: "array", minimum: 1, items: { type: "integer", exclusiveMinimum: 0 } })),
+    ).toThrow('Unsupported JSON Schema keyword "minimum" on type array in search_fixture.x');
+    expect(() => renderInputs(withProperty("x", { type: "array", items: { type: "string", minimum: 1 } }))).toThrow(
+      'Unsupported JSON Schema keyword "minimum" on type string in search_fixture.x.items',
+    );
+    expect(() =>
+      renderInputs(withProperty("x", { type: "array", items: { type: "boolean", exclusiveMaximum: 1 } })),
+    ).toThrow('Unsupported JSON Schema keyword "exclusiveMaximum" on type boolean in search_fixture.x.items');
+    expect(() => renderInputs(withProperty("x", { type: "string", maximum: 3 }))).toThrow(
+      'Unsupported JSON Schema keyword "maximum" on type string in search_fixture.x',
+    );
+  });
+
+  it("throws on a string keyword on a type other than string", () => {
+    expect(() => renderInputs(withProperty("x", { type: "array", minLength: 1, items: { type: "string" } }))).toThrow(
+      'Unsupported JSON Schema keyword "minLength" on type array in search_fixture.x',
+    );
+    expect(() => renderInputs(withProperty("x", { type: "integer", maxLength: 3 }))).toThrow(
+      'Unsupported JSON Schema keyword "maxLength" on type integer in search_fixture.x',
+    );
+    expect(() => renderInputs(withProperty("x", { type: "number", pattern: "^1$" }))).toThrow(
+      'Unsupported JSON Schema keyword "pattern" on type number in search_fixture.x',
+    );
+  });
+
   it("throws on an unknown keyword, naming the tool and the field", () => {
     expect(() => renderInputs(withProperty("when", { anyOf: [{ type: "string" }, { type: "integer" }] }))).toThrow(
       'Unsupported JSON Schema keyword "anyOf" in search_fixture.when',
