@@ -322,9 +322,80 @@ done
 # A ref the command does not name is not known to be a branch: updating or deleting it may move a tag
 check deny  coordinator 'gh api -X PATCH "repos/o/r/git/refs/$REF" -f sha=abc -F force=true'
 check deny  coordinator 'gh api -X DELETE "repos/o/r/git/refs/$REF"'
-for role in developer pr-reviewer ""; do
-  check deny "$role" "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { ref { name } } }'"
-  check deny "$role" "gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+
+# GraphQL: updateRef, updateRefs and deleteRef outside refs/heads/ move or delete a tag: nobody, coordinator included
+GQL_UPDATE_BODY='{"query":"mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { clientMutationId } }"}'
+GQL_BRANCH_BODY='{"query":"mutation { createRef(input: {repositoryId: \"R_1\", name: \"refs/heads/feat/x\", oid: \"abc\"}) { clientMutationId } }"}'
+REST_BRANCH_BODY='{"ref":"refs/heads/feat/x","sha":"abc"}'
+GQL_MOVE=(
+  "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { ref { name } } }'"
+  "gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+  "gh api graphql -f query='mutation { updateRefs(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }'"
+  "gh api graphql -f query='mutation { updateRefs(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/heads/feat/x\", afterOid: \"abc\"}, {name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }'"
+  "curl https://api.github.com/graphql -d '{\"query\":\"mutation { deleteRef(input: {refId: \\\"REF_1\\\"}) { clientMutationId } }\"}'"
+  "$(lines 'gh api graphql --input - <<EOF' "$GQL_UPDATE_BODY" 'EOF')"
+)
+for role in coordinator developer pr-reviewer ""; do
+  for cmd in "${GQL_MOVE[@]}"; do
+    check deny "$role" "$cmd"
+  done
+  check allow "$role" "gh api graphql -f query='mutation { updateRefs(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/heads/feat/x\", afterOid: \"abc\", force: true}]}) { clientMutationId } }'"
+  check allow "$role" "$(lines 'gh api graphql --input - <<EOF' "$GQL_BRANCH_BODY" 'EOF')"
+done
+
+# The refs/heads/ exemption covers its own command only: a branch push does not exempt the next API write
+# A body on stdin only counts from the command's own heredoc or here-string; from a file or a pipe it is unknown.
+# A mutation set in a variable by another command still counts.
+BRANCH_THEN='git push origin HEAD:refs/heads/feat/x && '
+GQL_DELETE_BODY='{"query":"mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }"}'
+MOVE_FORMS=(
+  "${BRANCH_THEN}gh api -X PATCH \"repos/o/r/git/refs/\$REF\" -f sha=abc -F force=true"
+  "${BRANCH_THEN}gh api -X DELETE \"repos/o/r/git/refs/\$REF\""
+  "${BRANCH_THEN}gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+  "$(lines "${BRANCH_THEN}gh api graphql --input - <<EOF" "$GQL_DELETE_BODY" 'EOF')"
+  "$(lines 'gh api graphql --input - <<EOF' "$GQL_DELETE_BODY" 'EOF' '# refs/heads/')"
+  "${BRANCH_THEN}gh api -X PATCH \"repos/o/r/git/refs/\$REF\" --input - <<<'{\"sha\":\"abc\",\"force\":true}'"
+  "${BRANCH_THEN}curl -X DELETE https://api.github.com/repos/o/r/git/refs/\$REF -d @-"
+  "Q='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'; gh api graphql -f query=\"\$Q\""
+  "$(lines "Q='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { clientMutationId } }'" 'gh api graphql -f query="$Q"')"
+  # updateRef and deleteRef take a refId: the command never names their target, so no refs/heads/ exempts them
+  "gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }' -f x=refs/heads/y"
+  "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { clientMutationId } }' # refs/heads/feat/x"
+  # A mutation set by another command may name a tag: the call's own refs/heads/ does not exempt it
+  "Q='mutation { updateRefs(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }'; gh api graphql -f query=\"\$Q\" -f branch=refs/heads/feat/x"
+  # Same over REST: curl sends the DELETE to every URL, a branch one included
+  "U=https://api.github.com/repos/o/r/git/refs/tags/v1.0.4; curl -X DELETE https://api.github.com/repos/o/r/git/refs/heads/feat/x \"\$U\""
+)
+CREATE_FORMS=(
+  "${BRANCH_THEN}gh api repos/o/r/git/refs --input ref.json"
+  "${BRANCH_THEN}gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \$name, oid: \"abc\"}) { ref { name } } }' -f name=v1.0.5"
+  "${BRANCH_THEN}gh api repos/o/r/git/refs --input - < ref.json"
+  "${BRANCH_THEN}cat ref.json | gh api repos/o/r/git/refs --input -"
+  'gh api repos/o/r/git/refs --input - < ref.json # refs/heads/'
+  "$(lines 'cat > /tmp/b.json <<EOF' "$REST_BRANCH_BODY" 'EOF' 'gh api repos/o/r/git/refs --input - < /tmp/b.json')"
+  "Q='mutation { createRef(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { clientMutationId } }'; gh api graphql -f query=\"\$Q\" -f branch=refs/heads/feat/x"
+  # A tag in a variable, a branch in another field of the call: refs/tags anywhere in the line voids the exemption
+  "R=refs/tags/v1.0.5; gh api repos/o/r/git/refs -f ref=\"\$R\" -f sha=abc -f note=refs/heads/feat/x"
+  "$(lines 'R=refs/tags/v1.0.5' 'gh api repos/o/r/git/refs -f ref="$R" -f sha=abc -f note=refs/heads/feat/x')"
+  "B='{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}'; gh api repos/o/r/git/refs --input - <<<\"\$B\" -f note=refs/heads/x"
+)
+for role in coordinator developer pr-reviewer ""; do
+  for cmd in "${MOVE_FORMS[@]}"; do
+    check deny "$role" "$cmd"
+  done
+  check allow "$role" "${BRANCH_THEN}gh api repos/o/r/git/refs -f ref=refs/heads/feat/y -f sha=abc"
+  check allow "$role" "$(lines 'gh api repos/o/r/git/refs --input - <<EOF' "$REST_BRANCH_BODY" 'EOF')"
+  check allow "$role" "gh api repos/o/r/git/refs --input - <<<'$REST_BRANCH_BODY'"
+  # PATCH or DELETE on a git/refs/heads/ path targets that branch, whatever the body
+  check allow "$role" 'cat b.json | gh api -X PATCH repos/o/r/git/refs/heads/feat/x --input -'
+  check allow "$role" 'gh api -X PATCH repos/o/r/git/refs/heads/feat/x --input - < b.json'
+  check allow "$role" 'curl -X PATCH https://api.github.com/repos/o/r/git/refs/heads/feat/x -d @- < b.json'
+done
+for cmd in "${CREATE_FORMS[@]}"; do
+  check allow coordinator "$cmd"
+  for role in developer pr-reviewer ""; do
+    check deny "$role" "$cmd"
+  done
 done
 
 # make with options or other targets before publish
@@ -361,8 +432,15 @@ for role in coordinator developer pr-reviewer ""; do
   check deny  "$role" 'npm --tag next version patch'
   check deny  "$role" 'npm --tag next version 1.2.0'
   check deny  "$role" 'npm --otp 1 version patch'
+  # A read word taken as an option value, then version and an argument: a bump, not a read
+  check deny  "$role" 'npm --tag v version patch'
+  check deny  "$role" 'npm --tag run version patch'
+  check deny  "$role" 'npm --tag view version 1.2.0'
+  check deny  "$role" 'npm --tag v version --preid rc prerelease'
 done
 check allow developer   'npm --tag next version 1.2.0 --no-git-tag-version'
+check allow developer   'npm --tag v version patch --no-git-tag-version'
+check allow developer   'npm --tag run version --no-git-tag-version 1.2.0'
 check deny  developer   'npm --registry https://r.example version patch'
 check deny  developer   'npm --loglevel silent version 1.1.0'
 check deny  developer   'npm --json version patch'

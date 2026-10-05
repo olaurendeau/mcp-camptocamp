@@ -5,8 +5,9 @@
 # - version bump (npm version)       → developer only, with --no-git-tag-version
 # - version tags (git tag/push vX.Y) → coordinator only, one named tag at a time
 # - bulk tag push (--tags/--follow-tags/--mirror/glob), moving or deleting a version tag → nobody
-# - tag creation through the REST API (POST …/git/refs) → coordinator only
-# - moving or deleting a tag, or writing a release, through the REST API → nobody
+# - tag creation through the API (POST …/git/refs, GraphQL createRef) → coordinator only
+# - moving or deleting a tag (PATCH/DELETE …/git/refs/…, GraphQL updateRef/updateRefs/deleteRef),
+#   or writing a release, through the API → nobody
 # - manual publication               → nobody (publish.yml publishes from the tag)
 # The human decides when to release and which version; agents only carry it out.
 # A guardrail for agents, not a security boundary: the human and obfuscated commands bypass it.
@@ -34,12 +35,15 @@ deny() {
 # Then split into one simple command per line, so each rule and its exemptions see one command at a time.
 # The split follows the shell: it never cuts inside quotes, and the code the shell runs from a command
 # ($(…), `…`, <(…), sh -c '…', eval "…") becomes its own command, replaced by $() or "" in the outer one.
+# A removed heredoc leaves <<HEREDOC_<n> in its command; its body follows the commands, as a line starting with \x01.
 segments=$(perl -e '
   local $/; $_ = <STDIN>;
   s/\\\n//g;
-  s{^([^\n]*?)(?<!<)<<(?!<)-?[ \t]*([\x27"]?)(\w+)\2([^\n]*)\n.*?^[ \t]*\3[ \t]*$}{
-    my ($whole, $line) = ($&, "$1$4");
-    $line =~ /(?:^|[\s|;&(\/])(?:ba|z|da|k)?sh(?:\s|$)/ ? $whole : $line
+  my @bodies;
+  s{^([^\n]*?)(?<!<)<<(?!<)-?[ \t]*([\x27"]?)(\w+)\2([^\n]*)\n(.*?)^[ \t]*\3[ \t]*$}{
+    my ($whole, $pre, $post, $body) = ($&, $1, $4, $5);
+    if ("$pre$post" =~ /(?:^|[\s|;&(\/])(?:ba|z|da|k)?sh(?:\s|$)/) { $whole }
+    else { push @bodies, $body =~ s/\n/ /gr; "$pre<<HEREDOC_$#bodies $post" }
   }gsme;
   # A double-quoted text still runs its $(…) and `…`, so it stays and the split below extracts them.
   my $q = qr/"(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27/s;
@@ -110,7 +114,12 @@ segments=$(perl -e '
   }
   split_cmd($_);
   print "$_\n" for @out;
+  print "\x01$_\n" for @bodies;
 ' <<<"$raw")
+heredocs=()
+while IFS= read -r line; do
+  case $line in $'\x01'*) heredocs+=("${line#?}") ;; esac
+done <<<"$segments"
 
 # Global options may sit between the program and its subcommand (git -C <path> push, git -c k=v tag,
 # npm --otp 123456 publish, make -C . publish), and their value may be quoted.
@@ -127,7 +136,10 @@ publish="${pkg}publish"
 publish+='|make[[:space:]](.*[[:space:]])?publish([[:space:]]|$)'
 publish+='|mcp-publisher[[:space:]]+publish'
 publish+='|gh[[:space:]].*release[[:space:]]+(create|upload|edit|delete)'
-bump='(?:npm|pnpm|yarn)(?:\s+-\S*(?:\s+(?!(?:'"$reads"')(?:\s|$))(?:"[^"]*"|\x27[^\x27]*\x27|[^-\s]\S*))?)*\s+version'
+bump_value='(?:"[^"]*"|\x27[^\x27]*\x27|[^-\s]\S*)'
+bump='(?:npm|pnpm|yarn)(?:\s+-\S*(?:\s+(?!(?:'"$reads"')(?:\s|$))'"$bump_value"')?)*\s+version'
+# A read word may still be an option value (npm --tag v version patch): then version followed by an argument bumps.
+bump+='|(?:npm|pnpm|yarn)(?:\s+-\S*(?:\s+'"$bump_value"')?)*\s+-\S*\s+(?:'"$reads"')\s+version(?:\s+-\S*)*\s+[^-\s]'
 no_git_tag='[[:space:]]--no-git-tag-version([[:space:]"'\'']|$)'
 git_tag='[[:space:]]--git-tag-version|--no-git-tag-version[[:space:]]+["'\'']?(true|false)(["'\''[:space:]]|$)'
 tag_create="${git}"'tag[[:space:]].*v[0-9]'
@@ -153,24 +165,41 @@ write='[[:space:]](-f|-F|--field|--raw-field|--input|-d|--data[-a-z]*|--json|--f
 get="${method}GET"
 api_refs='git/refs([/"'\''[:space:]?]|$)'
 api_releases='/releases([/"'\''[:space:]?]|$)'
-ref_mutation='(create|update|delete)Refs?[[:space:]]*\('
+create_ref='createRef[[:space:]]*\('
+# updateRef and deleteRef take a refId, so the command never names their target; updateRefs names its refs.
+move_ref_by_id='(updateRef|deleteRef)[[:space:]]*\('
+move_refs='updateRefs[[:space:]]*\('
+# A body read from stdin: --input -, -d @-.
+stdin_body='(--input[[:space:]=]+|@)-(["'\''[:space:]]|$)'
 
 has() { grep -Eq -- "$2" <<<"$1"; }
 has_i() { grep -Eiq -- "$2" <<<"$1"; }
 has_p() { perl -e 'exit($ARGV[0] =~ /$ARGV[1]/ ? 0 : 1)' -- "$1" "$2"; }
 # An API call that changes something: POST/PUT/PATCH/DELETE, and not forced back to GET.
 api_writes() { { has "$1" "$write" || has "$1" "${method}DELETE"; } && ! has "$1" "$get"; }
-# The command names only branches. The ref may sit in a field, a JSON heredoc or the path, so look in the raw command.
-branch_only() { grep -q 'refs/heads/' <<<"$raw" && ! grep -q 'refs/tags' <<<"$raw"; }
+# What an API call sends: its own command, with its own heredoc body or here-string when it reads stdin.
+# Fails when stdin comes from a file or a pipe, which the hook cannot read.
+sends() {
+  local n
+  if ! has "$1" "$stdin_body" || has "$1" '<<<'; then printf '%s\n' "$1"; return 0; fi
+  n=$(perl -ne 'print $1 if /<<HEREDOC_(\d+)/' <<<"$1")
+  [ -n "$n" ] && printf '%s\n%s\n' "$1" "${heredocs[$n]:-}"
+}
+# The API call names only branches, in a field, the path or its own stdin body; another command's refs/heads/ does not count.
+# A tag named anywhere in the line voids the exemption: a variable set by another command may carry it.
+branch_only() { local text; text=$(sends "$1") || return 1; has "$text" 'refs/heads/' && ! has "$raw" 'refs/tags'; }
+# PATCH/DELETE on a …/git/refs/heads/… path targets that branch, whatever the body says.
+branch_path() { has "$1" "${method}(PATCH|PUT|DELETE)" && has "$1" 'git/refs/heads/' && ! has "$raw" 'refs/tags'; }
 
 while IFS= read -r seg; do
+  case $seg in $'\x01'*) continue ;; esac
   if has "$seg" "$publish" || { has "$seg" "$api_releases" && api_writes "$seg"; }; then
     deny "Manual publication (npm/pnpm/yarn publish, make publish, mcp-publisher publish, gh release create/upload/edit/delete, writes to …/releases through the API) is blocked for every agent. Publication happens only through publish.yml, triggered by the coordinator pushing tag vX.Y.Z on main."
   fi
 
   # Any ref write through the API that is not known to target a branch (refs/heads/) may be a tag.
   # Creating one (POST …/git/refs) is a tag push; updating or deleting one (PATCH/DELETE …/git/refs/…) moves it.
-  if has "$seg" "$api_refs" && api_writes "$seg" && ! branch_only; then
+  if has "$seg" "$api_refs" && api_writes "$seg" && ! branch_only "$seg" && ! branch_path "$seg"; then
     if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$seg" 'git/refs/tags/'; then
       deny "No agent moves or deletes a tag through the API (PATCH/DELETE on …/git/refs/… other than refs/heads/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
     fi
@@ -178,8 +207,15 @@ while IFS= read -r seg; do
       deny "Only the coordinator creates version tags (POST …/git/refs or git push origin vX.Y.Z), on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
     fi
   fi
-  if [ "$agent" != "coordinator" ] && has "$seg" 'graphql' && grep -Eq "$ref_mutation" <<<"$raw" && ! branch_only; then
-    deny "Only the coordinator writes tag refs (GraphQL createRef/updateRef/deleteRef outside refs/heads/). Report to the coordinator instead."
+  # GraphQL: updateRef/updateRefs/deleteRef move or delete a ref, createRef creates one, like PATCH/DELETE and POST.
+  # The mutation may sit in a variable set by another command or in a heredoc, so look for it in the raw command.
+  if has "$seg" 'graphql'; then
+    if has "$raw" "$move_ref_by_id" || { has "$raw" "$move_refs" && ! branch_only "$seg"; }; then
+      deny "No agent moves or deletes a tag through the API (GraphQL updateRef/deleteRef, or updateRefs outside refs/heads/): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
+    fi
+    if [ "$agent" != "coordinator" ] && has "$raw" "$create_ref" && ! branch_only "$seg"; then
+      deny "Only the coordinator creates version tags (GraphQL createRef outside refs/heads/), on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
+    fi
   fi
 
   if has_p "$seg" "$bump"; then
