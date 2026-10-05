@@ -94,7 +94,7 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Smoke test (MCP initialize + tools/list over stdio)
         env:
-          EXPECTED_TOOLS: 13
+          EXPECTED_TOOLS: 14
         run: |
           USER_NAME=$(docker image inspect --format '{{.Config.User}}' mcp-camptocamp:ci)
           if [ "$USER_NAME" != "node" ]; then
