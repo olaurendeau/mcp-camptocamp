@@ -40,7 +40,7 @@ Each page gives the tool's purpose, its inputs and the tools to call before or a
 | Tool                              | What it does                                                                                                 |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | [`search_books`](search_books.md) | Search guidebooks and other books by title, book type and activity; author and ISBN searches are unreliable. |
-| [`get_book`](get_book.md)         | One book by ID: author, editor, date, ISBN, languages, and the routes, waypoints and articles it covers.     |
+| [`get_book`](get_book.md)         | One book by ID: author, editor, date, ISBN, languages, waypoints, articles; 50 routes/call (not in v1.4.0).  |
 
 ## Articles
 

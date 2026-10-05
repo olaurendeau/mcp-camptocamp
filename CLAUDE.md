@@ -204,7 +204,7 @@ The user-facing reference of each tool (purpose, generated inputs, output format
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                               |
 | `search_books`        | Search books by title only (author/ISBN unreliable), by `book_type` and `activity`; paged with `offset`          |
-| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)                |
+| `get_book`            | Book by ID (author, editor, date, ISBN, pages, languages, waypoints, articles; 50 routes/call, `routes_offset`)  |
 | `search_articles`     | Search articles by keyword and/or `category`, `article_type`, `activity` (any one suffices); paged with `offset` |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)                       |
 
@@ -257,6 +257,6 @@ Locale: every search function takes `lang?` and sends `pl={lang}` (default `fr`)
 - `GET /areas?q={query}&limit=10&pl={lang}[&atyp={type}][&offset={n}]`
 - `GET /areas/{id}`
 - `GET /books?q={query}&limit=10&pl={lang}[&btyp={book_type}][&act={activity}][&offset={n}]`
-- `GET /books/{id}`
+- `GET /books/{id}`: `associations.routes` holds every linked route in ascending `document_id` (804 for book 853932). `get_book` prints 50 of them from `routes_offset` (default 0, applied in the handler) under `## Associated routes (<first>–<last> of <total>)`, then `More: get_book {id: <id>, routes_offset: <next>}` while routes remain (S5 of #303).
 - `GET /articles?limit=10&pl={lang}[&q={query}][&acat={category}][&atyp={article_type}][&act={activity}][&offset={n}]` (at least one of `q`, `acat`, `atyp` and `act`)
 - `GET /articles/{id}`

@@ -175,6 +175,7 @@ const TOOL_ARGUMENTS: Record<string, Record<string, unknown>> = {
 // Optional inputs that take another output path, run through the same API-500 test as TOOL_ARGUMENTS.
 const EXTRA_ARGUMENTS: [string, Record<string, unknown>][] = [
   ["outing_stats", { group_by: "month", split_by: "condition" }],
+  ["get_book", { id: 853932, routes_offset: 50 }],
 ];
 
 const API_500_CASES = [...Object.entries(TOOL_ARGUMENTS), ...EXTRA_ARGUMENTS];
