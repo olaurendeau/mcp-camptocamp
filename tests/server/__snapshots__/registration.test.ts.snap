@@ -328,12 +328,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "integer",
       },
       "period_end": {
-        "description": "Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range.",
+        "description": "Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.",
         "pattern": "^\\d{2}-\\d{2}$",
         "type": "string",
       },
       "period_start": {
-        "description": "First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range.",
+        "description": "First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.",
         "pattern": "^\\d{2}-\\d{2}$",
         "type": "string",
       },
@@ -721,12 +721,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "type": "integer",
       },
       "period_end": {
-        "description": "Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range.",
+        "description": "Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.",
         "pattern": "^\\d{2}-\\d{2}$",
         "type": "string",
       },
       "period_start": {
-        "description": "First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range.",
+        "description": "First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.",
         "pattern": "^\\d{2}-\\d{2}$",
         "type": "string",
       },

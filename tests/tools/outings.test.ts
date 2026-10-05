@@ -1406,7 +1406,11 @@ describe("handleSearchOutings", () => {
 
   // S5: outings in the same days of every year (AC5.1–AC5.4), and by user (AC5.5).
   describe("period and user", () => {
-    const PERIOD_NOTE = "Note: Camptocamp's period filter can miss outings on the first or last day of the range.";
+    // D3 on #271: the gaps that remain once each bound covers its whole calendar day.
+    const PERIOD_NOTE =
+      "Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year " +
+      "or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day " +
+      "next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.";
     // A June outing at waypoint 37916, trimmed from the live period search (2026-10-04).
     const june: OutingListItem = {
       ...cosmiques,
@@ -1430,7 +1434,7 @@ describe("handleSearchOutings", () => {
       });
     });
 
-    it("prints the period filter and the boundary-day note in the header (D1)", async () => {
+    it("prints the period filter and the period note in the header (D1)", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([june], 66));
 
       const result = await search({ waypoint_id: 37916, period_start: "06-01", period_end: "06-30" });
@@ -1516,8 +1520,8 @@ describe("handleSearchOutings", () => {
       expect(result).not.toContain("Note:");
     });
 
-    // The period filter can drop boundary days, so "nothing found" is not stated as a plain fact.
-    it("keeps the boundary-day note when nothing matches the period", async () => {
+    // The period filter can drop some outings, so "nothing found" is not stated as a plain fact.
+    it("keeps the period note when nothing matches the period", async () => {
       mockSearchOutings.mockResolvedValueOnce(listResponse([]));
 
       const result = await search({ waypoint_id: 37916, period_start: "07-14", period_end: "07-14" });
@@ -2355,7 +2359,7 @@ describe("outingToolDefinitions", () => {
       "period_start / period_end (MM-DD",
       "every year",
       "cannot wrap around the new year",
-      "can miss outings on the first or last day of the range",
+      "can miss outings spanning the new year",
       "user_id",
       "Next page: offset=N",
       "Next page: offset=N (limit at most M)",
@@ -2406,8 +2410,20 @@ describe("outingToolDefinitions", () => {
     for (const field of [period_start, period_end]) {
       expect(field.description).toContain("cannot wrap around the new year, so make two calls for 12-20 → 01-10");
       expect(field.description).toContain(
-        "Camptocamp's period filter can miss outings on the first or last day of the range",
+        "Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year " +
+          "or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day " +
+          "next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.",
       );
+    }
+  });
+
+  // D3 on #271: each bound now covers its whole day, so widening a period would add days outside it.
+  it("no longer says edge days can be missed, nor suggests widening a period", () => {
+    const { period_start, period_end } = searchOutingsSchema.shape;
+
+    for (const text of [period_start.description ?? "", period_end.description ?? "", SHARED_PERIOD_NOTE]) {
+      expect(text).not.toContain("first or last day");
+      expect(text).not.toMatch(/widen/i);
     }
   });
 
