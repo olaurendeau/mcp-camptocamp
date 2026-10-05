@@ -1,16 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   handleSearchUserOutings,
   handleGetOuting,
+  handleGetOutings,
   handleSearchOutings,
   outingToolDefinitions,
   searchOutingsSchema,
   searchUserOutingsSchema,
 } from "../../src/tools/outings.js";
-import { USER_TEXT_NOTE } from "../../src/tools/text.js";
+import { USER_TEXT_NOTE, userTextNote } from "../../src/tools/text.js";
+import { DETAIL_LANG_NOTE, LANG_NOTE } from "../../src/tools/inputs.js";
 import type { z } from "zod";
 import * as api from "../../src/api/camptocamp.js";
-import type { OutingListItem, OutingListResponse } from "../../src/api/camptocamp.js";
+import type { OutingDetail, OutingListItem, OutingListResponse } from "../../src/api/camptocamp.js";
 import { outingDetailSchema, outingListResponseSchema } from "../../src/api/schemas.js";
 import { throughSchema } from "./through-schema.js";
 import { BARE_RATING } from "./bare-rating.js";
@@ -590,7 +592,8 @@ describe("get_outing partial trip", () => {
         title: "Mont Blanc : Arête de l'Innominata",
         description: "Superbe itinéraire avec du mixte, du rocher et un superbe panorama.",
         route_description: "Itinéraire: ",
-        conditions: "Conditions du glacier du brouillard pas trop mauvaises pour aller jusqu'à Eccles.",
+        conditions:
+          "Conditions du glacier du brouillard pas trop mauvaises pour aller jusqu'à Eccles, il faut juste rester sur la droite (cf photos).",
         weather: "Bonne",
         timing: "Itinéraire complet: ",
         participants: null,
@@ -693,6 +696,278 @@ describe("get_outing partial trip", () => {
 
     expect(description).toContain(`'Partial trip: yes' means the author ticked "partial trip"`);
     expect(description).toContain("no such line does not mean the route was completed");
+  });
+});
+
+// S1 of #255: get_outings reads up to 10 outings in one call, each in get_outing format.
+describe("handleGetOutings", () => {
+  afterEach(() => {
+    mockGetOuting.mockReset();
+  });
+
+  // Derived from GET /outings/1924138, /outings/1917601 and /outings/1545314 (2026-10-05): every field get_outing
+  // prints, nulls kept as sent. Edited: each text cut after its first sentence or line, except the conditions of
+  // 1545314, kept whole (3,272 characters); each route keeps only its fr locale and its ratings.
+  const innominata = {
+    document_id: 54513,
+    locales: [{ lang: "fr", title: "Arête de l'Innominata", title_prefix: "Mont Blanc" }],
+    global_rating: "D+",
+    engagement_rating: "IV",
+    ice_rating: "2",
+    mixed_rating: "M2",
+    rock_free_rating: "5b",
+    rock_required_rating: "4b",
+  };
+  // The facts the three outings share.
+  const facts = {
+    elevation_max: 4810,
+    elevation_min: 1590,
+    global_rating: "D+",
+    engagement_rating: "IV",
+    partial_trip: false,
+    participant_count: null,
+  };
+  const title = "Mont Blanc : Arête de l'Innominata";
+  const outing1924138 = {
+    ...facts,
+    document_id: 1924138,
+    locales: [
+      {
+        lang: "fr",
+        title,
+        description: null,
+        route_description: "L'arête est globalement très sèche.",
+        conditions: null,
+        weather: null,
+        timing: null,
+        participants: null,
+      },
+    ],
+    activities: ["mountain_climbing"],
+    date_start: "2026-07-03",
+    date_end: "2026-07-05",
+    height_diff_up: 3220,
+    height_diff_down: 3445,
+    condition_rating: "average",
+    associations: { users: [{ document_id: 1625915, name: "Anthony Davoine" }], routes: [innominata] },
+  };
+  const outing1917601 = {
+    ...facts,
+    document_id: 1917601,
+    locales: [
+      {
+        lang: "fr",
+        title,
+        description:
+          "Ma première grande course d'alpinisme sur ce magnifique versant italien du Mont-Blanc et pas déçu du voyage.",
+        route_description: "Mercredi : montée au bivouac Eccles par le glacier du brouillard.",
+        conditions: "Bonnes conditions pour l'arête de l'innominata, excellent regel.",
+        weather: "Grand beau, pas de vent et pas froid même si bon regel, difficile d'avoir mieux !",
+        timing: "Mercredi : ",
+        participants: null,
+      },
+    ],
+    activities: ["mountain_climbing", "snow_ice_mixed"],
+    date_start: "2026-06-17",
+    date_end: "2026-06-17",
+    height_diff_up: 3400,
+    height_diff_down: 3400,
+    condition_rating: "good",
+    associations: { users: [{ document_id: 1724768, name: "lucasd43" }], routes: [innominata] },
+  };
+  const CONDITIONS_1545314 =
+    "Depuis le parking remonter en direction du refuge Monzino par le sentier / via ferrata. Une fois au refuge nous sommes remonter en passant par le pied du glacier du Châtelet (neige juste au dessus du refuge) et par le glacier du Brouillard (quelques crevasses ouvertes). Le bivouac se trouve sur l'éperon rocheux sous le Pic Eccles. \n\nPour le bivouac (nouveau) 4 couchages conforts, 2 au sol sous les lits (très étroit) et un septième par terre au milieu. Matelas, nombreuses couvertures, casseroles et quelques ustensiles de cuisine et de la neige pour faire fondre.\n\nNous avons attaqué directement du bivouac par l'arête SW qui remonte au Pic Eccles par une pente de neige assez raide avec un peu de mixte pour rattraper le fil de l'arête et le suivre pour venir sur buter sur ressaut en 4b.\nUne vielle cordelette blanche dans le passage en 4b. Ensuite suivre l'arête en neige/rocher jusqu'au Pic Eccles pour y faire un rappel et rejoindre le Col Eccles (le relais de rappel se trouve légèrement en contrebas versant N du Pic).\n\nDepuis le col Eccles remonter le fil de l'arête jusqu'au ressaut raide (neige/glace/rocher), nombreux relais possibles. Une chasse d'eau dans le passage en 5b. Nous avons tiré une longueur pour le passage en 5b avec une corde de 50m puis le reste en corde tendue. \n\nAprès voir traversé le couloir de neige/glace (quelques chutes de pierres et glace provenant du couloir au dessus) entre l'Innomonata et l'arête secondaire, remonter en ascendance gauche en direction d'un couloir/rampe de neige évident qui rejoins le fil de l'arête de la Pointe Louis Amédée. \nAu sommet de la dernière pointe sur un gros becquet en versant E un relais sur cordelette avec une main courante qui ne mène nulle part. Pour descendre de la pointe et rejoindre la brèche avant d'attaquer la remontée des dernières pentes en neiges, le fil est très enneigé (gros grain) avec une très fine désescalade expo pour le second. Nous avons cherché une bonne heure une solution pour rejoindre la brèche, pour au final engager sur le fil en neige (pas très malin après réflexion). Les cordées derrière nous (ils se reconnaitrons) on terrassés la bosse de neige pour faire un court rappel et rejoindre la brèche. En conditions plus sèches ou avec une neige bien dur je pense que cette petite arête de désescalade facilement.\n\nUne fois à la brèche remonter la pente de neige en direction de l'arête du brouillard bien en neige à cette saison. Puis suivre cette arête jusqu'au sommet du Mont Blanc avec un dernier petit ressaut en mixte.\n\nDu sommet du Mont Blanc nous sommes descendu par la voie des trois Monts puis par le téléphérique de l'aiguille du midi.\n\nPartir tôt du parking peux être une bonne stratégie pour éviter de brasser jusqu'à la taille une fois sur le glacier.\nRegel nocturne moyen, neige dur à certains endroits et du gros grain sur la majorité de l'arête.\nNeige changeante dans les pentes, parfois ça porte parfois non.\nDe la glace très fine dans la longueur en 5b.\nRocher plutôt bon dans l'ensemble.\nAucunes traces de passage sur l'arête le jour de la sortie.\nTrois cordées de deux (nous y compris) le jour de la sortie.\n\nMatériel utilisé :\n- Friends du 0.3 au 1 \n- Un petit jeu de câblés \n- Corde multilabel de 50m\n- 2 piolets \n- Sangles pour les becquets";
+  const outing1545314 = {
+    ...facts,
+    document_id: 1545314,
+    locales: [
+      {
+        lang: "fr",
+        title,
+        description:
+          "Magnifique course d'arête dans l'envers du Mont Blanc, la montée au bivouac est déjà une sacrée aventure surtout quand on décide de partir en fin de matinée ! ",
+        route_description:
+          "Parking du refuge Monzino (Val Veni) -> Bivouac Eccles (par l'accès direct) -> Arête de l'Innominata -> Sommet du Mont Blanc -> Descente par la voie des 3 monts -> Téléphérique de l'Aiguille du Midi",
+        conditions: CONDITIONS_1545314,
+        weather: "Nuit clair ",
+        timing: "J1 ",
+        participants: "Julien ",
+      },
+    ],
+    activities: ["snow_ice_mixed", "mountain_climbing"],
+    date_start: "2023-06-17",
+    date_end: "2023-06-18",
+    height_diff_up: 3220,
+    height_diff_down: 3445,
+    condition_rating: "good",
+    participant_count: 2,
+    associations: { users: [{ document_id: 1265850, name: "arnaud_nico_" }], routes: [innominata] },
+  };
+  // The message getJson gives for GET /outings/999999999 (404, 2026-10-05).
+  const NOT_FOUND = "Camptocamp API error: 404 Not Found (outing 999999999): document not found";
+
+  // Answers each ID with its fixture, and any other ID with the 404 getJson gives.
+  function serve(...outings: { document_id: number }[]) {
+    mockGetOuting.mockImplementation((id) => {
+      const outing = outings.find((o) => o.document_id === id);
+      return outing ? Promise.resolve(outing as OutingDetail) : Promise.reject(new Error(NOT_FOUND));
+    });
+  }
+
+  // The text printed between the markers of one section, cut note included.
+  function sectionText(result: string, field: string): string {
+    const begin = `[begin user-written text: ${field}]\n`;
+    const start = result.indexOf(begin) + begin.length;
+    return result.slice(start, result.indexOf(`\n[end user-written text: ${field}]`, start));
+  }
+
+  it("prints one block per outing in input order, each in get_outing format (AC1.1)", async () => {
+    serve(outing1924138, outing1917601);
+
+    const result = await handleGetOutings({ ids: [1924138, 1917601] });
+
+    expect(result.split("\n").slice(0, 2)).toEqual([
+      `# ${title} (ID: 1924138)`,
+      "**URL**: https://www.camptocamp.org/outings/1924138",
+    ]);
+    const second = result.indexOf(`\n\n# ${title} (ID: 1917601)\n`);
+    const [first, last] = [result.slice(0, second), result.slice(second)];
+    expect(first).toContain("**Date**: 2026-07-03 → 2026-07-05\n");
+    expect(first).toContain("**Conditions**: average\n");
+    expect(first).toContain("\n## Route description\n");
+    expect(first).not.toContain("## Conditions");
+    expect(last).toContain("**Date**: 2026-06-17\n");
+    expect(last).toContain("**Conditions**: good\n");
+    expect(last).toContain("\n## Conditions\n");
+    expect(mockGetOuting.mock.calls.map(([id]) => id)).toEqual([1924138, 1917601]);
+  });
+
+  it.each([{}, { lang: "en" as const }])(
+    "gives each block the get_outing output when no section is cut, one blank line apart (%o)",
+    async (lang) => {
+      serve(outing1924138, outing1917601);
+      const single = [await handleGetOuting({ id: 1917601, ...lang }), await handleGetOuting({ id: 1924138, ...lang })];
+
+      expect(await handleGetOutings({ ids: [1917601, 1924138], ...lang })).toBe(single.join("\n\n"));
+    },
+  );
+
+  it("cuts a section over 2000 characters and points to get_outing for the rest (AC1.3, 1545314)", async () => {
+    serve(outing1545314);
+
+    const result = await handleGetOutings({ ids: [1545314] });
+
+    expect(sectionText(result, "conditions")).toBe(
+      `${Array.from(CONDITIONS_1545314).slice(0, 2000).join("")}\n` +
+        "[truncated, 1272 more characters; get_outing {id: 1545314} shows up to 8,000]",
+    );
+    // The other sections are short enough to be printed whole, and get_outing prints the conditions whole.
+    expect(result.match(/\[truncated/g)).toHaveLength(1);
+    expect(sectionText(await handleGetOuting({ id: 1545314 }), "conditions")).toBe(CONDITIONS_1545314);
+  });
+
+  it("prints every text section, with no input to choose them (AC1.2)", async () => {
+    serve(outing1545314);
+
+    const result = await handleGetOutings({ ids: [1545314] });
+
+    for (const heading of ["Description", "Route description", "Conditions", "Weather", "Timing", "Participants"]) {
+      expect(result).toContain(`\n## ${heading}\n`);
+    }
+  });
+
+  it("prints an error block for an ID it cannot read, after the outings before it (AC1.4)", async () => {
+    serve(outing1924138);
+
+    const result = await handleGetOutings({ ids: [1924138, 999999999] });
+
+    expect(result).toBe(
+      `${await handleGetOuting({ id: 1924138 })}\n\n# Outing not read (ID: 999999999)\nError: ${NOT_FOUND}`,
+    );
+  });
+
+  it("prints the error block where its ID was given, then the outings after it", async () => {
+    serve(outing1924138);
+
+    const result = await handleGetOutings({ ids: [999999999, 1924138] });
+
+    expect(result).toBe(
+      `# Outing not read (ID: 999999999)\nError: ${NOT_FOUND}\n\n${await handleGetOuting({ id: 1924138 })}`,
+    );
+  });
+
+  it("prints a rejection that is not an Error as its text", async () => {
+    mockGetOuting.mockRejectedValue("socket hang up");
+
+    expect(await handleGetOutings({ ids: [1] })).toBe("# Outing not read (ID: 1)\nError: socket hang up");
+  });
+
+  it("fetches and prints a repeated ID once, in first-seen order (AC1.5)", async () => {
+    serve(outing1924138, outing1917601);
+
+    const result = await handleGetOutings({ ids: [1917601, 1924138, 1917601, 1924138] });
+
+    expect(mockGetOuting.mock.calls.map(([id]) => id)).toEqual([1917601, 1924138]);
+    expect(result).toBe(await handleGetOutings({ ids: [1917601, 1924138] }));
+  });
+
+  it("never has more than 3 requests in flight for 10 IDs, and keeps the input order (AC1.5)", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    mockGetOuting.mockImplementation(async (id) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      // Later IDs answer sooner, so the order of the output cannot come from the order of the answers.
+      await new Promise((resolve) => setTimeout(resolve, 1924140 - id));
+      inFlight--;
+      return { ...outing1924138, document_id: id };
+    });
+    const ids = Array.from({ length: 10 }, (_, i) => 1924130 + i);
+
+    const result = await handleGetOutings({ ids });
+
+    expect(maxInFlight).toBe(3);
+    expect(mockGetOuting).toHaveBeenCalledTimes(10);
+    const headers = result.split("\n").filter((line) => line.startsWith("# "));
+    expect(headers).toEqual(ids.map((id) => `# ${title} (ID: ${String(id)})`));
+  });
+
+  describe("description (AC1.6)", () => {
+    const description = outingToolDefinitions.find((t) => t.name === "get_outings")?.description ?? "";
+
+    it("says it returns the get_outing format, how sections are cut and how to read the rest", () => {
+      for (const phrase of [
+        "up to 10 outings",
+        "as get_outing prints it",
+        "every text section",
+        "in the order given",
+        "[truncated, N more characters; get_outing {id: <id>} shows up to 8,000]",
+        "call get_outing with that ID",
+        "# Outing not read (ID: <id>)",
+        "A repeated ID is read once",
+      ]) {
+        expect(description).toContain(phrase);
+      }
+    });
+
+    it("says outings are past reports, not a forecast, and what Partial trip means", () => {
+      expect(description).toContain("past trip reports");
+      expect(description).toContain("not a forecast");
+      expect(description).toContain(`'Partial trip: yes' means the author ticked "partial trip"`);
+      expect(description).toContain("no such line does not mean the route was completed");
+    });
+
+    // From the review of #266: the length the description states is the length the cut applies.
+    it("states the length the cut really applies, and the lang notes, in under 2048 characters", async () => {
+      serve(outing1545314);
+      const text = sectionText(await handleGetOutings({ ids: [1545314] }), "conditions");
+      const shown = Array.from(text.slice(0, text.lastIndexOf("\n[truncated"))).length;
+
+      expect(description).toContain(userTextNote({ max: shown }, " per section"));
+      expect(description).toContain(LANG_NOTE);
+      expect(description).toContain(DETAIL_LANG_NOTE);
+      expect(description.length).toBeLessThan(2048);
+    });
   });
 });
 
@@ -1902,8 +2177,13 @@ describe("handleSearchUserOutings", () => {
 });
 
 describe("outingToolDefinitions", () => {
-  it("appends search_outings after the existing outing tools", () => {
-    expect(outingToolDefinitions.map((t) => t.name)).toEqual(["search_user_outings", "get_outing", "search_outings"]);
+  it("appends search_outings, then get_outings, after the existing outing tools", () => {
+    expect(outingToolDefinitions.map((t) => t.name)).toEqual([
+      "search_user_outings",
+      "get_outing",
+      "search_outings",
+      "get_outings",
+    ]);
   });
 
   // #211: per-field details live in the input-field descriptions, which the LLM reads with the tool description.

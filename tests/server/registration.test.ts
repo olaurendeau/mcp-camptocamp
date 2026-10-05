@@ -19,7 +19,7 @@ const definitions = [
   ...articleToolDefinitions,
 ];
 
-// The 13 tools of the CLAUDE.md "MCP Tools" table
+// The 14 tools of the CLAUDE.md "MCP Tools" table
 const TOOL_NAMES = [
   "search_routes",
   "get_route",
@@ -28,6 +28,7 @@ const TOOL_NAMES = [
   "search_user_outings",
   "get_outing",
   "search_outings",
+  "get_outings",
   "search_areas",
   "get_area",
   "search_books",
@@ -47,6 +48,7 @@ const TOOL_TITLES: Record<string, string> = {
   search_user_outings: "List a user's outings",
   get_outing: "Get outing details",
   search_outings: "Search outings",
+  get_outings: "Get several outings",
   search_areas: "Search areas",
   get_area: "Get area details",
   search_books: "Search books",
@@ -56,7 +58,7 @@ const TOOL_TITLES: Record<string, string> = {
 };
 
 describe("tool registration", () => {
-  it("lists exactly the 13 documented tools", async () => {
+  it("lists exactly the 14 documented tools", async () => {
     const client = await connect();
     const { tools } = await client.listTools();
 
@@ -86,7 +88,7 @@ describe("tool registration", () => {
     },
   );
 
-  // AC5.1, AC5.10 on #153: all 13 tools take lang and state its default and the fallback order.
+  // AC5.1, AC5.10 on #153: all 14 tools take lang and state its default and the fallback order.
   it("gives every tool a lang input and states it in its description", async () => {
     const client = await connect();
     const { tools } = await client.listTools();

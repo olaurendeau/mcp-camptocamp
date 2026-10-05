@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  DEFAULT_CUT,
   formatUserText,
   formatUserTexts,
   hasUserText,
@@ -353,6 +354,23 @@ describe("formatUserText with a custom cut", () => {
     expect(lines[4]).toBe("[cut, 6 more]");
   });
 
+  // From the review of #266: a cut of 0 characters or less, or of a fraction, is a programming error.
+  it.each([0, -1, 1.5, Number.NaN])("refuses a cut whose max is %d, even for a blank text", (max) => {
+    const bad: TextCut = { max, note: (more) => `[cut, ${more} more]` };
+
+    expect(() => formatUserText("description", "Description", "a", bad)).toThrow(
+      `TextCut.max must be a positive integer, got ${String(max)}`,
+    );
+    expect(() => formatUserText("description", "Description", null, bad)).toThrow(RangeError);
+  });
+
+  it("keeps a cut of 1 character", () => {
+    expect(formatUserText("description", "Description", "ab", { ...cut, max: 1 }).slice(3, 5)).toEqual([
+      "a",
+      "[cut, 1 more]",
+    ]);
+  });
+
   it("keeps an emoji at the boundary whole", () => {
     const lines = formatUserText("description", "Description", `${"a".repeat(1999)}😀${"b".repeat(10)}`, cut);
 
@@ -436,8 +454,9 @@ describe("formatUserTexts", () => {
 });
 
 describe("USER_TEXT_NOTE", () => {
-  it("is the note built with the default cut phrase", () => {
-    expect(userTextNote("cut after 8000 characters")).toBe(USER_TEXT_NOTE);
+  it("is the note built from the default cut", () => {
+    expect(userTextNote(DEFAULT_CUT)).toBe(USER_TEXT_NOTE);
+    expect(DEFAULT_CUT.max).toBe(8000);
   });
 
   it("keeps its text unchanged", () => {
@@ -446,9 +465,13 @@ describe("USER_TEXT_NOTE", () => {
     );
   });
 
-  it("puts another cut phrase in the same sentence", () => {
-    expect(userTextNote("cut after 2,000 characters")).toBe(
-      USER_TEXT_NOTE.replace("cut after 8000 characters", "cut after 2,000 characters"),
+  // From the review of #266: the length stated is always the length the cut applies.
+  it("states the max of the cut it is given, then the phrase that follows", () => {
+    expect(userTextNote({ max: 2000 }, " per section (more with get_outing)")).toBe(
+      USER_TEXT_NOTE.replace(
+        "cut after 8000 characters",
+        "cut after 2000 characters per section (more with get_outing)",
+      ),
     );
   });
 

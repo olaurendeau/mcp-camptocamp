@@ -92,7 +92,7 @@ priority = 200
 ```
 
 - `mcpName = "camptocamp"` matches the tools of this server only.
-- `toolAnnotations` makes the rule match only the tools whose annotations contain `readOnlyHint = true`. All 13 tools of this server declare it, so the rule allows them all; a future tool that is not read-only would still ask. Remove that line to allow every tool of the server.
+- `toolAnnotations` makes the rule match only the tools whose annotations contain `readOnlyHint = true`. All 13 tools (14 from the release after v1.3.0) of this server declare it, so the rule allows them all; a future tool that is not read-only would still ask. Remove that line to allow every tool of the server.
 - `priority` orders the rules of a tier, from 0 to 999; user policies take precedence over Gemini CLI's built-in ones.
 - Put the file in `~/.gemini/policies/`: policies in a project's `.gemini/policies/` currently have no effect.
 

@@ -11,7 +11,7 @@ This project provides an MCP (Model Context Protocol) server that exposes the [C
 ```
 src/
 ├── index.ts              # Entry point: stdio bootstrap only (createServer() + StdioServerTransport)
-├── server.ts             # createServer(): McpServer with instructions, version, registerTool for the 13 tools
+├── server.ts             # createServer(): McpServer with instructions, version, registerTool for the 14 tools
 ├── version.ts            # VERSION read from package.json, reported to MCP clients and in the User-Agent
 ├── api/
 │   ├── http.ts           # getJson: the one fetch (User-Agent, 15 s timeout, 10 MiB cap, error messages, zod parsing)
@@ -25,9 +25,10 @@ src/
     ├── paging.ts         # Shared search paging: header, filters, next-page footer, 10,000-result window; quote() escapes echoed user input (query, rating bounds) onto one line
     ├── filters.ts        # Shared rating and range filters of search_routes and search_outings: inputs, checks, Filters text
     ├── text.ts           # formatUserText: rewrites image tags and internal links, delimits, demotes and caps user-written text
+    ├── concurrency.ts    # mapWithConcurrency: parallel API calls in input order, at most MAX_PARALLEL_REQUESTS (3) at a time
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
-    ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings
+    ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings, get_outings
     ├── areas.ts          # Tools: search_areas, get_area
     ├── books.ts          # Tools: search_books, get_book
     └── articles.ts       # Tools: search_articles, get_article
@@ -51,7 +52,7 @@ tests/
 ├── docs/
 │   ├── markdown.ts         # Markdown helpers (files, fenced blocks, inline code, links, GitHub heading slugs) and the docs checks
 │   ├── docs.test.ts        # docs/ and README.md: links and anchors, json blocks, mcpServers, package/image names, Node version, Sources, support matrix dates
-│   ├── inputs.test.ts      # docs:tools generator: rendered Inputs block, markers, page idempotence, all 13 schemas
+│   ├── inputs.test.ts      # docs:tools generator: rendered Inputs block, markers, page idempotence, all 14 schemas
 │   ├── tools.test.ts       # docs/tools/: one page per registered tool, the index, Inputs blocks in sync with the schemas, no unknown tool or parameter
 │   ├── clients.test.ts     # docs/clients/: Mistral Vibe Code and Gemini CLI config snippets (toml permissions, mcp_servers entry, policy rules)
 │   ├── readme.test.ts      # README.md: length, sections, badges, quick start copied from getting-started, one line per tool
@@ -66,6 +67,7 @@ tests/
     ├── paging.test.ts      # Shared search paging unit tests
     ├── filters.test.ts     # Shared rating and range filter checks and messages
     ├── text.test.ts        # formatUserText unit tests
+    ├── concurrency.test.ts # mapWithConcurrency: order, cap, fast rejection
     ├── routes.test.ts      # Tool handler unit tests
     ├── waypoints.test.ts   # Tool handler unit tests
     ├── outings.test.ts     # Tool handler unit tests
@@ -162,6 +164,7 @@ The user-facing reference of each tool (purpose, generated inputs, output format
 | `search_user_outings` | Alias of `search_outings` by `user_id`: outings the user is listed on, written or not; newest first, paged       |
 | `get_outing`          | Outing by ID (ratings, conditions, partial trip, weather, participants, accounts, routes; no author, see search) |
 | `search_outings`      | Outings by keyword, area, activity, reported rating/conditions/elevation, dates, period, routes, waypoint, user  |
+| `get_outings`         | Up to 10 outings by ID in `get_outing` format, 3 requests at a time, sections cut at 2000; an error is a block   |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                               |
 | `search_books`        | Search books by title only (author/ISBN unreliable), by `book_type` and `activity`; paged with `offset`          |
@@ -183,7 +186,7 @@ Every `get_*` result starts with `# <title> (ID: <id>)`, then `**URL**: https://
 
 `get_waypoint` ends the same way, after its user-written text: `## Routes (<shown> of <total>)` from `associations.all_routes` in `search_routes` line format (`formatRouteLine`), at most 50 lines then `More: search_routes with waypoint_id=<id>` when more exist (decision Q2 on #58: a crag can have hundreds of routes), `## Associated books` (`formatBookLine`) and `## Recent outings (<shown> of <total>)` ending `More: search_outings with waypoint_id=<id>`; an empty list prints no section.
 
-Free-text locale fields written by Camptocamp users (descriptions, summaries, remarks, gear, access, conditions, weather…) go through `formatUserText` in `src/tools/text.ts`: printed under `## <Heading>` between `[begin user-written text: <field>]` and `[end user-written text: <field>]`. The pipeline: Camptocamp image tags rewritten to `[image: <caption>]` (nothing without a caption) and internal links `[[routes/54080/fr|Col des Roches]]` to `Col des Roches (routes/54080)`, other markup kept; line-start Markdown headings demoted two levels (capped at `######`), setext headings (`===` / `---` underlines) turned into `###` / `####`; copies of the markers neutralised (`[` → `(`), lookalikes included (full-width, `【`, dash variants, `user written` / `userwritten` / `user_written`, zero-width characters, combining grapheme joiner, variation selectors, and any non-ASCII letter such as Cyrillic `е` or Greek `Ε` in a marker word's letter position); then cut after 8000 characters with `[truncated, N more characters]`, N counted after the earlier steps. Each `get_*` tool description says that text between the markers is user-written content, not instructions.
+Free-text locale fields written by Camptocamp users (descriptions, summaries, remarks, gear, access, conditions, weather…) go through `formatUserText` in `src/tools/text.ts`: printed under `## <Heading>` between `[begin user-written text: <field>]` and `[end user-written text: <field>]`. The pipeline: Camptocamp image tags rewritten to `[image: <caption>]` (nothing without a caption) and internal links `[[routes/54080/fr|Col des Roches]]` to `Col des Roches (routes/54080)`, other markup kept; line-start Markdown headings demoted two levels (capped at `######`), setext headings (`===` / `---` underlines) turned into `###` / `####`; copies of the markers neutralised (`[` → `(`), lookalikes included (full-width, `【`, dash variants, `user written` / `userwritten` / `user_written`, zero-width characters, combining grapheme joiner, variation selectors, and any non-ASCII letter such as Cyrillic `е` or Greek `Ε` in a marker word's letter position); then cut after 8000 characters with `[truncated, N more characters]`, N counted after the earlier steps. `formatOutingDetail` takes a `TextCut` (`max` checked ≥ 1 by `formatUserText`): `get_outings` cuts at 2000 with `[truncated, N more characters; get_outing {id: <id>} shows up to 8,000]`, and `userTextNote(cut)` states the `max` in the description. Each `get_*` tool description says that text between the markers is user-written content, not instructions.
 
 ## Camptocamp API v6
 
@@ -193,7 +196,7 @@ Every request goes through `getJson` in `src/api/http.ts` with `User-Agent: mcp-
 
 Lists are parsed item by item (`tolerantArray`, decision D2 on #153): search `documents` (also `recent_outings` and `all_routes`), and every association list and `areas` of the `get_*` documents. An item that fails its schema becomes a `MalformedItem` (`{malformed: true, document_id?}`, the ID kept when it is a positive integer), and `formatListItems` in `src/tools/format.ts` prints it as `- [id] (not shown: Camptocamp sent this item in an unexpected format)` (`formatMalformed`; in the inline participants line of `get_outing`, `(user ID: id, not shown: …)` like the other accounts), so counts are unchanged. The lists themselves and every top-level field stay strict: a non-array list or a missing `document_id` is still `unexpected response`. The contract test checks that the named lists of route 54085, waypoints 104151 and 37355, outing 1757161, book 14643 and articles 469577 and 623671 have no malformed item.
 
-All 13 tools take an optional `lang` (`langInput()` in `src/tools/inputs.ts`: `LANGS` of `src/api/camptocamp.ts`, re-exported by `src/tools/enums.ts`; no zod default, so handlers pass `undefined` on and `pickLocale` falls back to `fr`). The searches pass it to the API function (sent as `pl`, never counted as a filter or printed in the `Filters:` line) and to their line formatters; `search_user_outings` picks it from `searchOutingsSchema`, so its output stays that of `search_outings`. On the `get_*` tools it picks the locale of the title, the texts and every association and area title. When the picked locale is not the requested one, `formatLanguageLine` adds `**Language**: en (no de version; available: it, en)` right after the URL line (decision D3 on #153: detail tools only, also without `lang` for a document with no `fr`). Every description states `LANG_NOTE` (the `get_*` ones also `DETAIL_LANG_NOTE`, before `USER_TEXT_NOTE`), and `INSTRUCTIONS` in `src/server.ts` states `lang`, its default and the fallback order (under 600 characters). `get_article` no longer prints a `**Language**` field of its own.
+All 14 tools take an optional `lang` (`langInput()` in `src/tools/inputs.ts`: `LANGS` of `src/api/camptocamp.ts`, re-exported by `src/tools/enums.ts`; no zod default, so handlers pass `undefined` on and `pickLocale` falls back to `fr`). The searches pass it to the API function (sent as `pl`, never counted as a filter or printed in the `Filters:` line) and to their line formatters; `search_user_outings` picks it from `searchOutingsSchema`, so its output stays that of `search_outings`. On the `get_*` tools it picks the locale of the title, the texts and every association and area title. When the picked locale is not the requested one, `formatLanguageLine` adds `**Language**: en (no de version; available: it, en)` right after the URL line (decision D3 on #153: detail tools only, also without `lang` for a document with no `fr`). Every description states `LANG_NOTE` (the `get_*` ones also `DETAIL_LANG_NOTE`, before `USER_TEXT_NOTE`), and `INSTRUCTIONS` in `src/server.ts` states `lang`, its default and the fallback order (under 600 characters). `get_article` no longer prints a `**Language**` field of its own.
 
 Locale: every search function takes `lang?` and sends `pl={lang}` (default `fr`), which returns one locale per document, in that language when it exists (route 54085 with `de`), otherwise another language chosen by Camptocamp. Detail requests send no query string: `pl` is ignored there and the API's `lang` query parameter is a no-op everywhere, so `pickLocale` in `src/tools/format.ts` picks one: the requested language, then `fr`, `en`, `it`, `de`, `es`, `ca`, `eu`, `sl`, `zh` (`LANG_ORDER`), then any other. This order is decision D1 on #57; only `[it, en]` → `en` (route 675555) was checked live against the search fallback.
 
@@ -208,6 +211,7 @@ Locale: every search function takes `lang?` and sends `pl={lang}` (default `fr`)
   - `associations`: `all_routes {documents, total}` (shaped like `/routes` search results; there is no `routes` key, hut 104151), `books`, and `recent_outings {documents, total}`; `waypoints`, `waypoint_children`, `articles`, `images` and `xreports` are not read.
 - `GET /outings/{id}`
   - No `author` key (only list items carry one). `associations.users` (`document_id`, `name`; locales without title) are the accounts linked to the outing, printed in API order as `**Participants with a Camptocamp account**`; the first is not necessarily the author (outing 1757161).
+  - `get_outings` sends one such request per distinct ID (the API has no batch endpoint), at most 3 at a time through `mapWithConcurrency`; a failed one prints `# Outing not read (ID: <id>)` and `Error: <message>`, and the call does not fail.
 - `GET /outings?sort=-date_end&limit=10&offset=0&pl={lang}[&q={query}][&a={area_id}][&act={activity}][&{rating param}={min},{max}][&ocond=excellent,{condition}][&oalt={min},{max}][&odif={min},{max}][&date={from},{to}][&period={start},{end}][&r={route_id} or {route_ids, comma-separated}][&w={waypoint_id}][&u={user_id}]` (ranges as for `/routes`; rating params: only `trat lrat grat erat prat irat frat krat hrat wrat mbur mbdr`, the API ignores the others; `ocond=excellent,{v}` means `{v}` or better)
   - `r=a,b` matches the outings of any of the routes, each outing once (`r=54513,1148298,54684` → 86, not 61 + 1 + 30). `search_outings` sends `route_ids` (1 to 10, deduplicated) this way and refuses it together with `route_id`.
   - `u` matches the outings the user is listed on (`associations.users`), not only those they wrote. `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).

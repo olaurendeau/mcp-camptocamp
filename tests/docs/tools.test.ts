@@ -160,7 +160,7 @@ describe("the registered tools", () => {
     const client = await connect();
 
     expect(tools).toEqual((await client.listTools()).tools);
-    expect(names).toHaveLength(13);
+    expect(names).toHaveLength(14);
   });
 });
 

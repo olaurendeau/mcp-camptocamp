@@ -43,6 +43,27 @@ describe("upstream HTTP errors", () => {
     expect(text).toBe(`Error: Camptocamp API error: 404 Not Found (${type} 999999999): document not found`);
   });
 
+  // AC1.4 on #255: an unreadable ID is a block of the result, with the text get_outing gives, not an error result.
+  it("get_outings prints get_outing's 404 text in a block after the outing it read, and does not fail", async () => {
+    const outing = { document_id: 1924138, locales: [{ lang: "fr", title: "Innominata" }], activities: [] };
+    const notFound = () => jsonResponse(NOT_FOUND_BODY, { status: 404, statusText: "Not Found" });
+    const fetchMock = stubFetch(jsonResponse(outing), notFound(), notFound());
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_outings", arguments: { ids: [1924138, 999999999] } });
+    const single = await callForText(client, "get_outing", { id: 999999999 });
+
+    expect(result.isError).toBeFalsy();
+    const [content] = result.content as Array<{ type: string; text: string }>;
+    expect(content.text).toMatch(/^# Innominata \(ID: 1924138\)\n/);
+    expect(content.text.endsWith(`\n\n# Outing not read (ID: 999999999)\n${single}`)).toBe(true);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://api.camptocamp.org/outings/1924138",
+      "https://api.camptocamp.org/outings/999999999",
+      "https://api.camptocamp.org/outings/999999999",
+    ]);
+  });
+
   it("gives the API reason of a search_outings 400 verbatim", async () => {
     stubFetch(apiError("offset + limit greater than 10000", 400, "Bad Request"));
     const client = await connect();

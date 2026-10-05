@@ -30,7 +30,7 @@ The VS Code extension has no settings panel yet: it follows the same configurati
 
 ## Add the server
 
-Append this block to the end of `config.toml`. The `[[mcp_servers]]` entry starts the server with npx; the `[tools.…]` tables allow its 13 tools without a prompt (see [Allow the tools without a prompt](#allow-the-tools-without-a-prompt)).
+Append this block to the end of `config.toml`. The `[[mcp_servers]]` entry starts the server with npx; the `[tools.…]` tables allow its 13 tools (14 from the release after v1.3.0) without a prompt (see [Allow the tools without a prompt](#allow-the-tools-without-a-prompt)).
 
 ```toml
 [[mcp_servers]]
@@ -58,6 +58,10 @@ permission = "always"
 permission = "always"
 
 [tools.camptocamp_search_outings]
+permission = "always"
+
+# get_outings: not in v1.3.0, comes with the release after v1.3.0
+[tools.camptocamp_get_outings]
 permission = "always"
 
 [tools.camptocamp_search_areas]
@@ -101,9 +105,9 @@ Vibe asks before it runs an MCP tool, with its default agent, `accept-edits`, wh
 
 The agent names come from the Vibe README and source code. Mistral's documentation site still lists a `default` agent that "asks before running any tool": the Vibe changelog renamed it to `ask` in version 2.24.1 (2026-08-11) and made `accept-edits` the default agent, and v2.25.8 (2026-09-23), the latest release as of 2026-10-05, has no `default` agent.
 
-Mistral documents no wildcard for permissions (the glob patterns of `enabled_tools` and `disabled_tools` only choose which tools are available), so the block above lists the 13 tools one by one. When this server adds a tool, add its table too.
+Mistral documents no wildcard for permissions (the glob patterns of `enabled_tools` and `disabled_tools` only choose which tools are available), so the block above lists the tools one by one: the 13 of v1.3.0, and `get_outings`, which comes with the release after v1.3.0. When this server adds a tool, add its table too.
 
-- All 13 tools only read public data from the Camptocamp API; none of them changes anything. Mistral's general advice is to keep MCP tools that touch external systems on `permission = "ask"`: leave out the `[tools.…]` tables if you prefer to approve each call.
+- All 13 tools (14 from the release after v1.3.0) only read public data from the Camptocamp API; none of them changes anything. Mistral's general advice is to keep MCP tools that touch external systems on `permission = "ask"`: leave out the `[tools.…]` tables if you prefer to approve each call.
 - When Vibe asks, the prompt can also offer a broader choice, such as always allowing this tool.
 - Avoid the `auto-approve` agent just for this server: it approves every tool, shell commands included.
 

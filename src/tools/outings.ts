@@ -31,7 +31,8 @@ import {
 import { isMalformed } from "../api/schemas.js";
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { describeRange, heightDiffUp, rangeFilter, ratingBound, ratingFilter, ratingScales } from "./filters.js";
-import { formatUserTexts, USER_TEXT_NOTE, type TextCut, type TextSection } from "./text.js";
+import { DEFAULT_CUT, formatUserTexts, USER_TEXT_NOTE, userTextNote, type TextCut, type TextSection } from "./text.js";
+import { MAX_PARALLEL_REQUESTS, mapWithConcurrency } from "./concurrency.js";
 
 // The free-text sections get_outing prints, in print order; a field name the locale lacks fails the typecheck.
 const OUTING_TEXT = [
@@ -157,7 +158,21 @@ export const searchUserOutingsSchema = searchOutingsSchema
   .pick({ user_id: true, limit: true, offset: true, lang: true })
   .required({ user_id: true });
 
+// get_outings: outings per call (S1 on #255), each text section cut at BATCH_TEXT_MAX characters.
+const MAX_OUTING_IDS = 10;
+const BATCH_TEXT_MAX = 2000;
+
+export const getOutingsSchema = z.object({
+  ids: documentIdList(
+    `Up to ${String(MAX_OUTING_IDS)} outing IDs from Camptocamp (e.g. [1924138, 1917601]), printed in this order; ` +
+      "a repeated ID is read once",
+    MAX_OUTING_IDS,
+  ),
+  lang: langInput(),
+});
+
 export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
+export type GetOutingsInput = z.infer<typeof getOutingsSchema>;
 export type GetOutingInput = z.infer<typeof getOutingSchema>;
 export type SearchOutingsInput = z.infer<typeof searchOutingsSchema>;
 
@@ -344,6 +359,37 @@ export async function handleGetOuting(input: GetOutingInput): Promise<string> {
   return formatOutingDetail(outing, input.lang);
 }
 
+// "8,000": the cut get_outing applies, which the pointer of a cut get_outings section names.
+const DEFAULT_TEXT_MAX = DEFAULT_CUT.max.toLocaleString("en-US");
+
+// The cut of one get_outings block: the note names the outing, for a get_outing call that shows more.
+function batchCut(id: number): TextCut {
+  return {
+    max: BATCH_TEXT_MAX,
+    note: (more) =>
+      `[truncated, ${String(more)} more characters; get_outing {id: ${String(id)}} shows up to ${DEFAULT_TEXT_MAX}]`,
+  };
+}
+
+// The block for an outing that could not be read, with the error text get_outing's result gives (src/server.ts).
+function formatUnreadOuting(id: number, error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return `# Outing not read (ID: ${String(id)})\nError: ${message}`;
+}
+
+// AC1.4, AC1.5 on #255: never throws once the input is valid; each ID is read once, 3 requests at a time.
+export async function handleGetOutings(input: GetOutingsInput): Promise<string> {
+  const ids = [...new Set(input.ids)];
+  const blocks = await mapWithConcurrency(ids, MAX_PARALLEL_REQUESTS, async (id) => {
+    try {
+      return formatOutingDetail(await getOuting(id), input.lang, batchCut(id));
+    } catch (error) {
+      return formatUnreadOuting(id, error);
+    }
+  });
+  return blocks.join("\n\n");
+}
+
 export const outingToolDefinitions = [
   {
     name: "search_user_outings",
@@ -371,5 +417,14 @@ export const outingToolDefinitions = [
       LANG_NOTE,
     inputSchema: searchOutingsSchema,
     handler: handleSearchOutings,
+  },
+  {
+    name: "get_outings",
+    title: "Get several outings",
+    description:
+      `Read up to ${String(MAX_OUTING_IDS)} outings (trip reports) from Camptocamp.org in one call, by ID (from search_outings or the recent outings of get_route and get_waypoint). Each outing is printed as get_outing prints it, with every text section and the associated routes: one block per ID, in the order given, separated by a blank line. A repeated ID is read once. Outings are past trip reports, each written by its author about that day, not a forecast. A text section longer than ${String(BATCH_TEXT_MAX)} characters is cut and ends with '[truncated, N more characters; get_outing {id: <id>} shows up to ${DEFAULT_TEXT_MAX}]': call get_outing with that ID to read more of it. An ID that cannot be read (unknown ID, Camptocamp error) prints '# Outing not read (ID: <id>)' then 'Error: <message>' in its place, and the other outings are still printed. 'Partial trip: yes' means the author ticked "partial trip" (only part of the route done); no such line does not mean the route was completed. ` +
+      `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${userTextNote({ max: BATCH_TEXT_MAX }, " per section")}`,
+    inputSchema: getOutingsSchema,
+    handler: handleGetOutings,
   },
 ];
