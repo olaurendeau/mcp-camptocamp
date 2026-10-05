@@ -75,14 +75,14 @@ printf '%s\n' \
 
 For Docker, replace the `npx` line with `| docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest \`.
 
-Output, captured from v1.3.0 on 2026-10-04 with both commands:
+Output, captured from v1.4.0 on 2026-10-05 with both commands:
 
 ```text
-{"name":"mcp-camptocamp","version":"1.3.0"}
-13
+{"name":"mcp-camptocamp","version":"1.4.0"}
+15
 ```
 
-The version should be 1.3.0 or later, and the server should list 13 tools, or 15 from the release after v1.3.0, which adds `get_outings` and `outing_stats`.
+The version should be 1.4.0 or later, and the server should list 15 tools.
 
 ## Connect a client
 
@@ -144,8 +144,8 @@ If the file already has an `mcpServers` object, add the `camptocamp` entry to it
 - Codex: https://learn.chatgpt.com/docs/extend/mcp
 - Mistral Vibe Code: https://docs.mistral.ai/vibe/code/cli/mcp-servers and https://github.com/mistralai/mistral-vibe
 - Gemini CLI: https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md
-- Cursor: https://cursor.com/docs/context/mcp (checked on 2026-10-05)
+- Cursor: https://cursor.com/docs/mcp (checked on 2026-10-05)
 - npx: https://docs.npmjs.com/cli/v11/commands/npx
 - docker run: https://docs.docker.com/reference/cli/docker/container/run/
 
-Last verified: 2026-10-04 against official docs
+Last verified: 2026-10-05 against official docs

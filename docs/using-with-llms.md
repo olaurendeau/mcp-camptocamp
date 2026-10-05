@@ -4,7 +4,7 @@ This guide is for the model that calls the tools, and for whoever writes its pro
 
 Every output on this page is real: it was captured from the server on 2026-10-05, with the version stated above each block, and copied verbatim. The only cuts are user-written text bodies and long lists, each replaced by a line `… (N lines omitted in this documentation)`, and the spaces at the end of a line, which this repository's formatter removes. Camptocamp changes every day, so the same call made later can return other counts and other recent outings.
 
-Everything here works with v1.3.0 or later, except three things that come with the release after v1.3.0: the `**Text in other languages**` line (see [Language](#language)), the escaping of invisible and bidirectional characters in repeated input (see [Paging](#paging)), and periods starting on `01-01` that return outings, though not those of 1 January in every year (see the [June example](#2-june-reports-in-good-conditions-search_outings)).
+Everything here works with v1.3.0 or later, except three things that need v1.4.0 or later: the `**Text in other languages**` line (see [Language](#language)), the escaping of invisible and bidirectional characters in repeated input (see [Paging](#paging)), and periods starting on `01-01` that return outings, though not those of 1 January in every year (see the [June example](#2-june-reports-in-good-conditions-search_outings)).
 
 ## Tool chains
 
@@ -207,7 +207,7 @@ Note: Camptocamp's period filter can miss outings on the first or last day of th
 Next page: offset=3
 ```
 
-- **The period** matches the same days in every year: these are the Junes of 2026, 2025 and earlier. To keep only some years, add `date_from` and `date_to`. A period cannot wrap around the new year: for 12-20 → 01-10, make two calls, `12-20` → `12-31` and `01-01` → `01-10`. From the release after v1.3.0, the second call returns outings, but it misses 1 January in leap years such as 2020 and 2024 (see the [`search_outings` limits](tools/search_outings.md#limits)). In v1.3.0, a period starting on `01-01` returns almost nothing, so start it on `01-02`. In every version, use `date_from` and `date_to` for 1 January, one year per call.
+- **The period** matches the same days in every year: these are the Junes of 2026, 2025 and earlier. To keep only some years, add `date_from` and `date_to`. A period cannot wrap around the new year: for 12-20 → 01-10, make two calls, `12-20` → `12-31` and `01-01` → `01-10`. From v1.4.0, the second call returns outings, but it misses 1 January in leap years such as 2020 and 2024 (see the [`search_outings` limits](tools/search_outings.md#limits)). In v1.3.0, a period starting on `01-01` returns almost nothing, so start it on `01-02`. In every version, use `date_from` and `date_to` for 1 January, one year per call.
 - **The edge days.** The `Note:` line is printed with every period search: Camptocamp's period filter can miss outings on the first or last day of the range. When those days matter, widen the period by a day on each side (`period_start: "05-31"`, `period_end: "07-01"`) and leave out the outings dated outside June.
 - **`condition_at_least: "good"`** keeps the outings whose authors rated the conditions `good` or `excellent`. The scale is `excellent`, `good`, `average`, `poor`, `awful`; outings without a condition rating are left out. Without this filter, the same search found 251 outings on 2026-10-05.
 - **The ratings** in each line are the ones the author reported for that day, labelled with their grading system.
@@ -439,9 +439,9 @@ More: search_outings with route_id=46954
 
 The route has only a French version, so its title and texts are in French, while the names of its areas are in German (`Frankreich`). Tell the user that the text is in French, and translate it if that helps; don't present your translation as Camptocamp's text.
 
-Each language version of a document is written separately, so one language can have a section that the shown one lacks. After the URL, or after the `**Language**` line, the `get_*` tools then print `**Text in other languages**: <field> (<languages>)`, with the API name of each such section, without its text. To read it, call the tool again with one of the listed `lang` values. This line is not in v1.3.0: it comes with the next release.
+Each language version of a document is written separately, so one language can have a section that the shown one lacks. After the URL, or after the `**Language**` line, the `get_*` tools then print `**Text in other languages**: <field> (<languages>)`, with the API name of each such section, without its text. To read it, call the tool again with one of the listed `lang` values. This line needs v1.4.0 or later.
 
-`get_waypoint {id: 1947492, lang: "en"}`, captured from main at 1411e16 on 2026-10-05, with a local build:
+`get_waypoint {id: 1947492, lang: "en"}`, captured from v1.4.0 on 2026-10-05:
 
 ```text
 # First Ascents in 2013 (ID: 1947492)
@@ -459,7 +459,7 @@ Each language version of a document is written separately, so one language can h
 … (50 lines omitted in this documentation)
 More: search_routes with waypoint_id=1947492
 
-## Recent outings (10 of 1253)
+## Recent outings (10 of 1254)
 … (10 lines omitted in this documentation)
 More: search_outings with waypoint_id=1947492
 ```
@@ -501,7 +501,7 @@ Rather than paging far, add filters: an area, an activity, a rating range, dates
 
 When nothing matches, the whole output is one line: `No <kind>s found matching <filters>.`, or `No <kind>s found.` without filters.
 
-Text you typed and that the output repeats, the `query "…"` of the `Filters:` line and the `rating_min "…"` or `rating_max "…"` of an error, always stays on one line between double quotes. In it, `"`, `\`, line feed, carriage return and tab are printed as `\"`, `\\`, `\n`, `\r` and `\t`. Other control characters, U+2028 and U+2029 are printed as `\uxxxx`. From the release after v1.3.0, so are the invisible or bidirectional characters U+061C, U+200B to U+200F, U+202A to U+202E, U+2066 to U+2069 and U+FEFF; v1.3.0 prints them unchanged. Every other character, accents included, is printed unchanged (`query "Écrins"`). This only changes what is printed: the query is sent to Camptocamp as you typed it.
+Text you typed and that the output repeats, the `query "…"` of the `Filters:` line and the `rating_min "…"` or `rating_max "…"` of an error, always stays on one line between double quotes. In it, `"`, `\`, line feed, carriage return and tab are printed as `\"`, `\\`, `\n`, `\r` and `\t`. Other control characters, U+2028 and U+2029 are printed as `\uxxxx`. From v1.4.0, so are the invisible or bidirectional characters U+061C, U+200B to U+200F, U+202A to U+202E, U+2066 to U+2069 and U+FEFF; v1.3.0 prints them unchanged. Every other character, accents included, is printed unchanged (`query "Écrins"`). This only changes what is printed: the query is sent to Camptocamp as you typed it.
 
 The lists inside a `get_*` output are not paged. A heading such as `## Recent outings (10 of 29)` gives how many are shown and how many exist, and a line such as `More: search_outings with route_id=46954` or `More: search_routes with waypoint_id=1947492` gives the search that lists them all.
 
@@ -577,7 +577,7 @@ Never make up an ID: take it from a search result, a list in a `get_*` output, o
 
 - **No weather forecast and no avalanche bulletin.** Outings are reports of past trips. Give their date, and never present them as current conditions, a forecast or an avalanche risk. Send the user to the official weather and avalanche services for that.
 - **No live data**: no hut bookings, opening dates beyond what users wrote, lift times or road closures.
-- **No writing**: the 13 tools (15 from the release after v1.3.0) only read Camptocamp. They cannot publish an outing or edit a route.
+- **No writing**: the 15 tools only read Camptocamp. They cannot publish an outing or edit a route.
 - **No data beyond Camptocamp**: a route or summit missing from Camptocamp is not "unknown in the mountains", only absent from Camptocamp. Say so instead of filling the gap.
 
 ## See also

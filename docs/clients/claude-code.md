@@ -1,6 +1,6 @@
 # Claude Code
 
-Claude Code starts this server on your machine as a local stdio server. One command adds it, and one permission rule lets Claude call its 13 tools (15 from the release after v1.3.0) without asking each time.
+Claude Code starts this server on your machine as a local stdio server. One command adds it, and one permission rule lets Claude call its 15 tools without asking each time.
 
 ## Prerequisites
 
@@ -71,7 +71,7 @@ claude mcp list
 claude mcp get camptocamp
 ```
 
-`claude mcp list` shows `✔ Connected` next to `camptocamp` when Claude Code could start it, and `✘ Failed to connect` with the failure detail otherwise. Inside Claude Code, `/mcp` shows the server's status and its tool count: 13, or 15 from the release after v1.3.0, which adds `get_outings` and `outing_stats`.
+`claude mcp list` shows `✔ Connected` next to `camptocamp` when Claude Code could start it, and `✘ Failed to connect` with the failure detail otherwise. Inside Claude Code, `/mcp` shows the server's status and its tool count: 15.
 
 ## Allow the tools without prompts
 
@@ -96,7 +96,7 @@ If the file already has a `permissions.allow` list, add `"mcp__camptocamp"` to i
 
 You can also add the rule from inside Claude Code with `/permissions`, which lists every rule and the settings file it comes from.
 
-The 13 tools (15 from the release after v1.3.0) only read public Camptocamp data: allowing the server lets Claude search and read Camptocamp without asking, not change anything. Some rules to keep in mind:
+The 15 tools only read public Camptocamp data: allowing the server lets Claude search and read Camptocamp without asking, not change anything. Some rules to keep in mind:
 
 - The rule uses the server name you gave in `claude mcp add`. If you named the server something other than `camptocamp`, change the rule to match.
 - Claude Code skips an allow rule that is a bare glob, such as `mcp__*`, and an `mcp__` rule with parentheses. Use one of the forms above.
@@ -108,9 +108,9 @@ The 13 tools (15 from the release after v1.3.0) only read public Camptocamp data
 
 Claude Code cuts each tool description and each server's instructions at 2,048 characters by default.
 
-Measured on v1.3.0 on 2026-10-05, the server's instructions are 569 characters and 12 of the 13 tool descriptions are shorter than 2,048 characters. The `search_outings` description is 2,241 characters: Claude Code drops its last two sentences, which explain the `lang` input. The description of the `lang` input itself still says the default is `fr`. The [smoke test](../getting-started.md#smoke-test) prints the version you run.
+Measured on v1.4.0 on 2026-10-05, the server's instructions are 591 characters and all 15 tool descriptions are shorter than 2,048 characters, the longest being `search_outings` at 2,015: Claude Code keeps them whole with the default limit. In v1.3.0, the `search_outings` description is 2,241 characters, and Claude Code drops its last two sentences, which explain the `lang` input; the description of the `lang` input itself still says the default is `fr`. The [smoke test](../getting-started.md#smoke-test) prints the version you run.
 
-From Claude Code v2.1.280, the `CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH` environment variable changes this limit, in characters, for every MCP server of the session. To keep the whole `search_outings` description:
+From Claude Code v2.1.280, the `CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH` environment variable changes this limit, in characters, for every MCP server of the session. To keep the whole `search_outings` description of v1.3.0:
 
 ```sh
 CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH=4096 claude
@@ -118,7 +118,7 @@ CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH=4096 claude
 
 ### Tool output: warning at 10,000 tokens, cap at 25,000
 
-Claude Code shows a warning when an MCP tool's output exceeds 10,000 tokens, and limits output to 25,000 tokens by default. When a text result exceeds the limit, Claude Code saves it to a file and replaces it in the conversation with a message that names the file, which Claude reads when it needs the content.
+Claude Code shows a warning when an MCP tool's output exceeds 10,000 tokens, and limits output to 25,000 tokens by default. When a text result exceeds the limit, Claude Code saves it to a file and replaces it in the conversation with a message that names the file, which Claude reads when it needs the content. It does the same with a text result longer than 50,000 characters, whatever its token count and `MAX_MCP_OUTPUT_TOKENS`.
 
 To keep results small, ask for fewer results per call: the search tools take a `limit`. Or raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable:
 
