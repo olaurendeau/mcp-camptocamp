@@ -170,7 +170,7 @@ Fixed limits:
 
 - A request body over 64 KiB gets 413.
 - A request still unanswered after 90 seconds gets 504, `Request timed out after 90 s`.
-- When more Camptocamp requests are waiting than the cap allows, up to 50 wait in line, each for at most 20 seconds. Past that, the tool answers `Error: this server is busy (too many Camptocamp requests in progress); try again shortly.` and nothing is retried.
+- When the tools need more Camptocamp requests at once than the cap allows, the extra requests wait in line: at most 50 of them, each for at most 20 seconds. Past either limit, the tool answers `Error: this server is busy (too many Camptocamp requests in progress); try again shortly.` and nothing is retried.
 
 ## TLS with Caddy
 
@@ -274,16 +274,19 @@ Filters: query "Aiguille Verte"
 }
 ```
 
-| Field                              | Meaning                                                                                                                                                              |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `path`                             | `/mcp`, `/mcp/` or `/healthz`. Any other path is logged as `"other"`, because a path can hold a secret.                                                              |
-| `status`                           | The HTTP status. `499` means the client left before the whole response reached it (nginx's "client closed request"): the server never sends 499 to a client.         |
-| `rpc`                              | The JSON-RPC method, `batch`, or `invalid` when it is not a plain name; `null` when the request was refused before its body was read.                                |
-| `tool`                             | The tool of a `tools/call`.                                                                                                                                          |
-| `result`                           | `ok`; `tool_error` when the tool answered with an error, such as a Camptocamp error or the busy message; `rejected` for a status of 400 or more or a JSON-RPC error. |
-| `upstream_requests`                | How many requests this request sent to Camptocamp.                                                                                                                   |
-| `token`                            | The position of the matching token in `MCP_AUTH_TOKENS`, or `null`.                                                                                                  |
-| `rejected_host`, `rejected_origin` | On a 403 only: the refused `Host` or `Origin` value, cut to 200 characters.                                                                                          |
+| Field                              | Meaning                                                                                                                                                                                                                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `time`                             | When the request ended, in UTC (ISO 8601).                                                                                                                                                                                                                                           |
+| `method`                           | The HTTP method.                                                                                                                                                                                                                                                                     |
+| `path`                             | `/mcp`, `/mcp/` or `/healthz`. Any other path is logged as `"other"`, because a path can hold a secret.                                                                                                                                                                              |
+| `status`                           | The HTTP status. `499` means the response never fully reached the client (nginx's "client closed request"): the client left, or the server cut a response the client had stopped reading, at the 90-second timeout or the shutdown deadline. The server never sends 499 to a client. |
+| `duration_ms`                      | Time from the request's arrival to the end of its response, in milliseconds.                                                                                                                                                                                                         |
+| `rpc`                              | The JSON-RPC method, `batch`, or `invalid` when it is not a plain name; `null` when no JSON body was read: the request was refused before its body was read, or the body was not valid JSON.                                                                                         |
+| `tool`                             | The tool of a `tools/call`, or `invalid` when its name is not a plain name; `null` otherwise.                                                                                                                                                                                        |
+| `result`                           | `ok`; `tool_error` when the tool answered with an error, such as a Camptocamp error or the busy message; `rejected` for a status of 400 or more or a JSON-RPC error.                                                                                                                 |
+| `upstream_requests`                | How many requests this request sent to Camptocamp.                                                                                                                                                                                                                                   |
+| `token`                            | The position of the matching token in `MCP_AUTH_TOKENS`, or `null`.                                                                                                                                                                                                                  |
+| `rejected_host`, `rejected_origin` | On a 403 only: the refused `Host` or `Origin` value, cut to 200 characters.                                                                                                                                                                                                          |
 
 The log never holds request bodies, tool arguments, query strings, responses, tokens or client IP addresses.
 
@@ -368,7 +371,7 @@ Tried on 2026-10-05 with Claude Code 2.1.289 against v1.4.0: the `--scope user` 
 codex mcp add camptocamp --url https://mcp.example.org/mcp --bearer-token-env-var CAMPTOCAMP_MCP_TOKEN
 ```
 
-The command writes this entry to `~/.codex/config.toml`, which you can also add by hand:
+OpenAI's MCP page documents the `bearer_token_env_var` key but not this flag; Codex CLI 0.160.0 accepted it and wrote this entry to `~/.codex/config.toml`, which you can also add by hand:
 
 ```toml
 [mcp_servers.camptocamp]
@@ -401,7 +404,7 @@ The single quotes keep the reference as written in `~/.gemini/settings.json`; Ge
 }
 ```
 
-String values in `settings.json` "can reference environment variables using `$VAR_NAME`, `${VAR_NAME}`"; an unset variable "resolves to an empty string", and the server answers 401.
+Google's configuration reference says string values in `settings.json` "can reference environment variables using `$VAR_NAME`, `${VAR_NAME}`". Its MCP page, about the same expansion in a server's `env`, says an unset variable "resolves to an empty string"; with `CAMPTOCAMP_MCP_TOKEN` empty, Gemini CLI 0.62.0 got a 401 from the server and showed it as `Disconnected`.
 
 Gemini CLI connects to MCP servers only in a trusted folder, user-level ones included: see [Trust the folder](clients/gemini-cli.md#trust-the-folder). Then `gemini mcp list` shows `✓ camptocamp: https://mcp.example.org/mcp (http) - Connected`. To stop the confirmation prompts, use the [policy rule](clients/gemini-cli.md#stop-the-confirmation-prompts) of the Gemini CLI page.
 
