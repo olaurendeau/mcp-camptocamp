@@ -419,6 +419,40 @@ describe("outing_stats inputs", () => {
   });
 });
 
+// AC5.4 of #303: get_book takes an optional routes_offset, checked before any request and never sent to Camptocamp.
+describe("get_book routes_offset", () => {
+  it.each<[string, unknown, string]>([
+    ["a negative routes_offset", -1, "Number must be greater than or equal to 0 at routes_offset"],
+    ["a non-integer routes_offset", 1.5, "Expected integer, received float at routes_offset"],
+    ["a routes_offset that is not a number", "50", "Expected number, received string at routes_offset"],
+  ])("rejects %s naming the field without calling Camptocamp", async (_label, routes_offset, issue) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_book", arguments: { id: ACCEPTED_ID, routes_offset } });
+
+    expect(validationIssues(result, "get_book")).toEqual([issue]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends the same single detail request with routes_offset as without it", async () => {
+    const book = {
+      ...BOOK,
+      associations: { routes: [{ document_id: 53834, locales: fr("Toit de Garrigou de droite") }] },
+    };
+    const fetchMock = stubFetch(jsonResponse(book));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_book", arguments: { id: ACCEPTED_ID, routes_offset: 50 } });
+
+    expect(resultText(result)).toContain("\n## Associated routes (none from routes_offset 50; 1 in total)");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.pathname).toBe(`/books/${String(ACCEPTED_ID)}`);
+    expect(url.search).toBe("");
+  });
+});
+
 // AC5.5: rules across several fields keep their exact messages through MCP.
 describe("cross-field rules", () => {
   it.each<[string, string, Record<string, unknown>, string]>([

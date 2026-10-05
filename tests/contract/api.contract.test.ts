@@ -663,6 +663,19 @@ describe("association lists keep every item (AC4.5)", () => {
     expect(await handleGetBook({ id: 14643 })).not.toContain("not shown:");
   });
 
+  // S5 of #303: get_book pages the route list in API order, which it relies on being ascending document_id.
+  it("book 853932: more than 50 routes, in ascending document_id order", async () => {
+    const routes = (await getBook(853932)).associations?.routes ?? [];
+    const ids = routes.map((route) => (isMalformed(route) ? Number.NaN : route.document_id));
+
+    expectListsWellFormed({ routes });
+    expect(ids.length).toBeGreaterThan(50);
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+    const page = await handleGetBook({ id: 853932 });
+    expect(page).toMatch(/\n## Associated routes \(1–50 of \d+\)\n/);
+    expect(page).toContain("\nMore: get_book {id: 853932, routes_offset: 50}");
+  });
+
   it("article 469577: routes, waypoints, articles, books", async () => {
     const article = await getArticle(469577);
 

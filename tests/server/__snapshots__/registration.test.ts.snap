@@ -89,6 +89,11 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         ],
         "type": "string",
       },
+      "routes_offset": {
+        "description": "Number of associated routes to skip; they are listed 50 at a time (default 0)",
+        "minimum": 0,
+        "type": "integer",
+      },
     },
     "required": [
       "id",

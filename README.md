@@ -112,7 +112,7 @@ The [support matrix](docs/README.md#support-matrix) lists the clients covered by
 | [`search_areas`](docs/tools/search_areas.md)               | Search ranges, administrative subdivisions and countries by name; the ID is reusable as `area_id`.               |
 | [`get_area`](docs/tools/get_area.md)                       | One area by ID: type, summary and description.                                                                   |
 | [`search_books`](docs/tools/search_books.md)               | Search guidebooks and other books by title, book type and activity; author and ISBN searches are unreliable.     |
-| [`get_book`](docs/tools/get_book.md)                       | One book by ID: author, editor, date, ISBN, languages, and the routes, waypoints and articles it covers.         |
+| [`get_book`](docs/tools/get_book.md)                       | One book by ID: author, editor, date, ISBN, languages, waypoints, articles; 50 routes/call (not in v1.4.0).      |
 | [`search_articles`](docs/tools/search_articles.md)         | Search articles (gear, technique, environment, stories) by keyword; by category, type and activity from v1.4.0.  |
 | [`get_article`](docs/tools/get_article.md)                 | One article by ID: text, author, type, and the routes, waypoints, articles, outings and books linked to it.      |
 
