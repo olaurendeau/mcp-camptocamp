@@ -244,14 +244,29 @@ export function checkMcpServers(text: string): string[] {
   );
 }
 
-// "Bearer " or "MCP_AUTH_TOKENS=" then 20 or more characters of a bearer token (RFC 6750 b64token): a real token,
-// not `$VAR`, `${VAR}` or `%s`.
+// A bearer token (RFC 6750 b64token) of 20 or more characters: a real token, not `$VAR`, `${VAR}` or `%s`.
+const TOKEN = String.raw`[A-Za-z0-9\-._~+/]{20,}`;
+// The entries of a comma-separated list before the token: `alice,`, `$OLD, ` or `${OLD},`.
+const EARLIER_ENTRIES = String.raw`(?:[^,\s"']*[ \t]*,[ \t]*)*`;
 const LITERAL_TOKENS: [RegExp, string][] = [
-  [/\bBearer +[A-Za-z0-9\-._~+/]{20,}/gi, "a literal bearer token"],
-  [/\bMCP_AUTH_TOKENS=["']?[A-Za-z0-9\-._~+/]{20,}/g, "a literal MCP_AUTH_TOKENS value"],
+  [new RegExp(String.raw`\bBearer +${TOKEN}`, "gi"), "a literal bearer token"],
+  // On the key's line, after `=` (env, docker -e), `:` (YAML) or `": "` (JSON).
+  [
+    new RegExp(String.raw`\bMCP_AUTH_TOKENS["']?[ \t]*[=:][ \t]*["']?${EARLIER_ENTRIES}${TOKEN}`, "g"),
+    "a literal MCP_AUTH_TOKENS value",
+  ],
+  // Alone on the next, more indented line, after a YAML key with no value or a block scalar indicator (`|`, `>-`…).
+  // A line as indented as the key is the next key: a Compose key without a value is read from the host.
+  [
+    new RegExp(
+      String.raw`^([ \t]*)["']?MCP_AUTH_TOKENS["']?[ \t]*:[ \t]*(?:[|>][+-]?\d?[ \t]*)?\n\1[ \t]+["']?${EARLIER_ENTRIES}${TOKEN}=*["']?[ \t]*$`,
+      "gm",
+    ),
+    "a literal MCP_AUTH_TOKENS value",
+  ],
 ];
 
-/** Problems with `text`: each `Bearer <token>` or `MCP_AUTH_TOKENS=<token>` with a literal token, anywhere. */
+/** Problems with `text`: each `Bearer <token>` or MCP_AUTH_TOKENS value with a literal token, anywhere. */
 export function checkTokenLiterals(text: string): string[] {
   // The problem names the line only: repeating the token would print it in the test output.
   return LITERAL_TOKENS.flatMap(([pattern, what]) => [...text.matchAll(pattern)].map(({ index }) => ({ index, what })))

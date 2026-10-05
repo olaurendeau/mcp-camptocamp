@@ -228,8 +228,9 @@ describe("tool reference checks fail on bad fixtures", () => {
 
   it("a page Prettier would reformat outside its Inputs block", async () => {
     const file = pageOf("search_routes");
-    const page = read(file);
     const tool = tools.find((t) => t.name === "search_routes") as Tool;
+    // Rendered, not read: a stale Inputs block in the real page must not change this test's message.
+    const page = await renderToolPage(tool, read(file), file);
 
     expect(page).toContain("# search_routes\n\n");
     expect(await checkPage(tool, page.replace("# search_routes\n\n", "# search_routes\n\n\n\n"), file)).toEqual([
