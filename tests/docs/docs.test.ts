@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import {
   ROOT,
   SELF_HOSTED_URL,
-  checkBearerLiterals,
   checkJsonBlocks,
   checkLinks,
   checkMcpServers,
@@ -12,6 +11,7 @@ import {
   checkNodeVersion,
   checkSources,
   checkSupportMatrix,
+  checkTokenLiterals,
   fencedBlocks,
   headingSlugs,
   inlineCodeSpans,
@@ -214,7 +214,7 @@ describe("docs checks fail on bad fixtures", () => {
     ]);
   });
 
-  it("an mcpServers block with another server name or a wrong image tag, in json, jsonc or JSON blocks", () => {
+  it("an mcpServers block with another server name, a wrong image tag or npx without -y, in json, jsonc or JSON", () => {
     const args = ["-y", "@olaurendeau/mcp-camptocamp"];
     const json = JSON.stringify({ mcpServers: { "camptocamp-server": { command: "npx", args } } });
     const jsonc = ["// comment", JSON.stringify({ mcpServers: { other: { command: "npx", args } } })].join("\n");
@@ -222,14 +222,16 @@ describe("docs checks fail on bad fixtures", () => {
     const upper = JSON.stringify({
       mcpServers: { camptocamp: { command: "docker", args: ["run", "--rm", "-i", image] } },
     });
-    const text = [json, jsonc, upper].map((block, n) =>
-      [fence + ["json", "jsonc", "JSON"][n], block, fence].join("\n"),
+    const noYes = JSON.stringify({ mcpServers: { camptocamp: { command: "npx", args: args.slice(1) } } });
+    const text = [json, jsonc, upper, noYes].map((block, n) =>
+      [fence + ["json", "jsonc", "JSON", "json"][n], block, fence].join("\n"),
     );
 
     expect(checkMcpServers(text.join("\n"))).toEqual([
       'mcpServers at line 2: expected the single key "camptocamp", got "camptocamp-server"',
       'mcpServers at line 5: expected the single key "camptocamp", got "other"',
       `mcpServers at line 9: ${STDIO_OR_HTTP}`,
+      `mcpServers at line 12: ${STDIO_OR_HTTP}`,
     ]);
   });
 
@@ -281,11 +283,31 @@ describe("docs checks fail on bad fixtures", () => {
       `"Authorization": "Bearer ${token}=="`,
       'WWW-Authenticate: Bearer realm="mcp-camptocamp", error="invalid_token"',
     ].join("\n");
-    const problems = checkBearerLiterals(text);
+    const problems = checkTokenLiterals(text);
 
     expect(problems).toEqual([
       "line 1: a literal bearer token; use an env var",
       "line 4: a literal bearer token; use an env var",
+    ]);
+    expect(problems.join("\n")).not.toContain(token.slice(0, 8));
+  });
+
+  it("a literal MCP_AUTH_TOKENS value anywhere, but not one read from a variable or a command", () => {
+    const token = "0f".repeat(32);
+    const text = [
+      `MCP_AUTH_TOKENS=${token}`,
+      "-e MCP_AUTH_TOKENS and MCP_AUTH_TOKENS=$TOKENS or MCP_AUTH_TOKENS=${TOKENS}",
+      `docker run -e MCP_AUTH_TOKENS="${token},${token}" image`,
+      `printf 'MCP_AUTH_TOKENS=%s\\n' "$(openssl rand -hex 32)" and MCP_AUTH_TOKENS=${token.slice(0, 19)}`,
+      `      - 'MCP_AUTH_TOKENS=${token}='`,
+      "`MCP_AUTH_TOKENS: token 1 is shorter than 32 characters`",
+    ].join("\n");
+    const problems = checkTokenLiterals(text);
+
+    expect(problems).toEqual([
+      "line 1: a literal MCP_AUTH_TOKENS value; use an env var",
+      "line 3: a literal MCP_AUTH_TOKENS value; use an env var",
+      "line 5: a literal MCP_AUTH_TOKENS value; use an env var",
     ]);
     expect(problems.join("\n")).not.toContain(token.slice(0, 8));
   });
@@ -341,6 +363,7 @@ describe("docs checks fail on bad fixtures", () => {
 
   it('accepts versions below the minimum after the phrase "older Node.js versions", and only those', () => {
     expect(checkNodeVersion("With the older Node.js versions 18 and 20, npx ran v1.2.0.", ">=22")).toEqual([]);
+    expect(checkNodeVersion("Older  node.JS\nVersions 18 and 20 run v1.2.0.", ">=22")).toEqual([]);
     expect(checkNodeVersion("With the older Node.js versions 20 and 22, npx ran v1.2.0.", ">=22")).toEqual([
       'older Node.js versions 20 and 22: "older Node.js versions" must name versions below 22',
     ]);
@@ -358,6 +381,9 @@ describe("docs checks fail on bad fixtures", () => {
     expect(checkSources("## Sources\n\n- none\n\nLast verified: 2026-10-04 against official docs")).toEqual([
       "the Sources section has no https URL",
     ]);
+    expect(
+      checkSources("## Sources\n\n- https://example.com/docs\n\nLast verified: 2026-10 against official docs"),
+    ).toEqual(['no line "Last verified: YYYY-MM-DD against official docs"']);
     expect(
       checkSources("## Sources\n\n- https://example.com/docs\n\nLast verified: 2026-10-04 against official docs\n"),
     ).toEqual([]);
@@ -438,8 +464,8 @@ describe("docs/ and README.md", () => {
     expect(problemsIn(checkedFiles, (_file, text) => checkMcpServers(text))).toEqual([]);
   });
 
-  it("never print a literal bearer token", () => {
-    expect(problemsIn(checkedFiles, (_file, text) => checkBearerLiterals(text))).toEqual([]);
+  it("never print a literal bearer token or MCP_AUTH_TOKENS value", () => {
+    expect(problemsIn(checkedFiles, (_file, text) => checkTokenLiterals(text))).toEqual([]);
   });
 
   it("give the Node version of engines.node", () => {
