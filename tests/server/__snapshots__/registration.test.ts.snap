@@ -542,6 +542,17 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "maximum": 9007199254740991,
         "type": "integer",
       },
+      "route_ids": {
+        "description": "Up to 10 Camptocamp route IDs from search_routes (e.g. [54513, 1148298]): outings of any of these routes, an outing linked to several of them listed once; an unknown ID adds no outings and does not empty the result; not with route_id",
+        "items": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
+        "maxItems": 10,
+        "minItems": 1,
+        "type": "array",
+      },
       "user_id": {
         "description": "Camptocamp user ID (the number in their profile URL): outings this user is listed on as a participant, not only those they wrote",
         "exclusiveMinimum": 0,

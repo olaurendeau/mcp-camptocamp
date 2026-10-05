@@ -20,11 +20,11 @@ Each page gives the tool's purpose, its inputs and the tools to call before or a
 
 ## Outings
 
-| Tool                                            | What it does                                                                                                    |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [`search_outings`](search_outings.md)           | Search trip reports by keyword, area, activity, ratings, conditions, elevation, dates, route, waypoint or user. |
-| [`search_user_outings`](search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                           |
-| [`get_outing`](get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.               |
+| Tool                                            | What it does                                                                                                     |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [`search_outings`](search_outings.md)           | Search trip reports by keyword, area, activity, ratings, conditions, elevation, dates, routes, waypoint or user. |
+| [`search_user_outings`](search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                            |
+| [`get_outing`](get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.                |
 
 ## Areas
 

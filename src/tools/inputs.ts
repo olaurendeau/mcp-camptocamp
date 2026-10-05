@@ -11,6 +11,18 @@ export function documentId(description: string) {
   return z.number().int().positive().max(Number.MAX_SAFE_INTEGER).describe(description);
 }
 
+/**
+ * A list of 1 to `max` Camptocamp document IDs, each bounded like `documentId`. The items have no description of
+ * their own: the list's description says what they are.
+ */
+export function documentIdList(description: string, max: number) {
+  return z
+    .array(z.number().int().positive().max(Number.MAX_SAFE_INTEGER))
+    .min(1, "must list at least 1 ID")
+    .max(max, `must list at most ${String(max)} IDs`)
+    .describe(description);
+}
+
 /** Longest free-text search query sent to Camptocamp; longer ones get an HTML 400 upstream. */
 export const MAX_QUERY_LENGTH = 200;
 

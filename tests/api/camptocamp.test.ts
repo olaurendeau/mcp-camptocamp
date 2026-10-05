@@ -1607,6 +1607,29 @@ describe("searchOutings", () => {
     expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?u=430052&sort=-date_end&limit=10&offset=480&pl=fr`);
   });
 
+  // AC2.1 on #255: `r=` takes several route IDs, matched as an OR.
+  it("sends route_ids as one comma-separated r, in the place of route_id", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 62 }));
+
+    await searchOutings({ activity: "mountain_climbing", route_ids: [54513, 1148298], waypoint_id: 37233 });
+
+    const params = calledUrl().searchParams;
+    expect(params.get("r")).toBe("54513,1148298");
+    expect(params.getAll("r")).toHaveLength(1);
+    expect(mockFetch.mock.calls[0][0]).toContain("?act=mountain_climbing&r=54513%2C1148298&w=37233&sort=-date_end");
+  });
+
+  it("sends a one-ID route_ids as route_id sends it", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ route_ids: [54513] });
+    await searchOutings({ route_id: 54513 });
+
+    expect(mockFetch.mock.calls[0][0]).toBe(mockFetch.mock.calls[1][0]);
+    expect(calledUrl().searchParams.get("r")).toBe("54513");
+  });
+
   it("throws on non-OK response", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 500));
 

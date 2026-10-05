@@ -82,7 +82,7 @@ The [support matrix](docs/README.md#support-matrix) lists the clients covered by
 | [`get_route`](docs/tools/get_route.md)                     | One route by ID: ratings, elevation, practical facts, description, areas, books, waypoints and recent outings.   |
 | [`search_waypoints`](docs/tools/search_waypoints.md)       | Search summits, huts, passes, crags and other waypoints by name and/or area, optionally by type; paged.          |
 | [`get_waypoint`](docs/tools/get_waypoint.md)               | One waypoint by ID: altitude, GPS coordinates, hut details, access, areas, routes, books and outings.            |
-| [`search_outings`](docs/tools/search_outings.md)           | Search trip reports by keyword, area, activity, ratings, conditions, elevation, dates, route, waypoint or user.  |
+| [`search_outings`](docs/tools/search_outings.md)           | Search trip reports by keyword, area, activity, ratings, conditions, elevation, dates, routes, waypoint or user. |
 | [`search_user_outings`](docs/tools/search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                            |
 | [`get_outing`](docs/tools/get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.                |
 | [`search_areas`](docs/tools/search_areas.md)               | Search ranges, administrative subdivisions and countries by name; the ID is reusable as `area_id`.               |
