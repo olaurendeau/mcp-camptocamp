@@ -4,12 +4,12 @@ Vibe Code, Mistral's coding mode, runs this server through its CLI and its VS Co
 
 Which Mistral product can use it:
 
-| Product                                           | Can it use this server? | Why                                                                                                                                                       |
-| ------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vibe Code CLI                                     | Yes                     | It starts local servers with the `stdio` transport.                                                                                                       |
-| Vibe Code VS Code extension                       | Yes                     | It uses the CLI's configuration, MCP servers included.                                                                                                    |
-| Vibe Work (formerly Le Chat), web and mobile apps | No                      | It connects only to remote servers: "the server must be accessible over HTTPS with a valid TLS certificate". This server runs on your machine over stdio. |
-| Vibe Code Web (remote cloud sessions)             | Not covered             | Its documentation describes no MCP server setup.                                                                                                          |
+| Product                                           | Can it use this server? | Why                                                                                                                                                                                                                                     |
+| ------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vibe Code CLI                                     | Yes                     | It starts local servers with the `stdio` transport.                                                                                                                                                                                     |
+| Vibe Code VS Code extension                       | Yes                     | It uses the CLI's configuration, MCP servers included.                                                                                                                                                                                  |
+| Vibe Work (formerly Le Chat), web and mobile apps | Self-hosted only        | It connects only to remote servers: "the server must be accessible over HTTPS with a valid TLS certificate". This server runs on your machine over stdio, unless you [host an instance](../self-hosting.md#vibe-work-formerly-le-chat). |
+| Vibe Code Web (remote cloud sessions)             | Not covered             | Its documentation describes no MCP server setup.                                                                                                                                                                                        |
 
 ## Before you start
 

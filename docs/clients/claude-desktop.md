@@ -4,7 +4,7 @@ Claude Desktop starts this server on your computer from its configuration file, 
 
 Two other ways to add tools to Claude don't work with this server:
 
-- **Custom connectors** (remote MCP), including in Claude Desktop: Claude connects to them "from Anthropic's cloud infrastructure, rather than from your local device", so the server "must be reachable over the public internet". This server is a local program with no public address.
+- **Custom connectors** (remote MCP), including in Claude Desktop: Claude connects to them "from Anthropic's cloud infrastructure, rather than from your local device", so the server "must be reachable over the public internet". This server is a local program with no public address, unless you [host an instance over HTTP](../self-hosting.md#claudeai-custom-connectors) (v1.4.0 or later).
 - **claude.ai and Cowork**: Anthropic's help center says that local servers configured in `claude_desktop_config.json` "aren't available in Cowork or claude.ai".
 
 To use the server from a terminal instead, see [Claude Code](claude-code.md).

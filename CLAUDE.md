@@ -10,11 +10,19 @@ This project provides an MCP (Model Context Protocol) server that exposes the [C
 
 ```
 src/
-├── index.ts              # Entry point: stdio bootstrap only (createServer() + StdioServerTransport)
+├── index.ts              # Entry point: MCP_TRANSPORT picks stdio (createServer() + StdioServerTransport) or HTTP (dynamic import of http/main.ts)
 ├── server.ts             # createServer(): McpServer with instructions, version, registerTool for the 15 tools
 ├── version.ts            # VERSION read from package.json, reported to MCP clients and in the User-Agent
+├── http/                 # HTTP mode only (MCP_TRANSPORT=http); never loaded over stdio
+│   ├── config.ts         # MCP_* settings: readTransport, readHttpConfig, ConfigError (exit 1, tokens named by position)
+│   ├── auth.ts           # Bearer token check: HMAC digests compared with timingSafeEqual, no early exit
+│   ├── guards.ts         # Host and Origin checks against MCP_ALLOWED_HOSTS / MCP_ALLOWED_ORIGINS
+│   ├── body.ts           # readBody: 64 KiB cap, declared or streamed
+│   ├── server.ts         # Stateless Streamable HTTP on /mcp, /healthz, 90 s timeout, one log line per request, 8 s drain
+│   └── main.ts           # runHttp: startup line, upstream cap and User-Agent, SIGTERM/SIGINT handlers
 ├── api/
 │   ├── http.ts           # getJson: the one fetch (User-Agent, 15 s timeout, 10 MiB cap, error messages, zod parsing)
+│   ├── upstream.ts       # HTTP mode only: FIFO cap on Camptocamp requests (queue 50, 20 s), request context, self-hosted User-Agent
 │   ├── schemas.ts        # zod response schemas, the one place response types are declared
 │   └── camptocamp.ts     # Camptocamp API v6 client: one function per endpoint, pl={lang} (default fr) on searches
 └── tools/
@@ -41,6 +49,7 @@ tests/
 ├── api/
 │   ├── camptocamp.test.ts  # API client unit tests with mocked fetch (URLs, parameters)
 │   ├── http.test.ts        # getJson: errors, timeout, size cap, User-Agent, malformed responses
+│   ├── upstream.test.ts    # Upstream cap, FIFO queue, busy error, request context, User-Agent
 │   └── schemas.test.ts     # Response schemas against real-shaped fixtures (null and missing fields)
 ├── server/                 # MCP-layer tests: SDK Client + InMemoryTransport against createServer(), fetch mocked
 │   ├── helpers.ts          # connect(), stubFetch(), jsonResponse()
@@ -48,11 +57,17 @@ tests/
 │   ├── input-validation.test.ts  # Invalid inputs rejected before any request
 │   ├── errors.test.ts            # Upstream failures returned as isError
 │   └── version.test.ts           # Reported version equals package.json
+├── http/                   # HTTP mode, server started in-process (helpers.ts), fetch mocked
+│   ├── config.test.ts, auth.test.ts, guards.test.ts, body.test.ts  # Settings, token check, Host/Origin, body cap
+│   ├── server.test.ts      # Routes, /healthz, 401, 403, 413, 400, stateless MCP, startup line
+│   ├── fidelity.test.ts    # Tools, schemas and tool output identical to the in-memory transport
+│   ├── logging.test.ts, timeout.test.ts, shutdown.test.ts, upstream.test.ts  # Request log, 504, drain, cap and User-Agent
+│   └── cli.test.ts         # src/index.ts spawned: stdio by default, HTTP startup and exit codes; runHttp signals
 ├── contract/
 │   └── api.contract.test.ts  # Live Camptocamp API contract tests (npm run test:contract only)
 ├── docs/
 │   ├── markdown.ts         # Markdown helpers (files, fenced blocks, inline code, links, GitHub heading slugs) and the docs checks
-│   ├── docs.test.ts        # docs/ and README.md: links and anchors, json blocks, mcpServers, package/image names, Node version, Sources, support matrix dates
+│   ├── docs.test.ts        # docs/ and README.md: links and anchors, json blocks, mcpServers (stdio or self-hosted HTTP entry), no literal bearer token, package/image names, Node version, Sources, support matrix dates, self-hosting guide commands
 │   ├── inputs.test.ts      # docs:tools generator: rendered Inputs block, markers, page idempotence, all 15 schemas
 │   ├── tools.test.ts       # docs/tools/: one page per registered tool, the index, Inputs blocks in sync with the schemas, no unknown tool or parameter
 │   ├── clients.test.ts     # docs/clients/: Mistral Vibe Code and Gemini CLI config snippets (toml permissions, mcp_servers entry, policy rules)
@@ -88,6 +103,7 @@ docs/
 │   ├── gemini-cli.md
 │   └── remote-only.md      # Clients that only take remote servers, with their source and a local alternative
 ├── agent-sdks.md           # OpenAI Agents SDK, Mistral and google-genai over stdio, with Sources
+├── self-hosting.md         # HTTP mode: token, docker run / compose / npx, Caddy, checks, logs, each client, Sources
 ├── using-with-llms.md      # Tool chains, a worked example, output conventions, what the server does not provide
 ├── system-prompt.md        # A copyable system prompt for SDK agents, and why each rule
 ├── development.md          # Make targets, contract tests, local image, releases, stack
@@ -129,6 +145,23 @@ The contract tests also run every Monday through the `Contract` workflow (`.gith
 
 - GitHub disables scheduled workflows after 60 days without repository activity, so a missing weekly run is not a pass. GitHub refuses manual runs of a disabled workflow, so re-enable it first (`gh workflow enable contract.yml` or the Actions tab), then run it by hand with `gh workflow run contract.yml`.
 - Failures of scheduled runs are notified to the user who last modified the cron line (after a squash merge, the author of that commit on `main`), or, once the workflow has been re-enabled, to the user who re-enabled it.
+
+## HTTP mode
+
+`MCP_TRANSPORT=http` (v1.4.0 or later) serves stateless Streamable HTTP on `POST /mcp` behind a bearer token, plus `GET /healthz`; the user guide is [`docs/self-hosting.md`](docs/self-hosting.md). Without it, nothing below is read and the stdio server is unchanged.
+
+| Variable                   | Default                                                       | Meaning                                                         |
+| -------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- |
+| `MCP_TRANSPORT`            | `stdio`                                                       | `stdio` or `http`                                               |
+| `MCP_AUTH_TOKENS`          | none; required in http mode                                   | Comma-separated tokens, each ≥ 32 RFC 6750 characters           |
+| `MCP_ALLOWED_HOSTS`        | `localhost`, `127.0.0.1`, `[::1]`, with and without `:<port>` | `Host` values accepted on `/mcp`; setting it replaces these     |
+| `MCP_ALLOWED_ORIGINS`      | empty                                                         | `Origin` values accepted; a request without `Origin` passes     |
+| `MCP_HTTP_HOST`            | `127.0.0.1` (the Docker image sets `0.0.0.0`)                 | Bind address                                                    |
+| `MCP_HTTP_PORT`            | `3000`                                                        | 1–65535                                                         |
+| `MCP_UPSTREAM_CONCURRENCY` | `4`                                                           | 1–8 Camptocamp requests in flight per process                   |
+| `MCP_OPERATOR_CONTACT`     | none                                                          | Added to the User-Agent; printable ASCII without `()`, `;`, `\` |
+
+A bad value exits 1 with a message naming the variable (a token only by its position). Fixed limits: 64 KiB body (413), 90 s per request (504), upstream queue of 50 waiting at most 20 s (busy error), 8 s drain on SIGTERM/SIGINT. Each request logs one JSON line to stderr (`src/http/server.ts`): no body, argument, query string, token, response or IP; `499` for a client gone before its response, `path` `"other"` for any path but `/mcp`, `/mcp/` and `/healthz`.
 
 ## Workflow
 
@@ -195,7 +228,7 @@ Free-text locale fields written by Camptocamp users (descriptions, summaries, re
 
 Base URL: `https://api.camptocamp.org`
 
-Every request goes through `getJson` in `src/api/http.ts` with `User-Agent: mcp-camptocamp/<version> (+https://github.com/olaurendeau/mcp-camptocamp)`, a 15 s timeout and a 10 MiB body cap; every 200 body is parsed with the zod schemas of `src/api/schemas.ts`.
+Every request goes through `getJson` in `src/api/http.ts` with `User-Agent: mcp-camptocamp/<version> (+https://github.com/olaurendeau/mcp-camptocamp)` (in HTTP mode `…; self-hosted[; contact: <MCP_OPERATOR_CONTACT>])`, from `userAgent()` in `src/api/upstream.ts`), a 15 s timeout and a 10 MiB body cap; every 200 body is parsed with the zod schemas of `src/api/schemas.ts`.
 
 Lists are parsed item by item (`tolerantArray`, decision D2 on #153): search `documents` (also `recent_outings` and `all_routes`), and every association list and `areas` of the `get_*` documents. An item that fails its schema becomes a `MalformedItem` (`{malformed: true, document_id?}`, the ID kept when it is a positive integer), and `formatListItems` in `src/tools/format.ts` prints it as `- [id] (not shown: Camptocamp sent this item in an unexpected format)` (`formatMalformed`; in the inline participants line of `get_outing`, `(user ID: id, not shown: …)` like the other accounts), so counts are unchanged. The lists themselves and every top-level field stay strict: a non-array list or a missing `document_id` is still `unexpected response`. The contract test checks that the named lists of route 54085, waypoints 104151 and 37355, outing 1757161, book 14643 and articles 469577 and 623671 have no malformed item.
 

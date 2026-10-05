@@ -1,6 +1,6 @@
 # Agent SDKs
 
-Start the server from your own agent code. Each SDK below can launch a local MCP server as a subprocess and talk to it over stdio, which is the only transport this server has.
+Start the server from your own agent code. Each SDK below can launch a local MCP server as a subprocess and talk to it over stdio, with nothing to host. From v1.4.0 the server also has an [HTTP mode](self-hosting.md), for clients that only take a URL.
 
 Each example is the vendor's own minimal stdio example, with its source linked. Under each one, **Changes from the source** lists every line we changed or removed, apart from formatting: quotes, commas, spacing and line breaks in the JavaScript examples, which this repository's formatter (Prettier) normalises. Where the vendor calls MCP support experimental, so does this page.
 

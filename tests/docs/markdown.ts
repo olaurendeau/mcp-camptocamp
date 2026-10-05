@@ -190,6 +190,28 @@ export function checkJsonBlocks(text: string): string[] {
 
 const NPX_ARGS = ["-y", "@olaurendeau/mcp-camptocamp"];
 const DOCKER_ARGS = ["run", "--rm", "-i", "ghcr.io/olaurendeau/mcp-camptocamp:latest"];
+/** The one public URL the docs give a self-hosted instance (docs/self-hosting.md). */
+export const SELF_HOSTED_URL = "https://mcp.example.org/mcp";
+/** A bearer token taken from an environment variable: `$VAR` or `${VAR}`, never the token itself. */
+const BEARER_FROM_ENV = /^Bearer (?:\$[A-Z][A-Z0-9_]*|\$\{[A-Z][A-Z0-9_]*\})$/;
+const STDIO_OR_HTTP =
+  `camptocamp must run npx ${NPX_ARGS.join(" ")} or docker ${DOCKER_ARGS.join(" ")}, ` +
+  `or be an HTTP entry for ${SELF_HOSTED_URL} with headers.Authorization "Bearer \${VAR}" and no command`;
+
+/** Whether `server` is an HTTP entry for the self-hosted URL whose Authorization header reads the token from a variable. */
+function isHttpEntry(server: { command?: unknown; url?: unknown; httpUrl?: unknown; headers?: unknown }): boolean {
+  const url = server.httpUrl ?? server.url;
+  const authorization: unknown =
+    typeof server.headers === "object" && server.headers !== null
+      ? (server.headers as Record<string, unknown>).Authorization
+      : undefined;
+  return (
+    server.command === undefined &&
+    url === SELF_HOSTED_URL &&
+    typeof authorization === "string" &&
+    BEARER_FROM_ENV.test(authorization)
+  );
+}
 
 /** Every value of a `mcpServers` key in `value`, at any depth. */
 function mcpServersIn(value: unknown): unknown[] {
@@ -200,7 +222,10 @@ function mcpServersIn(value: unknown): unknown[] {
   return entries.flatMap(([key, child]) => [...(key === "mcpServers" ? [child] : []), ...mcpServersIn(child)]);
 }
 
-/** Problems with the `mcpServers` objects of the json and jsonc blocks of `text`: another server name, another command. */
+/**
+ * Problems with the `mcpServers` objects of the json and jsonc blocks of `text`: another server name, another
+ * command, or an HTTP entry for another URL or without an Authorization header read from a variable.
+ */
 export function checkMcpServers(text: string): string[] {
   // Blocks that do not parse have no value: checkJsonBlocks reports them.
   return jsonBlocks(text).flatMap((block) =>
@@ -210,13 +235,23 @@ export function checkMcpServers(text: string): string[] {
       if (names.length !== 1 || names[0] !== "camptocamp") {
         return [`${where}: expected the single key "camptocamp", got ${names.map((name) => `"${name}"`).join(", ")}`];
       }
-      const { command, args } = (servers as { camptocamp: { command?: unknown; args?: unknown } }).camptocamp;
+      const server = (servers as { camptocamp: Record<string, unknown> }).camptocamp;
+      const { command, args } = server;
       const npx = command === "npx" && isDeepStrictEqual(args, NPX_ARGS);
       const docker = command === "docker" && isDeepStrictEqual(args, DOCKER_ARGS);
-      return npx || docker
-        ? []
-        : [`${where}: camptocamp must run npx ${NPX_ARGS.join(" ")} or docker ${DOCKER_ARGS.join(" ")}`];
+      return npx || docker || isHttpEntry(server) ? [] : [`${where}: ${STDIO_OR_HTTP}`];
     }),
+  );
+}
+
+// "Bearer" then 20 or more characters of a bearer token (RFC 6750 b64token): a real token, not `$VAR` or `${VAR}`.
+const LITERAL_BEARER = /\bBearer +[A-Za-z0-9\-._~+/]{20,}=*/gi;
+
+/** Problems with `text`: each `Bearer <token>` with a literal token of 20 or more characters, anywhere. */
+export function checkBearerLiterals(text: string): string[] {
+  // The problem names the line only: repeating the token would print it in the test output.
+  return [...text.matchAll(LITERAL_BEARER)].map(
+    ({ index }) => `line ${text.slice(0, index).split("\n").length}: a literal bearer token; use an env var`,
   );
 }
 

@@ -80,16 +80,17 @@ The server is listed in the [official MCP registry](https://registry.modelcontex
 
 ## Supported clients
 
-| Client                                                                 | Works?                                                  | Setup                                                                      |
-| ---------------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Claude Desktop                                                         | Yes                                                     | [Claude Desktop](docs/clients/claude-desktop.md)                           |
-| Claude Code                                                            | Yes                                                     | [Claude Code](docs/clients/claude-code.md)                                 |
-| ChatGPT desktop app, Codex CLI and Codex IDE extension                 | Yes                                                     | [ChatGPT desktop app and Codex](docs/clients/chatgpt-desktop-and-codex.md) |
-| Mistral Vibe Code CLI and VS Code extension                            | Yes                                                     | [Mistral Vibe Code](docs/clients/mistral-vibe-code.md)                     |
-| Gemini CLI, Gemini Code Assist                                         | Yes: CLI in a trusted folder, Code Assist in agent mode | [Gemini CLI and Gemini Code Assist](docs/clients/gemini-cli.md)            |
-| Your own agent: OpenAI Agents SDK, Mistral Python SDK, google-genai    | Yes                                                     | [Agent SDKs](docs/agent-sdks.md)                                           |
-| Cursor and other clients that start a local command                    | Yes                                                     | [Getting started](docs/getting-started.md#other-mcp-clients)               |
-| Claude.ai custom connectors, ChatGPT on the web, Vibe Work, Gemini API | No: remote servers only                                 | [Remote-only clients](docs/clients/remote-only.md)                         |
+| Client                                                              | Works?                                                  | Setup                                                                      |
+| ------------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Claude Desktop                                                      | Yes                                                     | [Claude Desktop](docs/clients/claude-desktop.md)                           |
+| Claude Code                                                         | Yes                                                     | [Claude Code](docs/clients/claude-code.md)                                 |
+| ChatGPT desktop app, Codex CLI and Codex IDE extension              | Yes                                                     | [ChatGPT desktop app and Codex](docs/clients/chatgpt-desktop-and-codex.md) |
+| Mistral Vibe Code CLI and VS Code extension                         | Yes                                                     | [Mistral Vibe Code](docs/clients/mistral-vibe-code.md)                     |
+| Gemini CLI, Gemini Code Assist                                      | Yes: CLI in a trusted folder, Code Assist in agent mode | [Gemini CLI and Gemini Code Assist](docs/clients/gemini-cli.md)            |
+| Your own agent: OpenAI Agents SDK, Mistral Python SDK, google-genai | Yes                                                     | [Agent SDKs](docs/agent-sdks.md)                                           |
+| Cursor and other clients that start a local command                 | Yes                                                     | [Getting started](docs/getting-started.md#other-mcp-clients)               |
+| Claude.ai custom connectors, Vibe Work                              | With an instance you host over HTTP (v1.4.0 or later)   | [Self-hosting over HTTP](docs/self-hosting.md)                             |
+| ChatGPT on the web, Gemini API                                      | No: remote servers only                                 | [Remote-only clients](docs/clients/remote-only.md)                         |
 
 The [support matrix](docs/README.md#support-matrix) lists the clients covered by the client pages and the agent SDK guide, with the date each page was last checked against the vendor's docs.
 
@@ -121,6 +122,7 @@ Each tool page gives its inputs, generated from the registered schema, its outpu
 
 - [Using the tools with an LLM](docs/using-with-llms.md): which tools to chain for a region, a summit altitude, a hut, recent conditions or guidebooks; what each output line means; and a real June ski-tour example.
 - [System prompt](docs/system-prompt.md): a prompt to paste into your agent, so the model quotes Camptocamp, cites it and says when a value is missing.
+- [Self-hosting over HTTP](docs/self-hosting.md): host an instance behind a secret token for clients that only take a URL, such as Claude.ai and Vibe Work (v1.4.0 or later).
 - [Documentation index](docs/README.md): every page, by topic.
 
 ## Development

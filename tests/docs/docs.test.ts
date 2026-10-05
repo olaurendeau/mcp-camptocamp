@@ -3,6 +3,8 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ROOT,
+  SELF_HOSTED_URL,
+  checkBearerLiterals,
   checkJsonBlocks,
   checkLinks,
   checkMcpServers,
@@ -24,6 +26,7 @@ const DOCS = join(ROOT, "docs");
 const README = join(ROOT, "README.md");
 const INDEX = join(DOCS, "README.md");
 const REMOTE_ONLY = join(DOCS, "clients", "remote-only.md");
+const SELF_HOSTING = join(DOCS, "self-hosting.md");
 const docFiles = listMarkdownFiles(DOCS);
 const checkedFiles = [...docFiles, README];
 const engines = (JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { engines: { node: string } }).engines
@@ -39,6 +42,14 @@ function problemsIn(files: string[], check: (file: string, text: string) => stri
 }
 
 const fence = "```";
+const STDIO_OR_HTTP =
+  "camptocamp must run npx -y @olaurendeau/mcp-camptocamp or docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest, " +
+  'or be an HTTP entry for https://mcp.example.org/mcp with headers.Authorization "Bearer ${VAR}" and no command';
+
+/** A json block declaring `server` as the camptocamp entry of mcpServers. */
+function serverBlock(server: Record<string, unknown>): string {
+  return [fence + "json", JSON.stringify({ mcpServers: { camptocamp: server } }), fence].join("\n");
+}
 
 describe("markdown helpers", () => {
   it("lists the Markdown files under a folder, recursively and sorted", () => {
@@ -218,7 +229,7 @@ describe("docs checks fail on bad fixtures", () => {
     expect(checkMcpServers(text.join("\n"))).toEqual([
       'mcpServers at line 2: expected the single key "camptocamp", got "camptocamp-server"',
       'mcpServers at line 5: expected the single key "camptocamp", got "other"',
-      "mcpServers at line 9: camptocamp must run npx -y @olaurendeau/mcp-camptocamp or docker run --rm -i ghcr.io/olaurendeau/mcp-camptocamp:latest",
+      `mcpServers at line 9: ${STDIO_OR_HTTP}`,
     ]);
   });
 
@@ -234,6 +245,49 @@ describe("docs checks fail on bad fixtures", () => {
     const text = [fence + "json", JSON.stringify(npx), fence, fence + "json", JSON.stringify(docker), fence].join("\n");
 
     expect(checkMcpServers(text)).toEqual([]);
+  });
+
+  it("accepts an HTTP entry for the self-hosted URL whose token comes from an env var, as url or httpUrl", () => {
+    const blocks = [
+      serverBlock({ type: "http", url: SELF_HOSTED_URL, headers: { Authorization: "Bearer ${CAMPTOCAMP_MCP_TOKEN}" } }),
+      serverBlock({ httpUrl: SELF_HOSTED_URL, headers: { Authorization: "Bearer $CAMPTOCAMP_MCP_TOKEN" } }),
+    ];
+
+    expect(checkMcpServers(blocks.join("\n"))).toEqual([]);
+  });
+
+  it("an HTTP entry with a literal token, no header, another host, an unclosed ${, or a command", () => {
+    const header = { Authorization: "Bearer ${CAMPTOCAMP_MCP_TOKEN}" };
+    const blocks = [
+      serverBlock({ type: "http", url: SELF_HOSTED_URL, headers: { Authorization: `Bearer ${"0f".repeat(32)}` } }),
+      serverBlock({ type: "http", url: SELF_HOSTED_URL }),
+      serverBlock({ type: "http", url: SELF_HOSTED_URL, headers: { "X-Api-Key": "${CAMPTOCAMP_MCP_TOKEN}" } }),
+      serverBlock({ type: "http", url: "https://mcp.example.com/mcp", headers: header }),
+      serverBlock({ httpUrl: SELF_HOSTED_URL, headers: { Authorization: "Bearer ${CAMPTOCAMP_MCP_TOKEN" } }),
+      serverBlock({ command: "npx", url: SELF_HOSTED_URL, headers: header }),
+    ];
+
+    expect(checkMcpServers(blocks.join("\n"))).toEqual(
+      [2, 5, 8, 11, 14, 17].map((line) => `mcpServers at line ${line}: ${STDIO_OR_HTTP}`),
+    );
+  });
+
+  it("a literal bearer token anywhere, but not a token read from an env var", () => {
+    const token = "0f".repeat(32);
+    const text = [
+      `curl -H "Authorization: Bearer ${token}"`,
+      "Bearer ${CAMPTOCAMP_MCP_TOKEN} and Bearer $CAMPTOCAMP_MCP_TOKEN",
+      `| Authorization | bearer ${token.slice(0, 19)} |`,
+      `"Authorization": "Bearer ${token}=="`,
+      'WWW-Authenticate: Bearer realm="mcp-camptocamp", error="invalid_token"',
+    ].join("\n");
+    const problems = checkBearerLiterals(text);
+
+    expect(problems).toEqual([
+      "line 1: a literal bearer token; use an env var",
+      "line 4: a literal bearer token; use an env var",
+    ]);
+    expect(problems.join("\n")).not.toContain(token.slice(0, 8));
   });
 
   it("a wrong image tag in prose", () => {
@@ -380,8 +434,12 @@ describe("docs/ and README.md", () => {
     expect(problemsIn(checkedFiles, (_file, text) => checkJsonBlocks(text))).toEqual([]);
   });
 
-  it("declare mcpServers only as camptocamp, with the npx or Docker command", () => {
+  it("declare mcpServers only as camptocamp, with the npx or Docker command or the self-hosted URL", () => {
     expect(problemsIn(checkedFiles, (_file, text) => checkMcpServers(text))).toEqual([]);
+  });
+
+  it("never print a literal bearer token", () => {
+    expect(problemsIn(checkedFiles, (_file, text) => checkBearerLiterals(text))).toEqual([]);
   });
 
   it("give the Node version of engines.node", () => {
@@ -392,12 +450,13 @@ describe("docs/ and README.md", () => {
     expect(problemsIn(docFiles, (_file, text) => checkNames(text))).toEqual([]);
   });
 
-  it("end each client and SDK page with Sources and a Last verified line", () => {
+  it("end each client and SDK page and the self-hosting guide with Sources and a Last verified line", () => {
     const sourced = docFiles.filter((file) => {
       const path = relative(DOCS, file);
-      return path.startsWith("clients/") || path === "agent-sdks.md";
+      return path.startsWith("clients/") || path === "agent-sdks.md" || path === "self-hosting.md";
     });
 
+    expect(sourced).toContain(SELF_HOSTING);
     expect(problemsIn(sourced, (_file, text) => checkSources(text))).toEqual([]);
   });
 });
@@ -417,6 +476,56 @@ describe("pages", () => {
     const pages = [...listMarkdownFiles(join(DOCS, "clients")), join(DOCS, "agent-sdks.md")];
 
     expect(checkSupportMatrix(INDEX, read(INDEX), pages)).toEqual([]);
+  });
+
+  it("the support matrix rows of Claude.ai and Vibe Work link the self-hosting guide first", () => {
+    const rows = (section(read(INDEX), "Support matrix") ?? "").split("\n").filter((line) => line.startsWith("|"));
+
+    for (const client of ["Claude.ai custom connectors", "Vibe Work"]) {
+      const row = rows.find((line) => line.slice(1).trim().startsWith(client));
+      const page = row?.split("|")[3] ?? "";
+
+      expect(row, client).toBeDefined();
+      expect(links(page)[0]?.replace(/#.*/, ""), client).toBe("self-hosting.md");
+    }
+  });
+
+  it("the remote-only page links the self-hosting guide from its Claude.ai and Vibe Work sections", () => {
+    const text = read(REMOTE_ONLY);
+
+    for (const title of ["Claude.ai custom connectors", "Vibe Work (formerly Le Chat)"]) {
+      const targets = links(section(text, title) ?? "").map((link) => link.replace(/#.*/, ""));
+
+      expect(targets, title).toContain("../self-hosting.md");
+    }
+  });
+
+  it("the self-hosting guide gives the token, docker run, Caddyfile and check commands", () => {
+    const text = read(SELF_HOSTING);
+    // Continuation lines joined, so a command split over several lines reads as one.
+    const code = fencedBlocks(text)
+      .map((block) => block.content.replace(/\\\n\s*/g, ""))
+      .join("\n");
+
+    for (const snippet of [
+      "openssl rand -hex 32",
+      "docker run -d --restart unless-stopped --name camptocamp -e MCP_TRANSPORT=http -e MCP_AUTH_TOKENS " +
+        "-e MCP_ALLOWED_HOSTS=mcp.example.org -e MCP_OPERATOR_CONTACT -p 127.0.0.1:3000:3000 --read-only --cap-drop ALL " +
+        "ghcr.io/olaurendeau/mcp-camptocamp:latest",
+      "curl -sS https://mcp.example.org/healthz",
+      "curl -sS -i -X POST https://mcp.example.org/mcp",
+      "Accept: application/json, text/event-stream",
+      '"method":"initialize"',
+      "docker stop -t 10 camptocamp",
+      "stop_grace_period: 10s",
+    ]) {
+      expect(code, snippet).toContain(snippet);
+    }
+    expect(fencedBlocks(text, "caddyfile").map((block) => block.content)).toContain(
+      "mcp.example.org\nreverse_proxy 127.0.0.1:3000",
+    );
+    expect(code).toContain("HTTP/2 401");
+    expect(text).toContain("v1.4.0 or later");
   });
 
   it("the remote-only page quotes a source for 6 surfaces, links a local alternative, and has no recipe", () => {
