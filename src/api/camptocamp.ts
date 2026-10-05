@@ -180,16 +180,24 @@ export async function getArea(id: number): Promise<AreaDetail> {
 const DATE_MIN = "0001-01-01";
 const DATE_MAX = "9999-12-31";
 
-// `period` matches month and day in every year. The API reduces each bound to its time modulo a 365.2425-day
-// year, so the year of a bound decides where it lands. Bounds go in 2020, a leap year, so that 02-29 exists,
-// except 01-01: 2020-01-01 lands at day 365.1, after every other day, and January periods matched nothing.
-// A 01-01 start goes in 1970 (day 0), a 01-01 end in 2021 (day 0.63, before every 01-02 since 1990).
-// Outing dates are reduced the same way, so 1 January can still drop out: in leap years (2020, 2024) it lands at
-// day 365.1, after every period end, and in 2025 at day 0.66, after a 01-01 end (#271).
-// A range wrapping around the new year (12-20 → 01-10) matches nothing.
+// `period` matches month and day in every year. The API reduces each bound, and each outing's dates, to its time
+// modulo a 365.2425-day year, so the year of a bound decides which calendar days it covers (#271). For outings
+// dated 1989–2027, a day sits within 0.9975 day of its band: January–February days from 1992 (earliest) to 2025
+// (latest), March–December days from 1991 to 2024. A start goes in the earliest year of its band and an end in
+// the latest, so each bound covers the whole calendar day and none of its neighbours; a 01-01 start goes in 1970,
+// at 0. Exact until 2028-02-29 (#324). 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024 lands
+// after every 31 December, so no period bound returns an outing starting that day; 01-01 → 12-31 is sent as no
+// period, which returns them. A range wrapping around the new year (12-20 → 01-10) matches nothing.
 function periodBound(day: string, side: "start" | "end"): string {
-  if (day === "01-01") return side === "start" ? "1970-01-01" : "2021-01-01";
-  return `2020-${day}`;
+  if (side === "start") {
+    if (day === "01-01") return "1970-01-01";
+    return `${day < "03-01" ? "1992" : "1991"}-${day}`;
+  }
+  return `${day <= "02-28" ? "2025" : "2024"}-${day}`;
+}
+
+function isWholeYear(period: { start: string; end: string }): boolean {
+  return period.start === "01-01" && period.end === "12-31";
 }
 
 export interface OutingSearchParams {
@@ -235,7 +243,7 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
   if (params.date_from !== undefined || params.date_to !== undefined) {
     search.set("date", `${params.date_from ?? DATE_MIN},${params.date_to ?? DATE_MAX}`);
   }
-  if (params.period !== undefined) {
+  if (params.period !== undefined && !isWholeYear(params.period)) {
     search.set("period", `${periodBound(params.period.start, "start")},${periodBound(params.period.end, "end")}`);
   }
   // `r=a,b` matches the outings of any of the routes, each outing once.

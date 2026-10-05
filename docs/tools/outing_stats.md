@@ -52,8 +52,8 @@ Count the trip reports that match a search, by the month or year they start in, 
 - `height_diff_up_max`: Highest elevation gain in metres, inclusive (outings without an elevation gain are excluded).
 - `date_from`: Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it. An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.
 - `date_to`: Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it. An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.
-- `period_start`: First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range.
-- `period_end`: Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; Camptocamp's period filter can miss outings on the first or last day of the range.
+- `period_start`: First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
+- `period_end`: Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 - `route_id`: Camptocamp route ID from search_routes.
 - `route_ids`: Up to 10 Camptocamp route IDs from search_routes (e.g. \[54513, 1148298\]): outings of any of these routes, an outing linked to several of them listed once; an unknown ID adds no outings and does not empty the result; not with route\_id.
 - `waypoint_id`: Camptocamp waypoint ID from search_waypoints.
@@ -69,7 +69,7 @@ Count the trip reports that match a search, by the month or year they start in, 
 ```text
 <N> outing(s) counted (all matches), by <start month | start year | condition>
 Filters: <filters>
-Note: Camptocamp's period filter can miss outings on the first or last day of the range.
+Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
 
 <group>: <count>
@@ -80,7 +80,7 @@ Counts of trip reports published on Camptocamp, not of ascents; a month with no 
 
 - **The header** gives the number of outings counted, which is every outing the search matches.
 - **The `Filters:` line** is the one [`search_outings`](search_outings.md#output-format) prints for the same filters. There is no `Filters:` line without filters.
-- **The `Note:` line** is printed only when `period_start` and `period_end` are given. See the [`search_outings` Limits](search_outings.md#limits).
+- **The `Note:` line** is printed only when `period_start` and `period_end` are given. v1.4.0 prints `Note: Camptocamp's period filter can miss outings on the first or last day of the range.` instead: its periods can miss outings dated on their first or last day, which the release after it counts. See the [`search_outings` Limits](search_outings.md#limits).
 - **The `Counts of trip reports…` line** is printed on every call.
 - **`group_by: "month"`** prints 12 lines, `01` to `12`, zeros included. An outing counts in the month of its start date, even when it ends in the next month.
 - **`group_by: "year"`** prints one line per year from the first to the last start year, zeros included, and no year line when no outing has a start date.
@@ -94,7 +94,7 @@ With `split_by` (not in v1.4.0), the groups are a Markdown table instead:
 ```text
 <N> outing(s) counted (all matches), by <group_by label> and <split_by label>
 Filters: <filters>
-Note: Camptocamp's period filter can miss outings on the first or last day of the range.
+Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
 
 | <group_by label> | <split_by value> | … | total |
@@ -119,7 +119,7 @@ With `split_by: "route"` (not in v1.4.0), the columns are the routes of `route_i
 ```text
 <N> outing(s) counted (all matches), by <group_by label> and route
 Filters: <filters>
-Note: Camptocamp's period filter can miss outings on the first or last day of the range.
+Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
 <S> outing(s) are linked to more than one of these routes and count under each.
 
@@ -287,7 +287,7 @@ The 6 shared outings (908630, 1560424, 1670075, 1673759, 1784207 and 1924138) ar
 - **The counts reflect one state of Camptocamp.** When an outing is published, edited or deleted between two pages, the call fails with `Camptocamp's results changed while counting; call again.` With `split_by: "route"`, it also fails so when the outing IDs found by the search of the routes together differ from those found by the searches of the routes one by one, which an outing published or relinked between the searches causes. Two changes that cancel out between pages (one outing deleted, another published) keep the total and are not detected: the counts may then mix the data before and after them.
 - **Counts are of published reports, not of ascents.** Many ascents have no report, older reports may have no condition, and one report can cover several days. A month with no report is not evidence the route is out of condition.
 - **No count of partial trips, and no success rate.** Camptocamp neither indexes nor lists `partial_trip` ("Parcours partiel" on camptocamp.org), so no filter or count on it is possible: reading it takes one detail request per outing. Camptocamp has no field for a failed attempt either, and attempts never written up are absent from the data. Measured on the live API on 2026-10-05, of the 61 outings of the Innominata (route 54513), 1 has `partial_trip` ticked (219347), 17 unticked and 43 unset. To read the flag, use [`get_outings`](get_outings.md) (v1.4.0 or later), which prints `**Partial trip**: yes` only when it is ticked. `false` is the form default, so no line does not mean the route was completed: never present these counts as a success rate.
-- **Filters behave as in `search_outings`.** The period edge days, the overlap of `date_from` and `date_to`, the titles-only `query` and the unknown IDs that match nothing are explained in the [`search_outings` Limits](search_outings.md#limits). `route_id` with `route_ids`, a wrapping period or dates out of order are refused before any request.
+- **Filters behave as in `search_outings`.** What a period misses, the overlap of `date_from` and `date_to`, the titles-only `query` and the unknown IDs that match nothing are explained in the [`search_outings` Limits](search_outings.md#limits). `route_id` with `route_ids`, a wrapping period or dates out of order are refused before any request.
 - **`lang` does not change the counts.** It is sent as for `search_outings`, and the output prints no title.
 
 ## Related tools
