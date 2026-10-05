@@ -27,7 +27,7 @@ Find routes by keyword, area, waypoint, activity, rating, elevation gain, route 
 | `offset`             | integer         | no       | `0`     | ≥ 0                    |
 | `lang`               | string          | no       |         |                        |
 
-- `query`: Search query for routes (e.g. 'Mont Blanc voie normale').
+- `query`: Search query for routes (e.g. 'Mont Blanc voie normale'). Matches route names ('\<summit\> : \<route title\>') only, not descriptions.
 - `limit`: Maximum number of results.
 - `area_id`: Camptocamp area ID from search_areas (e.g. 14403 for Écrins).
 - `waypoint_id`: Camptocamp waypoint ID from search_waypoints: routes associated with this summit, hut, crag… (e.g. 37916 for Mont Pourri).
@@ -38,11 +38,13 @@ Find routes by keyword, area, waypoint, activity, rating, elevation gain, route 
 - `height_diff_up_min`: Lowest elevation gain in metres, inclusive (routes without an elevation gain are excluded).
 - `height_diff_up_max`: Highest elevation gain in metres, inclusive (routes without an elevation gain are excluded).
 - `route_types`: Route types, matching any of: return_same_way, loop, loop_hut, traverse, raid, expedition. Values: `return_same_way`, `loop`, `loop_hut`, `traverse`, `raid`, `expedition`
-- `configuration`: Terrain configurations, matching any of: edge, pillar, face, corridor, goulotte, glacier (edge = arête/ridge). Values: `edge`, `pillar`, `face`, `corridor`, `goulotte`, `glacier`
+- `configuration`: Terrain configurations, matching any of: edge, pillar, face, corridor, goulotte, glacier (edge = arête/ridge). Tagging is incomplete: routes without a configuration are excluded, and some ridges are tagged pillar or glacier. For ridges, also search query: 'arête', which matches names only and so also lists routes on summits whose name contains 'arête'. Values: `edge`, `pillar`, `face`, `corridor`, `goulotte`, `glacier`
 - `offset`: Number of results to skip, for paging (offset + limit ≤ 10,000).
 - `lang`: Language of titles and texts, one of: fr, en, de, it, es, ca, eu, sl, zh (default fr). Values: `fr`, `en`, `de`, `it`, `es`, `ca`, `eu`, `sl`, `zh`
 
 <!-- generated:inputs end -->
+
+**Not in v1.3.0:** the `query` and `configuration` descriptions above, which state that `query` matches route names only and that configuration tagging is incomplete (see [Limits](#limits)), come with the release after v1.3.0. v1.3.0 has the same behaviour, but describes `query` only as "Search query for routes (e.g. 'Mont Blanc voie normale')" and `configuration` without the last two sentences.
 
 ## Output format
 
@@ -97,6 +99,8 @@ Next page: offset=3
   A `rating_min` above `rating_max` is refused too. To search two systems, such as a Toponeige and a Labande range, make two calls.
 
 - **Missing values exclude a route.** With a rating filter, routes without a value in that system are left out; with `height_diff_up_min` or `height_diff_up_max`, routes without an elevation gain are left out. A route rated only in Labande never matches a `ski_rating` filter.
+- **`query` matches route names only.** Camptocamp searches the route name, `<summit> : <route title>`, not the description, gear or remarks, so a word found only in a route's text finds nothing. Full-text search is not available from the API.
+- **Configuration tagging is incomplete.** A route without a configuration never matches a `configuration` filter, and the tag doesn't always follow the route's name. Measured on 2026-10-05 in range 14410 (Mont-Blanc) with `activity: "mountain_climbing"`: 60 of the 453 routes have no configuration, and some ridges are tagged `pillar` or `glacier` rather than `edge`, such as `Aiguille de Blaitière : Arête NW` (657284, `pillar`) and `Grand Luy : Arête ESE` (54221, `glacier`). For ridges, also search `query: "arête"`, which matches route names only. On the same date and filters, it finds 125 routes (`Found 125 route(s)`), against 102 when combined with `configuration: ["edge"]`, so 23 are not tagged `edge`. Ten of those 23 are ridges, including the two above: 4 have no configuration and 6 are tagged `pillar` or `glacier`. The other 13 are not ridge routes: they are on summits whose name contains "arête", such as `Pointe 2505 m de l’arête NE des Grands Charmoz : Mythe Errant` (1912655, `face`) and `Pointe 2704 m de l’arête NE des Grands Charmoz : Éperon NE Duteurtre Ratheaux` (1912694, `pillar`), and their tags are right. Read the route title, after the `:`, before taking a result for a ridge. Neither search alone lists every ridge.
 - **Closed lists are checked.** An `activity`, `route_types`, `configuration` or `rating_system` value outside its list is refused with the valid values. Activities and codes are Camptocamp's own and stay in English whatever `lang` is.
 - **Unknown IDs return nothing.** An unknown `area_id` or `waypoint_id` gives no results, not an error. `search_routes {waypoint_id: 999999999, limit: 3}`, captured from v1.3.0 on 2026-10-05:
 
