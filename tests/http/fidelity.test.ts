@@ -5,7 +5,10 @@ import { callTool, postMcp, rpc, startTestServer } from "./helpers.js";
 // AC2.6 to AC2.8 on #277: over HTTP, the tools, their schemas and their output are exactly those of the
 // in-memory transport, and a failing Camptocamp API is a tool error (HTTP 200, isError), never an HTTP error.
 
+// Runs before the helpers' hook, which shuts the server down: a timeout test that failed must not leave the
+// drain on fake timers, nor leak them into the next tests.
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -150,7 +153,7 @@ async function afterApiTimeout<T>(fetchMock: ReturnType<typeof stubHangingFetch>
 }
 
 // One valid input per registered tool. Every tool reaches the API with it; search_outings goes through route_ids,
-// which fetches once per route.
+// which sends both routes in a single `r=54513,1148298` request.
 const TOOL_ARGUMENTS: Record<string, Record<string, unknown>> = {
   search_routes: { query: "gamma" },
   get_route: { id: 53914 },

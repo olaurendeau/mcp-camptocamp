@@ -1,14 +1,14 @@
 import { request as httpRequest } from "node:http";
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { getJson } from "../../src/api/http.js";
-import { BUSY_MESSAGE, userAgent } from "../../src/api/upstream.js";
+import { BUSY_MESSAGE, configureUpstream, queuedUpstreamRequests, userAgent } from "../../src/api/upstream.js";
 import type { Env } from "../../src/http/config.js";
 import { runHttp, type HttpProcess } from "../../src/http/main.js";
 import type { RunningHttpServer } from "../../src/http/server.js";
 import { VERSION } from "../../src/version.js";
 import { z } from "zod";
 import { jsonResponse } from "../server/helpers.js";
-import { HOST, MCP_HEADERS, TOKEN, callTool, freePort, postMcp } from "./helpers.js";
+import { HOST, MCP_HEADERS, TOKEN, callTool, freePort, postMcp, startTestServer } from "./helpers.js";
 
 // AC7.1–AC7.3 of #277 end to end: the HTTP mode as src/index.ts starts it (runHttp), real HTTP requests, and a
 // stubbed fetch standing in for the Camptocamp API.
@@ -33,9 +33,12 @@ function routeId(input: Parameters<typeof fetch>[0]): number {
 
 const running: RunningHttpServer[] = [];
 
-// Registered after the helpers' hook, so it runs first: every server stops while fetch is still stubbed.
+// Registered after the helpers' hook, so it runs first: every server stops while fetch is still stubbed, and
+// with real timers, so a test that failed with fake ones cannot leave the 8 s drain waiting forever.
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all(running.splice(0).map((server) => server.shutdown()));
+  configureUpstream(undefined);
 });
 
 /** Runs the HTTP mode on a free port with the test token and Host, plus `env`. */
@@ -152,11 +155,10 @@ describe("HTTP mode busy error (AC7.2)", () => {
   it("answers a tool call with the busy message once 1 request is in flight and 50 wait", async () => {
     const { fetchMock, release } = heldFetch();
     const { port } = await startHttp({ MCP_UPSTREAM_CONCURRENCY: "1" });
-    // Each waiter holds a 20 s timer and the request in flight its 15 s timeout: their count shows the queue.
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const filling = Array.from({ length: 51 }, (_, i) => callForResult(port, "get_route", { id: 1 + i }));
     await vi.waitFor(() => {
-      expect(vi.getTimerCount()).toBe(51);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(queuedUpstreamRequests()).toBe(50);
     });
 
     const busy = await callForResult(port, "get_route", { id: 999 });
@@ -171,6 +173,7 @@ describe("HTTP mode busy error (AC7.2)", () => {
     const results = await Promise.all(filling);
     expect(results.every((result) => !result.isError)).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(51); // never for a refused call
+    expect(queuedUpstreamRequests()).toBe(0);
   });
 });
 
@@ -178,7 +181,6 @@ describe("HTTP mode client disconnect", () => {
   it("drops a disconnected client's queued request and aborts its fetch in flight", async () => {
     const { fetchMock, release } = heldFetch();
     const { port } = await startHttp({ MCP_UPSTREAM_CONCURRENCY: "1" });
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 
     const inFlight = openPost(port, callTool("get_route", { id: 1 }));
     await vi.waitFor(() => {
@@ -186,12 +188,12 @@ describe("HTTP mode client disconnect", () => {
     });
     const queued = openPost(port, callTool("get_route", { id: 2 }));
     await vi.waitFor(() => {
-      expect(vi.getTimerCount()).toBe(2); // the 15 s timeout of route 1, the 20 s wait of route 2
+      expect(queuedUpstreamRequests()).toBe(1);
     });
 
     queued.disconnect();
     await vi.waitFor(() => {
-      expect(vi.getTimerCount()).toBe(1); // route 2 left the queue
+      expect(queuedUpstreamRequests()).toBe(0);
     });
     inFlight.disconnect();
     const signal = fetchMock.mock.calls[0][1]?.signal;
@@ -203,6 +205,31 @@ describe("HTTP mode client disconnect", () => {
     const next = await callForResult(port, "get_route", { id: 3 });
     expect(next.isError).toBeFalsy();
     expect(fetchMock.mock.calls.map(([url]) => routeId(url))).toEqual([1, 3]);
+  });
+});
+
+describe("HTTP mode shutdown deadline", () => {
+  it("aborts the Camptocamp request in flight and empties the queue", async () => {
+    const { fetchMock } = heldFetch();
+    // The cap is set here rather than by runHttp, whose shutdown turns it off: the queue stays readable after.
+    configureUpstream({ concurrency: 1 });
+    const server = await startTestServer();
+    const inFlight = postMcp(server.port, callTool("get_route", { id: 1 }));
+    const queued = postMcp(server.port, callTool("get_route", { id: 2 }));
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(queuedUpstreamRequests()).toBe(1);
+    });
+
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const shutdown = server.shutdown();
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);
+    expect(queuedUpstreamRequests()).toBe(0);
+    expect((await inFlight).status).toBe(503);
+    expect((await queued).status).toBe(503);
+    await shutdown;
+    expect(fetchMock).toHaveBeenCalledOnce(); // route 2 never reached the API
   });
 });
 
@@ -232,9 +259,22 @@ describe("HTTP mode User-Agent (AC7.3)", () => {
     const { fetchMock, release } = heldFetch();
     const requests = [1, 2].map((id) => getJson({ path: `/routes/${String(id)}`, schema: z.unknown() }));
     expect(fetchMock).toHaveBeenCalledTimes(2); // both at once: no cap any more
+    expect(queuedUpstreamRequests()).toBe(0);
     expect(sentUserAgent(fetchMock)).toBe(STDIO_USER_AGENT);
     release();
     await Promise.all(requests);
+  });
+
+  it("goes back to the stdio User-Agent even when the HTTP server fails to stop", async () => {
+    const server = await startHttp({ MCP_OPERATOR_CONTACT: "ops@example.org" });
+    running.splice(running.indexOf(server), 1); // its shutdown fails: the test closes it itself
+    const close = vi.spyOn(server.server, "close").mockImplementationOnce(() => {
+      throw new Error("close failed");
+    });
+    await expect(server.shutdown()).rejects.toThrow("close failed");
+    expect(userAgent()).toBe(STDIO_USER_AGENT);
+    close.mockRestore();
+    await new Promise((resolve) => server.server.close(resolve));
   });
 
   it("keeps the stdio User-Agent when the HTTP server cannot listen", async () => {

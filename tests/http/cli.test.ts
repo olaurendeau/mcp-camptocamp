@@ -121,4 +121,31 @@ describe("runHttp", () => {
       expect(proc.exits).toEqual([1, 0]);
     });
   });
+
+  it("exits 1 with a one-line error when the drain fails, with no unhandled rejection", async () => {
+    const port = await freePort();
+    const proc = new FakeProcess({ ...HTTP_ENV, MCP_HTTP_PORT: String(port) });
+    const server = await runHttp(proc.process);
+    if (!server) throw new Error(proc.stderr);
+    const close = vi.spyOn(server.server, "close").mockImplementationOnce(() => {
+      throw new Error(`close failed for ${HTTP_ENV.MCP_AUTH_TOKENS}`);
+    });
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      proc.signal("SIGTERM");
+      await vi.waitFor(() => {
+        expect(proc.exits).toEqual([1]);
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+      close.mockRestore();
+      await new Promise((resolve) => server.server.close(resolve));
+    }
+    expect(lines(proc.stderr)).toHaveLength(2);
+    expect(JSON.parse(lines(proc.stderr)[1])).toEqual({ message: "shutdown failed", error: "Error" });
+    expect(proc.stderr).not.toContain(HTTP_ENV.MCP_AUTH_TOKENS);
+  });
 });

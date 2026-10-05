@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { connect, jsonResponse } from "../server/helpers.js";
 import { VERSION } from "../../src/version.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -17,6 +17,11 @@ import {
   startTestServer,
   testConfig,
 } from "./helpers.js";
+
+// A spy must not outlive its test, even one that failed before restoring it.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const UNAUTHORIZED = '{"jsonrpc":"2.0","error":{"code":-32001,"message":"Unauthorized"},"id":null}';
 
@@ -210,7 +215,6 @@ describe("HTTP server", () => {
       const { port } = await startTestServer();
       const result = await postMcp(port, rpc("tools/list"), { cookie: "session=secret" });
       const { headers } = handleRequest.mock.calls[0][0];
-      handleRequest.mockRestore();
       expect(result.status).toBe(200);
       expect(headers.get("authorization")).toBeNull();
       expect(headers.get("cookie")).toBeNull();
