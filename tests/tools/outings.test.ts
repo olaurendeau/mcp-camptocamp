@@ -1679,6 +1679,18 @@ describe("search_outings route_ids", () => {
     ]);
   });
 
+  // Live on 2026-10-05: r=54513,999999999 finds the 61 outings of 54513, as r=54513 does.
+  it("names an unknown route ID with the others, which still list their outings", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse(innominata, 61));
+
+    const result = await search({ route_ids: [54513, 999999999], limit: 2 });
+
+    expect(result.split("\n").slice(0, 2)).toEqual([
+      "Found 61 outing(s), most recent first. Showing 2 from offset 0:",
+      "Filters: routes 54513 or 999999999",
+    ]);
+  });
+
   it("names a single route as route_id does", async () => {
     mockSearchOutings.mockResolvedValueOnce(listResponse([], 0));
 
@@ -1764,6 +1776,10 @@ describe("search_outings route_ids", () => {
     expect(description.length).toBeLessThan(2048);
     expect(searchOutingsSchema.shape.route_ids.description).toContain("listed once");
     expect(searchOutingsSchema.shape.route_ids.description).toContain("not with route_id");
+    expect(description).toContain("not an error; one in route_ids adds no outings");
+    expect(searchOutingsSchema.shape.route_ids.description).toContain(
+      "an unknown ID adds no outings and does not empty the result",
+    );
   });
 });
 
