@@ -108,7 +108,7 @@ The [support matrix](docs/README.md#support-matrix) lists the clients covered by
 | [`search_user_outings`](docs/tools/search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                            |
 | [`get_outing`](docs/tools/get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.                |
 | [`get_outings`](docs/tools/get_outings.md)                 | Up to 10 outings by ID in one call, in `get_outing` format, each section cut at 2,000 characters; from v1.4.0.   |
-| [`outing_stats`](docs/tools/outing_stats.md)               | Count `search_outings` matches by start month, year or condition (from v1.4.0), or two of them (not in v1.4.0).  |
+| [`outing_stats`](docs/tools/outing_stats.md)               | Count `search_outings` matches by month, year, condition (from v1.4.0), two of them or per route (not in v1.4.0) |
 | [`search_areas`](docs/tools/search_areas.md)               | Search ranges, administrative subdivisions and countries by name; the ID is reusable as `area_id`.               |
 | [`get_area`](docs/tools/get_area.md)                       | One area by ID: type, summary and description.                                                                   |
 | [`search_books`](docs/tools/search_books.md)               | Search guidebooks and other books by title, book type and activity; author and ISBN searches are unreliable.     |

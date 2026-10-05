@@ -1,6 +1,7 @@
 // outing_stats (S4 on #255): counts the outings matching a search by start month, start year or condition, and
-// with split_by (S3 of #303) on a second of these axes, in a table. Counts come from the listed outings, never from
-// separate API queries, so every page must be read and must agree with the others.
+// with split_by (S3 of #303) on a second of these axes, or per route of route_ids (S4 of #303), in a table. Counts
+// come from the listed outings, never from separate API queries, so every page must be read and must agree with the
+// others.
 import { z } from "zod";
 import { searchOutings } from "../api/camptocamp.js";
 import type { OutingListResponse } from "../api/camptocamp.js";
@@ -43,7 +44,9 @@ const readPage = (filters: OutingFilters, offset: number) =>
  * Every outing of each set of filters: one result per set, in the order given, each in its search's order (most
  * recent first, ties by ID). Reads every set's first page, at most 3 at a time, then calls `checkTotals` with the
  * sets' totals, which throws to refuse them before any other request. Then reads the other pages of every set, at
- * most 3 at a time across all sets, and fails if a page fails or a set's pages disagree.
+ * most 3 at a time across all sets, and fails if a page fails or a set's pages disagree. `checkTotals` is the only
+ * limit on how many requests it makes: one per set, then one per other page of 100 of every set it lets through.
+ * An outing may be in several sets: each set is checked on its own.
  */
 export async function collectOutingSets(
   sets: readonly OutingFilters[],
@@ -73,6 +76,16 @@ export async function collectOutingSets(
   });
 }
 
+const formatCount = (count: number) => count.toLocaleString("en-US");
+
+// The refusal of more outings than one call reads, after `matched`, which says how many match.
+function tooManyOutings(matched: string): Error {
+  return new Error(
+    `${matched}, more than the ${formatCount(MAX_COLLECTED_OUTINGS)} that can be counted in one call: narrow the ` +
+      "filters (dates, area, activity, routes…) and call again.",
+  );
+}
+
 /**
  * Every outing matching `filters`, in the search's order (most recent first, ties by ID). Refuses a search
  * matching more than 2,000 outings after its first page, and fails if a page fails or the pages disagree.
@@ -80,13 +93,7 @@ export async function collectOutingSets(
 export async function collectMatchingOutings(filters: OutingFilters): Promise<OutingListResponse> {
   const [result] = await collectOutingSets([filters], (totals) => {
     for (const total of totals) {
-      if (total > MAX_COLLECTED_OUTINGS) {
-        throw new Error(
-          `${total.toLocaleString("en-US")} outings match these filters, more than the ` +
-            `${MAX_COLLECTED_OUTINGS.toLocaleString("en-US")} that can be counted in one call: narrow the filters ` +
-            "(dates, area, activity, routes…) and call again.",
-        );
-      }
+      if (total > MAX_COLLECTED_OUTINGS) throw tooManyOutings(`${formatCount(total)} outings match these filters`);
     }
   });
   // One set of filters gives one result.
@@ -95,6 +102,9 @@ export async function collectMatchingOutings(filters: OutingFilters): Promise<Ou
 
 const AXES = ["month", "year", "condition"] as const;
 type Axis = (typeof AXES)[number];
+// The second axis: another of AXES, or the routes of route_ids (S4 of #303).
+const SPLITS = [...AXES, "route"] as const;
+type Split = (typeof SPLITS)[number];
 
 // The search_outings filters, without paging (AC4.4 on #255); lang is kept, as every tool takes it.
 export const outingStatsSchema = searchOutingsSchema.omit({ limit: true, offset: true }).extend({
@@ -103,11 +113,13 @@ export const outingStatsSchema = searchOutingsSchema.omit({ limit: true, offset:
       "the author reported)",
   ),
   // No zod default and no .refine: server.ts reads the shape, so split_by equal to group_by is refused by the handler.
-  split_by: enumValue(AXES)
+  split_by: enumValue(SPLITS)
     .optional()
     .describe(
       "A second axis, another of month, year or condition: prints a Markdown table of counts instead, one row per " +
-        "group_by value and one column per split_by value, with a total row and column",
+        "group_by value and one column per split_by value, with a total row and column. route (with route_ids, not " +
+        "route_id): one column per route, then an 'all routes' column of distinct outings instead of the total " +
+        "column; an outing linked to several of these routes counts under each",
     ),
 });
 
@@ -118,7 +130,12 @@ export const COUNTS_NOTE =
   "Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route " +
   "is out of condition.";
 
-const AXIS_LABELS: Record<Axis, string> = { month: "start month", year: "start year", condition: "condition" };
+const AXIS_LABELS: Record<Split, string> = {
+  month: "start month",
+  year: "start year",
+  condition: "condition",
+  route: "route",
+};
 
 // The lines of outings counted outside the groups, so that the lines add up to the total.
 const NO_START_DATE = "(no start date)";
@@ -159,7 +176,7 @@ function axisValues(axis: Axis, keys: Iterable<string>): string[] {
   return Array.from({ length: Math.max(...years) - first + 1 }, (_, i) => String(first + i).padStart(4, "0"));
 }
 
-function increment(counts: Map<string, number>, key: string): void {
+function increment<K>(counts: Map<K, number>, key: K): void {
   counts.set(key, (counts.get(key) ?? 0) + 1);
 }
 
@@ -184,6 +201,32 @@ function formatCounts(documents: Outing[], groupBy: Axis): string[] {
 const cell = (value: string) => value.replaceAll("|", "\\|");
 const tableRow = (cells: string[]) => `| ${cells.join(" | ")} |`;
 
+// A Markdown table of counts, `count(row, column)` in each cell, with a total row; with `totalColumn`, a last
+// column gives each row's total.
+function countTable(
+  label: string,
+  columns: string[],
+  rows: string[],
+  count: (row: string, column: string) => number,
+  totalColumn: boolean,
+): string[] {
+  const extra = totalColumn ? ["total"] : [];
+  const line = (counts: number[]) => (totalColumn ? [...counts, sum(counts)] : counts).map(String);
+  const columnTotal = (column: string) => sum(rows.map((row) => count(row, column)));
+  return [
+    tableRow([label, ...columns.map(cell), ...extra]),
+    tableRow(["---", ...[...columns, ...extra].map(() => "---:")]),
+    ...rows.map((row) => tableRow([cell(row), ...line(columns.map((column) => count(row, column)))])),
+    tableRow(["total", ...line(columns.map(columnTotal))]),
+  ];
+}
+
+// The cell key of a row and a column.
+const cellKey = (row: string, column: string) => JSON.stringify([row, column]);
+
+// A blank line ends a table: a line right after it would be read as one more row.
+const withBelow = (table: string[], below: string[]) => (below.length > 0 ? [...table, "", ...below] : table);
+
 // Rows from group_by, columns from split_by, with a total column and row: counts only (AC3.3 of #303). An outing
 // with either value outside the axes is counted below the table, so the table and those lines add up to N.
 function formatTable(documents: Outing[], rowAxis: Axis, columnAxis: Axis): string[] {
@@ -200,7 +243,7 @@ function formatTable(documents: Outing[], rowAxis: Axis, columnAxis: Axis): stri
     } else {
       rowKeys.push(row);
       columnKeys.push(column);
-      increment(cells, JSON.stringify([row, column]));
+      increment(cells, cellKey(row, column));
     }
   }
   const rows = axisValues(rowAxis, rowKeys);
@@ -209,39 +252,106 @@ function formatTable(documents: Outing[], rowAxis: Axis, columnAxis: Axis): stri
   // Without a year with a start date there is no row or column to print, as there is no year line without split_by.
   if (rows.length === 0 || columns.length === 0) return below;
 
-  const count = (row: string, column: string) => cells.get(JSON.stringify([row, column])) ?? 0;
-  const totals = columns.map((column) => sum(rows.map((row) => count(row, column))));
-  const table = [
-    tableRow([AXIS_LABELS[rowAxis], ...columns.map(cell), "total"]),
-    tableRow(["---", ...columns.map(() => "---:"), "---:"]),
-    ...rows.map((row) => {
-      const counts = columns.map((column) => count(row, column));
-      return tableRow([cell(row), ...[...counts, sum(counts)].map(String)]);
-    }),
-    tableRow(["total", ...[...totals, sum(totals)].map(String)]),
-  ];
-  // A blank line ends the table: a line right after it would be read as one more row.
-  return below.length > 0 ? [...table, "", ...below] : table;
+  const count = (row: string, column: string) => cells.get(cellKey(row, column)) ?? 0;
+  return withBelow(countTable(AXIS_LABELS[rowAxis], columns, rows, count, true), below);
 }
 
-// split_by equal to group_by is refused first, then the filters are checked, all before any request: the
-// collector's input type allows route_id with route_ids.
+const ROUTE_SPLIT_NEEDS_ROUTE_IDS =
+  'split_by "route" counts the routes of route_ids: give the routes to compare in route_ids (up to 10), not route_id.';
+
+const idsOf = (documents: Outing[]) => documents.flatMap(({ document_id }) => document_id ?? []);
+
+// split_by route (S4 of #303): the union of the routes first, then each route's outings, in route_ids order. An
+// outing linked to several routes is read once per route, so the routes' totals are refused above 2,000; the union
+// cannot hold more outings than they add up to. Items without an ID cannot be matched, so they are not checked.
+async function collectRouteSets(others: Omit<OutingFilters, "route_ids">, routeIds: number[]) {
+  const sets = [{ ...others, route_ids: routeIds }, ...routeIds.map((route_id) => ({ ...others, route_id }))];
+  // One total and one result per set: the union's first, then the routes', in route_ids order.
+  const results = await collectOutingSets(sets, (totals) => {
+    const [unionTotal, ...routeTotals] = totals as [number, ...number[]];
+    const routeSum = sum(routeTotals);
+    if (routeSum > MAX_COLLECTED_OUTINGS) {
+      const perRoute = routeTotals.map((total, i) => `route ${String(routeIds[i])}: ${formatCount(total)}`);
+      throw tooManyOutings(
+        `${formatCount(routeSum)} outings match these filters route by route (${perRoute.join(", ")})`,
+      );
+    }
+    if (unionTotal > routeSum) throw new Error(RESULTS_CHANGED);
+  });
+  const [union, ...routes] = results as [OutingListResponse, ...OutingListResponse[]];
+  // How many of the routes each outing is linked to; the union must hold exactly these outings.
+  const linked = new Map<number, number>();
+  for (const { documents } of routes) for (const id of new Set(idsOf(documents))) increment(linked, id);
+  const unionIds = new Set(idsOf(union.documents));
+  if (unionIds.size !== linked.size || [...linked.keys()].some((id) => !unionIds.has(id))) {
+    throw new Error(RESULTS_CHANGED);
+  }
+  const shared = [...linked.values()].filter((count) => count > 1).length;
+  const columns = routes.map(({ documents }, i): [string, Outing[]] => [String(routeIds[i]), documents]);
+  return { union, columns, shared };
+}
+
+const ALL_ROUTES = "all routes";
+
+// Rows from group_by, one column per route, then `all routes`, counted from the union: an outing linked to several
+// routes counts in each of their columns, and once in `all routes`. The outings outside the rows are counted once,
+// from the union, below the table, so the `all routes` column and those lines add up to N.
+function formatRouteTable(rowAxis: Axis, columns: [string, Outing[]][], union: Outing[]): string[] {
+  const cells = new Map<string, number>();
+  const rowKeys: string[] = [];
+  for (const [column, documents] of [...columns, [ALL_ROUTES, union] as const]) {
+    for (const outing of documents) {
+      const row = keyOf(outing, rowAxis);
+      rowKeys.push(row);
+      increment(cells, cellKey(row, column));
+    }
+  }
+  const outside = new Map<string, number>();
+  for (const outing of union) increment(outside, keyOf(outing, rowAxis));
+  const below = outsideLines(outside);
+  const rows = axisValues(rowAxis, rowKeys);
+  if (rows.length === 0) return below;
+  const labels = [...columns.map(([column]) => column), ALL_ROUTES];
+  const count = (row: string, column: string) => cells.get(cellKey(row, column)) ?? 0;
+  return withBelow(countTable(AXIS_LABELS[rowAxis], labels, rows, count, false), below);
+}
+
+// The counts, and the lines printed before them, for the filters of a call. split_by route without route_ids is
+// refused here, before any request.
+async function countOutings(filters: OutingFilters, groupBy: Axis, splitBy: Split | undefined) {
+  if (splitBy === "route") {
+    const { route_ids: routeIds, ...others } = filters;
+    if (routeIds === undefined) throw new Error(ROUTE_SPLIT_NEEDS_ROUTE_IDS);
+    const { union, columns, shared } = await collectRouteSets(others, routeIds);
+    return {
+      total: union.total,
+      notes: [`${String(shared)} outing(s) are linked to more than one of these routes and count under each.`],
+      lines: formatRouteTable(groupBy, columns, union.documents),
+    };
+  }
+  const { total, documents } = await collectMatchingOutings(filters);
+  const lines = splitBy === undefined ? formatCounts(documents, groupBy) : formatTable(documents, groupBy, splitBy);
+  return { total, notes: [], lines };
+}
+
+// split_by equal to group_by is refused first, then the filters are checked, then split_by route without route_ids,
+// all before any request: the collector's input type allows route_id with route_ids.
 export async function handleOutingStats({ group_by, split_by, ...input }: OutingStatsInput): Promise<string> {
   if (split_by === group_by) {
     throw new Error(
-      `split_by must differ from group_by (${group_by}): give another of month, year or condition, or leave it out`,
+      `split_by must differ from group_by (${group_by}): give another of month, year, condition or route, or leave ` +
+        "it out",
     );
   }
   const filters = outingFilterParams(input);
-  const { total, documents } = await collectMatchingOutings(filters);
-  const lines = split_by === undefined ? formatCounts(documents, group_by) : formatTable(documents, group_by, split_by);
+  const { total, notes, lines } = await countOutings(filters, group_by, split_by);
 
   const filterText = describeOutingFilters(filters).join(", ");
   const axes = AXIS_LABELS[group_by] + (split_by === undefined ? "" : ` and ${AXIS_LABELS[split_by]}`);
   const output = [`${String(total)} outing(s) counted (all matches), by ${axes}`];
   if (filterText) output.push(`Filters: ${filterText}`);
   if (filters.period !== undefined) output.push(PERIOD_NOTE);
-  output.push(COUNTS_NOTE);
+  output.push(COUNTS_NOTE, ...notes);
   if (lines.length > 0) output.push("", ...lines);
   return output.join("\n");
 }
@@ -251,7 +361,7 @@ export const outingStatsToolDefinitions = [
     name: "outing_stats",
     title: "Count outings",
     description:
-      "Count the outings (trip reports) on Camptocamp.org that match a search, by start month, start year or condition: for example, in which months a route's reports were written. It takes the filters of search_outings (query, area_id, activity, rating_system with rating_min / rating_max, condition_at_least, max_elevation_min / max_elevation_max, height_diff_up_min / height_diff_up_max, date_from / date_to, period_start / period_end, route_id or route_ids, waypoint_id, user_id), without limit and offset, and group_by: month, year or condition. Every matching outing is read, 100 per request, so the counts are exact. The output starts with 'N outing(s) counted (all matches), by start month' and the Filters line of search_outings, then one line per group, zeros included: months 01 to 12 of the start date; every year from the first to the last start date; or conditions excellent, good, average, poor, awful, any other code as sent, then '(not given): N'. A trip over several days counts in the month and year it starts. Outings without a start date count on '(no start date): N', and items Camptocamp sent in an unexpected format on '(unexpected format): N', so the lines add up to N. With split_by (another of month, year or condition), a Markdown table instead: group_by rows, split_by columns, a total row and column, counts only; those two lines follow it. A search matching more than 2,000 outings is refused before counting, with its total: narrow the filters (dates, area, activity, routes). If Camptocamp's results change while counting, the call fails: call again. These are counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition. To read the reports, list them with search_outings and read them with get_outings. " +
+      "Count the outings (trip reports) on Camptocamp.org that match a search, by start month, start year or condition. It takes the filters of search_outings (query, area_id, activity, rating_system with rating_min / rating_max, condition_at_least, max_elevation_min / max_elevation_max, height_diff_up_min / height_diff_up_max, date_from / date_to, period_start / period_end, route_id or route_ids, waypoint_id, user_id), without limit and offset, and group_by: month, year or condition. Every matching outing is read, so the counts are exact. The output starts with 'N outing(s) counted (all matches), by start month' and a Filters line, then one line per group, zeros included: months 01 to 12; every year from the first to the last start date; or conditions excellent, good, average, poor, awful, any other code as sent, then '(not given): N'. A trip over several days counts in the month and year it starts. Outings without a start date count on '(no start date): N', and items Camptocamp sent in an unexpected format on '(unexpected format): N', so the lines add up to N. With split_by (another of month, year or condition), a Markdown table instead: group_by rows, split_by columns, a total row and column, counts only; those two lines follow it. split_by route (with route_ids): a column per route, then 'all routes' (distinct outings) instead of total; an outing on several routes counts under each. A search matching more than 2,000 outings (summed per route for split_by route) is refused before counting: narrow the filters (dates, area, activity, routes). If Camptocamp's results change while counting, the call fails: call again. These are counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition. Read the reports with search_outings and get_outings. " +
       LANG_NOTE,
     inputSchema: outingStatsSchema,
     handler: handleOutingStats,
