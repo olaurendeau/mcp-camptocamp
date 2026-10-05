@@ -47,7 +47,11 @@ function enumList<T extends string>(values: readonly [T, ...T[]], description: s
 }
 
 export const searchRoutesSchema = z.object({
-  query: searchQuery("Search query for routes (e.g. 'Mont Blanc voie normale')", { allowBlank: true }).optional(),
+  // Camptocamp searches route names only (a FIXME in v6_api's search), not descriptions (#255 S5).
+  query: searchQuery(
+    "Search query for routes (e.g. 'Mont Blanc voie normale'). Matches route names ('<summit> : <route title>') only, not descriptions",
+    { allowBlank: true },
+  ).optional(),
   limit: z.number().int().min(1).max(50).optional().default(10).describe("Maximum number of results"),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14403 for Écrins)").optional(),
   waypoint_id: documentId(
@@ -70,7 +74,9 @@ export const searchRoutesSchema = z.object({
   route_types: enumList(ROUTE_TYPES, `Route types, matching any of: ${ROUTE_TYPES.join(", ")}`),
   configuration: enumList(
     ROUTE_CONFIGURATIONS,
-    `Terrain configurations, matching any of: ${ROUTE_CONFIGURATIONS.join(", ")} (edge = arête/ridge)`,
+    `Terrain configurations, matching any of: ${ROUTE_CONFIGURATIONS.join(", ")} (edge = arête/ridge). ` +
+      "Tagging is incomplete: routes without a configuration are excluded, and some ridges are tagged pillar or glacier. " +
+      "For ridges, also search query: 'arête', which matches names only",
   ),
   offset: searchOffset(),
   lang: langInput(),

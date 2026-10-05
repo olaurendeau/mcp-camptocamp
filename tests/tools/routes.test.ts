@@ -1145,6 +1145,21 @@ describe("search_routes tool definition", () => {
     expect(tool?.description).toContain("Next page: offset=N");
     expect(tool?.description).toContain("at least one filter");
   });
+
+  // AC5.1 of #255: the API matches q against route names only (a FIXME in v6_api's search).
+  it("says query matches route names only, not descriptions", () => {
+    const description = shape.query.description ?? "";
+    expect(description).toContain("Matches route names ('<summit> : <route title>') only, not descriptions");
+  });
+
+  // AC5.2 of #255: 60 of 453 mountaineering routes in range 14410 have no configuration (2026-10-05).
+  it("says configuration tagging is incomplete, untagged routes are excluded, and names the arête complement", () => {
+    const description = shape.configuration.description ?? "";
+    expect(description).toContain("Tagging is incomplete");
+    expect(description).toContain("routes without a configuration are excluded");
+    expect(description).toContain("some ridges are tagged pillar or glacier");
+    expect(description).toContain("query: 'arête'");
+  });
 });
 
 describe("get_route tool definition", () => {
