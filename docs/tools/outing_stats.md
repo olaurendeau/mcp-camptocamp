@@ -52,8 +52,8 @@ Count the trip reports that match a search, by the month or year they start in, 
 - `height_diff_up_max`: Highest elevation gain in metres, inclusive (outings without an elevation gain are excluded).
 - `date_from`: Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it. An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.
 - `date_to`: Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it. An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.
-- `period_start`: First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
-- `period_end`: Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
+- `period_start`: First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
+- `period_end`: Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 - `route_id`: Camptocamp route ID from search_routes.
 - `route_ids`: Up to 10 Camptocamp route IDs from search_routes (e.g. \[54513, 1148298\]): outings of any of these routes, an outing linked to several of them listed once; an unknown ID adds no outings and does not empty the result; not with route\_id.
 - `waypoint_id`: Camptocamp waypoint ID from search_waypoints.
@@ -69,7 +69,7 @@ Count the trip reports that match a search, by the month or year they start in, 
 ```text
 <N> outing(s) counted (all matches), by <start month | start year | condition>
 Filters: <filters>
-Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
+Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
 
 <group>: <count>
@@ -94,7 +94,7 @@ With `split_by` (not in v1.4.0), the groups are a Markdown table instead:
 ```text
 <N> outing(s) counted (all matches), by <group_by label> and <split_by label>
 Filters: <filters>
-Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
+Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
 
 | <group_by label> | <split_by value> | … | total |
@@ -119,7 +119,7 @@ With `split_by: "route"` (not in v1.4.0), the columns are the routes of `route_i
 ```text
 <N> outing(s) counted (all matches), by <group_by label> and route
 Filters: <filters>
-Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
+Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
 <S> outing(s) are linked to more than one of these routes and count under each.
 

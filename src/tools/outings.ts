@@ -89,12 +89,14 @@ function maxElevation(bound: string) {
 // On both bounds of each pair, moved from the search_outings description to keep it under 2048 characters (#211).
 const DATE_RANGE_NOTE =
   "An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.";
-// D3 on #271: what the period filter still misses, from the release after v1.4.0. The edge days are no longer
-// among them, so nothing tells the LLM to widen a period past the days it asked for.
+// D3 on #271: what the period filter still misses or adds, from the release after v1.4.0, with no list of years so
+// that it stays true as outings are added. 1 January lands after 31 December in the leap years 1972–2036 and the
+// years before one from 1971 to 2003. The bound years are exact for outings dated 1989–2027 only (#324). Nothing
+// tells the LLM to widen a period past the days it asked for.
 const PERIOD_GAPS =
-  "Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and " +
-  "misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: " +
-  "use date_from / date_to for those.";
+  "Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year " +
+  "or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day " +
+  "next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.";
 const PERIOD_LIMITS_NOTE = `A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. ${PERIOD_GAPS}`;
 
 // route_ids: routes per call, sent as one `r=a,b` (S2 on #255).

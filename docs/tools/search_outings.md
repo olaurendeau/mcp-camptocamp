@@ -48,8 +48,8 @@ Search trip reports across Camptocamp.org, most recent first, by keyword, area, 
 - `height_diff_up_max`: Highest elevation gain in metres, inclusive (outings without an elevation gain are excluded).
 - `date_from`: Earliest date (YYYY-MM-DD); matches outings whose date range ends on or after it. An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.
 - `date_to`: Latest date (YYYY-MM-DD); matches outings whose date range starts on or before it. An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.
-- `period_start`: First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
-- `period_end`: Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
+- `period_start`: First day (MM-DD) of a period matched in every year; give period_end too (e.g. 06-01). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
+- `period_end`: Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 - `route_id`: Camptocamp route ID from search_routes.
 - `route_ids`: Up to 10 Camptocamp route IDs from search_routes (e.g. \[54513, 1148298\]): outings of any of these routes, an outing linked to several of them listed once; an unknown ID adds no outings and does not empty the result; not with route\_id.
 - `waypoint_id`: Camptocamp waypoint ID from search_waypoints.
@@ -67,7 +67,7 @@ Search trip reports across Camptocamp.org, most recent first, by keyword, area, 
 ```text
 Found <total> outing(s), most recent first. Showing <n> from offset <offset>:
 Filters: <filter>, <filter>, …
-Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
+Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 
 - [<id>] <title> (<activities>) | <date> | Conditions: <condition> | Max elevation: <metres>m | Elevation gain: <metres>m | <rating system>: <grade> | … | Areas: <range> [<area id>], … | Author: <name>
 
@@ -95,7 +95,7 @@ Next page: offset=<N>
 
   With no filter at all, there is no `Filters:` line.
 
-- **The `Note:` line** names what the period filter still misses: outings spanning the new year, and 1 January of some years. It is printed with every search that has `period_start` and `period_end`, `01-01` → `12-31` included, even when nothing is found. This text comes with the release after v1.4.0; v1.4.0 prints `Note: Camptocamp's period filter can miss outings on the first or last day of the range.` instead, a gap the release after it closes. See [Limits](#limits).
+- **The `Note:` line** names what the period filter still misses or adds: outings spanning the new year, 1 January of some years, and a day next to the period for outings dated before 1989 or after 2027. It is printed with every search that has `period_start` and `period_end`, `01-01` → `12-31` included, even when nothing is found. This text comes with the release after v1.4.0; v1.4.0 prints `Note: Camptocamp's period filter can miss outings on the first or last day of the range.` instead, a gap the release after it closes. See [Limits](#limits).
 - **Each result line** starts with the outing's ID in brackets, its title as its author wrote it, and its activities. It carries no route ID, because Camptocamp's outing list has none: [`get_outings`](get_outings.md) lists an outing's routes, with their IDs, under `## Associated routes`. The other parts follow in the order above, and each one is left out when the author gave no value:
   - the date, or `<start> → <end>` for an outing over several days;
   - `Conditions:`, a code from `excellent`, `good`, `average`, `poor`, `awful`, copied verbatim;
@@ -117,7 +117,7 @@ June ski-touring reports in the Vanoise, in conditions rated good or better: the
 ```text
 Found 107 outing(s), most recent first. Showing 3 from offset 0:
 Filters: area 14409, activity skitouring, conditions good or better, period 06-01 → 06-30 of every year
-Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
+Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.
 
 - [1912989] Dôme de Polset : Par le Col de Gébroulaz et boucle sur le glacier de Gébroulaz  (skitouring) | 2026-06-07 | Conditions: good | Max elevation: 3500m | Elevation gain: 1640m | Ski rating (Toponeige): 3.2 | Labande: PD+ | Areas: Vanoise [14409] | Author: Loïc Perrin
 - [1913877] Aiguille de Péclet : Versant W (skitouring) | 2026-06-06 | Conditions: good | Max elevation: 3561m | Elevation gain: 1261m | Ski rating (Toponeige): 3.3 | Labande: AD+ | Areas: Vanoise [14409] | Author: NiFo73

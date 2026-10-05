@@ -288,13 +288,18 @@ describe("searches (AC8.2, AC8.3)", () => {
     });
 
     // D1: 346,400 in v1.4.0; sent as no period, so equal to every outing (346,769).
+    // One request after the other, and once more if they differ: an outing published or deleted between the two
+    // would otherwise fail the test with no regression.
     it("01-01 → 12-31 returns every outing", async () => {
-      const [wholeYear, all] = await Promise.all([
-        searchOutings({ period: { start: "01-01", end: "12-31" }, limit: 1 }),
-        searchOutings({ limit: 1 }),
-      ]);
+      const totals = async () => {
+        const wholeYear = await searchOutings({ period: { start: "01-01", end: "12-31" }, limit: 1 });
+        const all = await searchOutings({ limit: 1 });
+        return [wholeYear.total, all.total];
+      };
+      let [wholeYear, all] = await totals();
+      if (wholeYear !== all) [wholeYear, all] = await totals();
 
-      expect(wholeYear.total).toBe(all.total);
+      expect(wholeYear).toBe(all);
     });
   });
 

@@ -1408,9 +1408,9 @@ describe("handleSearchOutings", () => {
   describe("period and user", () => {
     // D3 on #271: the gaps that remain once each bound covers its whole calendar day.
     const PERIOD_NOTE =
-      "Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, " +
-      "and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: " +
-      "use date_from / date_to for those.";
+      "Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year " +
+      "or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day " +
+      "next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.";
     // A June outing at waypoint 37916, trimmed from the live period search (2026-10-04).
     const june: OutingListItem = {
       ...cosmiques,
@@ -2410,9 +2410,9 @@ describe("outingToolDefinitions", () => {
     for (const field of [period_start, period_end]) {
       expect(field.description).toContain("cannot wrap around the new year, so make two calls for 12-20 → 01-10");
       expect(field.description).toContain(
-        "Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, " +
-          "and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: " +
-          "use date_from / date_to for those.",
+        "Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year " +
+          "or starting on 1 January of a leap year or, until 2003, of the year before one, and can add or miss a day " +
+          "next to the period for outings dated before 1989 or after 2027: use date_from / date_to for those.",
       );
     }
   });
