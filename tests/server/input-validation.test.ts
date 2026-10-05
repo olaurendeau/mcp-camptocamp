@@ -662,11 +662,11 @@ describe("cross-field rules", () => {
     });
 
     const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
-    expect(params.get("period")).toBe("2020-06-01,2020-06-30");
+    expect(params.get("period")).toBe("1991-06-01,2024-06-30");
     expect(params.get("u")).toBe("430052");
   });
 
-  // #251: the second call the wrap-around error suggests starts on 01-01, sent in a non-leap year.
+  // #251: the second call the wrap-around error suggests starts on 01-01, sent in 1970; #271: a January end in 2025.
   it("search_outings sends a period starting on 01-01 through MCP with a 1970 start", async () => {
     const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
     const client = await connect();
@@ -674,7 +674,25 @@ describe("cross-field rules", () => {
     await client.callTool({ name: "search_outings", arguments: { period_start: "01-01", period_end: "01-10" } });
 
     const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
-    expect(params.get("period")).toBe("1970-01-01,2020-01-10");
+    expect(params.get("period")).toBe("1970-01-01,2025-01-10");
+  });
+
+  // D1 on #271: the whole year is sent as no period, and the output still names the period the caller gave.
+  it("search_outings sends no period for 01-01 → 12-31 through MCP and still prints it in Filters", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "search_outings",
+      arguments: { waypoint_id: 37916, period_start: "01-01", period_end: "12-31" },
+    });
+
+    const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
+    expect(params.has("period")).toBe(false);
+    expect(params.get("w")).toBe("37916");
+    expect(resultText(result).split("\n")[0]).toBe(
+      "No outings found matching period 01-01 → 12-31 of every year, waypoint 37916.",
+    );
   });
 
   // AC2.3 on #303: the route-ID sentence is description only; a route search stays one list request.

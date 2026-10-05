@@ -2,9 +2,9 @@
 
 This guide is for the model that calls the tools, and for whoever writes its prompt. It shows which tools to chain for common mountaineering questions, what each line of the output means, and what the server cannot tell you. The [system prompt](system-prompt.md) sums it up in a block you can paste into an agent; the [tool reference](tools/README.md) gives each tool's inputs.
 
-Every output on this page is real: it was captured from the server on 2026-10-05, with the version stated above each block, and copied verbatim. The only cuts are user-written text bodies and long lists, each replaced by a line `… (N lines omitted in this documentation)`, and the spaces at the end of a line, which this repository's formatter removes. Camptocamp changes every day, so the same call made later can return other counts and other recent outings.
+Every output on this page is real: it was captured from the server on 2026-10-05 or 2026-10-06, with the version stated above each block, and copied verbatim. The only cuts are user-written text bodies and long lists, each replaced by a line `… (N lines omitted in this documentation)`, and the spaces at the end of a line, which this repository's formatter removes. Camptocamp changes every day, so the same call made later can return other counts and other recent outings.
 
-Everything here works with v1.3.0 or later, except three things that need v1.4.0 or later: the `**Text in other languages**` line (see [Language](#language)), the escaping of invisible and bidirectional characters in repeated input (see [Paging](#paging)), and periods starting on `01-01` that return outings, though not those of 1 January in every year (see the [June example](#2-june-reports-in-good-conditions-search_outings)).
+Everything here works with v1.3.0 or later, except three things that need v1.4.0 or later: the `**Text in other languages**` line (see [Language](#language)), the escaping of invisible and bidirectional characters in repeated input (see [Paging](#paging)), and periods starting on `01-01` that return outings, though not those of 1 January in every year (see the [June example](#2-june-reports-in-good-conditions-search_outings)). From the release after v1.4.0, a period also returns the outings dated on its first and last days in every year, and a `01-01` → `01-01` period those of 1 January 2025 (same example).
 
 ## Tool chains
 
@@ -178,7 +178,7 @@ Here Camptocamp returned 2 books for `limit: 3`, out of 3 matches. The footer st
 
 The user asks: "I'd like to ski tour in the Vanoise in June. Which tours have had good conditions then?"
 
-No tool forecasts the snow of next June. What Camptocamp has is past reports, not a forecast, so the honest answer is a list of tours that people skied in good conditions in past Junes, each with its date. Every output below was captured from v1.3.0 on 2026-10-05.
+No tool forecasts the snow of next June. What Camptocamp has is past reports, not a forecast, so the honest answer is a list of tours that people skied in good conditions in past Junes, each with its date. Every output below was captured from v1.3.0 on 2026-10-05, except step 2, captured from main at 816d1e3 with the whole-day period bounds (#271) on 2026-10-06, with a local build.
 
 ### 1. The area: `search_areas`
 
@@ -196,9 +196,9 @@ Filters: query "vanoise"
 `search_outings {area_id: 14409, activity: "skitouring", period_start: "06-01", period_end: "06-30", condition_at_least: "good", limit: 3}`:
 
 ```text
-Found 101 outing(s), most recent first. Showing 3 from offset 0:
+Found 107 outing(s), most recent first. Showing 3 from offset 0:
 Filters: area 14409, activity skitouring, conditions good or better, period 06-01 → 06-30 of every year
-Note: Camptocamp's period filter can miss outings on the first or last day of the range.
+Note: Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: use date_from / date_to for those.
 
 - [1912989] Dôme de Polset : Par le Col de Gébroulaz et boucle sur le glacier de Gébroulaz  (skitouring) | 2026-06-07 | Conditions: good | Max elevation: 3500m | Elevation gain: 1640m | Ski rating (Toponeige): 3.2 | Labande: PD+ | Areas: Vanoise [14409] | Author: Loïc Perrin
 - [1913877] Aiguille de Péclet : Versant W (skitouring) | 2026-06-06 | Conditions: good | Max elevation: 3561m | Elevation gain: 1261m | Ski rating (Toponeige): 3.3 | Labande: AD+ | Areas: Vanoise [14409] | Author: NiFo73
@@ -207,9 +207,9 @@ Note: Camptocamp's period filter can miss outings on the first or last day of th
 Next page: offset=3
 ```
 
-- **The period** matches the same days in every year: these are the Junes of 2026, 2025 and earlier. To keep only some years, add `date_from` and `date_to`. A period cannot wrap around the new year: for 12-20 → 01-10, make two calls, `12-20` → `12-31` and `01-01` → `01-10`. From v1.4.0, the second call returns outings, but it misses 1 January in leap years such as 2020 and 2024 (see the [`search_outings` limits](tools/search_outings.md#limits)). In v1.3.0, a period starting on `01-01` returns almost nothing, so start it on `01-02`. In every version, use `date_from` and `date_to` for 1 January, one year per call.
-- **The edge days.** The `Note:` line is printed with every period search: Camptocamp's period filter can miss outings on the first or last day of the range. When those days matter, widen the period by a day on each side (`period_start: "05-31"`, `period_end: "07-01"`) and leave out the outings dated outside June.
-- **`condition_at_least: "good"`** keeps the outings whose authors rated the conditions `good` or `excellent`. The scale is `excellent`, `good`, `average`, `poor`, `awful`; outings without a condition rating are left out. Without this filter, the same search found 251 outings on 2026-10-05.
+- **The period** matches the same days in every year: these are the Junes of 2026, 2025 and earlier. To keep only some years, add `date_from` and `date_to`. A period cannot wrap around the new year: for 12-20 → 01-10, make two calls, `12-20` → `12-31` and `01-01` → `01-10`. From v1.4.0, the second call returns outings, but it misses 1 January in some years: measured, 1991, 1992, 1999, 2000, 2003, 2004, 2008, 2012, 2016, 2020 and 2024 (see the [`search_outings` limits](tools/search_outings.md#limits)). In v1.3.0, a period starting on `01-01` returns almost nothing, so start it on `01-02`. In every version, use `date_from` and `date_to` for 1 January, one year per call.
+- **The edge days.** From the release after v1.4.0, the period returns the outings dated 1 June and 30 June in every year: v1.4.0 finds 101 outings for this call, against 107. The `Note:` line, printed with every period search, names what the filter still misses: outings spanning the new year, and those starting on 1 January of some years; for those, use `date_from` and `date_to`. v1.4.0 prints `Note: Camptocamp's period filter can miss outings on the first or last day of the range.` instead: there, use `date_from` and `date_to` when the first or last days matter.
+- **`condition_at_least: "good"`** keeps the outings whose authors rated the conditions `good` or `excellent`. The scale is `excellent`, `good`, `average`, `poor`, `awful`; outings without a condition rating are left out. Without this filter, the same search found 270 outings on 2026-10-06, and 251 with v1.4.0.
 - **The ratings** in each line are the ones the author reported for that day, labelled with their grading system.
 
 ### 3. One report: `get_outing`

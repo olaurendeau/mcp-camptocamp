@@ -200,7 +200,7 @@ describe("searches (AC8.2, AC8.3)", () => {
     }
   });
 
-  // `period=2020-06-01,2020-06-30`: the same days in every year.
+  // `period=1991-06-01,2024-06-30`: the same days in every year.
   // An outing may start or end outside June (05-30 → 06-02): it only has to overlap a June.
   it("outings at waypoint 37916 in the period 06-01 → 06-30, each overlapping June, fewer than all its outings", async () => {
     const result = await searchOutings({ waypoint_id: 37916, period: { start: "06-01", end: "06-30" } });
@@ -221,6 +221,81 @@ describe("searches (AC8.2, AC8.3)", () => {
 
     expect(january.total).toBeGreaterThan(0);
     expect(january.total).toBeGreaterThanOrEqual(fromSecond.total);
+  });
+
+  // AC3 on #271: each period bound covers its whole calendar day, and no more, for outings dated 1989–2027.
+  // Each check pairs one day D (date_from = date_to = D) with a period, against the dates alone; it asserts the
+  // relation, never the counts measured on 2026-10-06, which are in the comments.
+  describe("period bounds cover whole calendar days (#271)", () => {
+    const onDay = (day: string, period?: { start: string; end: string }) =>
+      searchOutings({ date_from: day, date_to: day, limit: 100, ...(period !== undefined && { period }) });
+
+    // Whether every listed outing's dates include the day: a match only through a neighbouring day must span it.
+    function expectAllInclude(result: OutingListResponse, day: string): void {
+      for (const outing of wellFormed(result.documents)) {
+        const start = outing.date_start ?? "";
+        const end = outing.date_end ?? "";
+        expect(start <= day && end >= day, `outing ${outing.document_id} (${start} → ${end})`).toBe(true);
+      }
+    }
+
+    // 0 → 84 (88 dates only): the 01-01 end used to land before 1 January 2025.
+    it("01-01 → 01-01 returns outings of 2025-01-01", async () => {
+      expect((await onDay("2025-01-01", { start: "01-01", end: "01-01" })).total).toBeGreaterThan(0);
+    });
+
+    // 4 → 76 (80 dates only): the single-day outings of 31 December 2024 are all returned.
+    it("12-01 → 12-31 returns every single-day outing of 2024-12-31", async () => {
+      const [alone, withPeriod] = await Promise.all([
+        onDay("2024-12-31"),
+        onDay("2024-12-31", { start: "12-01", end: "12-31" }),
+      ]);
+      const returned = new Set(wellFormed(withPeriod.documents).map((outing) => outing.document_id));
+      const singleDay = wellFormed(alone.documents).filter(
+        (outing) => outing.date_start === "2024-12-31" && outing.date_end === "2024-12-31",
+      );
+
+      expect(alone.total, "more outings than one page: page through them").toBeLessThanOrEqual(100);
+      expect(singleDay.length).toBeGreaterThan(0);
+      for (const outing of singleDay) expect(returned.has(outing.document_id), `${outing.document_id}`).toBe(true);
+    });
+
+    // v1.4.0 → fix (dates only): 21 → 140 (140), 5 → 88 (88), 0 → 77 (77), 4 → 112 (112).
+    it.each([
+      ["2019-06-01", "06-01", "06-30"],
+      ["2026-01-31", "01-02", "01-31"],
+      ["2004-02-29", "02-29", "02-29"],
+      ["2026-03-01", "03-01", "03-31"],
+    ])("on %s, the period %s → %s returns as many outings as the dates alone", async (day, start, end) => {
+      const [alone, withPeriod] = await Promise.all([onDay(day), onDay(day, { start, end })]);
+
+      expect(alone.total).toBeGreaterThan(0);
+      expect(withPeriod.total).toBe(alone.total);
+    });
+
+    // 0, 4 (all spanning 2024-12-31) and 2 (both spanning 2024-02-29): no day next to the period is added.
+    it.each([
+      ["2025-01-02", "01-01", "01-01", "2025-01-01"],
+      ["2024-12-30", "12-31", "12-31", "2024-12-31"],
+      ["2024-03-01", "02-29", "02-29", "2024-02-29"],
+    ])("on %s, the period %s → %s only returns outings that include %s", async (day, start, end, inside) => {
+      expectAllInclude(await onDay(day, { start, end }), inside);
+    });
+
+    // 0 (77 dates only): 1 January of a leap year lands after 31 December, which the docs state.
+    it("01-01 → 01-31 returns no outing of 2020-01-01", async () => {
+      expect((await onDay("2020-01-01", { start: "01-01", end: "01-31" })).total).toBe(0);
+    });
+
+    // D1: 346,400 in v1.4.0; sent as no period, so equal to every outing (346,769).
+    it("01-01 → 12-31 returns every outing", async () => {
+      const [wholeYear, all] = await Promise.all([
+        searchOutings({ period: { start: "01-01", end: "12-31" }, limit: 1 }),
+        searchOutings({ limit: 1 }),
+      ]);
+
+      expect(wholeYear.total).toBe(all.total);
+    });
   });
 
   // `sort=-date_end,-id` (tiebreak_by_id), which outing counts page through: a strict order, so pages of

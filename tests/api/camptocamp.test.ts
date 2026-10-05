@@ -1532,42 +1532,54 @@ describe("searchOutings", () => {
     expect(calledUrl().searchParams.get("date")).toBe("0001-01-01,2026-01-01");
   });
 
-  // AC5.1: Camptocamp matches `period` on month and day in every year; 2020 is a leap year, so 02-29 is valid.
-  it("sends a period as a 2020 date range", async () => {
+  // AC5.1: Camptocamp matches `period` on month and day in every year.
+  it("sends a period alongside the other filters, without a date range", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 
     await searchOutings({ waypoint_id: 37916, period: { start: "06-01", end: "06-30" } });
 
     const params = calledUrl().searchParams;
-    expect(params.get("period")).toBe("2020-06-01,2020-06-30");
+    expect(params.get("period")).toBe("1991-06-01,2024-06-30");
     expect(params.get("w")).toBe("37916");
     expect(params.has("date")).toBe(false);
   });
 
-  it("sends 02-29 as the leap day of 2020", async () => {
-    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
-
-    await searchOutings({ period: { start: "02-01", end: "02-29" } });
-
-    expect(calledUrl().searchParams.get("period")).toBe("2020-02-01,2020-02-29");
-  });
-
-  // #251: the API reduces each bound to its time modulo a 365.2425-day year, so 2020-01-01 lands at day 365.1,
-  // after every other day. A 01-01 start goes in 1970 (day 0), a 01-01 end in 2021 (day 0.6, before every 01-02).
+  // AC1 on #271: the API reduces each bound to its time modulo a 365.2425-day year, so the year of a bound decides
+  // which days it covers. Each bound goes in the year that covers the whole calendar day for outings dated
+  // 1989–2027: a start in 1970 (01-01), 1992 (01-02 to 02-29) or 1991 (from 03-01), an end in 2025 (to 02-28)
+  // or 2024 (from 02-29).
   it.each([
-    ["01-01", "01-31", "1970-01-01,2020-01-31"],
-    ["01-01", "01-01", "1970-01-01,2021-01-01"],
-    ["01-01", "02-29", "1970-01-01,2020-02-29"],
-    ["01-01", "12-31", "1970-01-01,2020-12-31"],
-    ["02-29", "02-29", "2020-02-29,2020-02-29"],
-    ["06-01", "06-30", "2020-06-01,2020-06-30"],
-    ["12-20", "12-31", "2020-12-20,2020-12-31"],
+    ["06-01", "06-30", "1991-06-01,2024-06-30"],
+    ["01-01", "01-31", "1970-01-01,2025-01-31"],
+    ["01-01", "01-01", "1970-01-01,2025-01-01"],
+    ["01-02", "01-31", "1992-01-02,2025-01-31"],
+    ["02-01", "02-28", "1992-02-01,2025-02-28"],
+    ["02-01", "02-29", "1992-02-01,2024-02-29"],
+    ["02-29", "02-29", "1992-02-29,2024-02-29"],
+    ["02-28", "03-01", "1992-02-28,2024-03-01"],
+    ["03-01", "03-31", "1991-03-01,2024-03-31"],
+    ["01-15", "06-15", "1992-01-15,2024-06-15"],
+    ["12-20", "12-31", "1991-12-20,2024-12-31"],
+    ["12-31", "12-31", "1991-12-31,2024-12-31"],
   ])("sends the period %s → %s as %s", async (start, end, expected) => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 
     await searchOutings({ period: { start, end } });
 
     expect(calledUrl().searchParams.get("period")).toBe(expected);
+  });
+
+  // D1 on #271: the whole year matches every outing, the same as no period, which also keeps the 1 January
+  // that any period bound misses in some years.
+  it("sends no period for 01-01 → 12-31, keeping the other filters", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ waypoint_id: 37916, date_from: "2020-01-01", period: { start: "01-01", end: "12-31" } });
+
+    const params = calledUrl().searchParams;
+    expect(params.has("period")).toBe(false);
+    expect(params.get("w")).toBe("37916");
+    expect(params.get("date")).toBe("2020-01-01,9999-12-31");
   });
 
   // AC5.3: the period and the date range are two independent filters.
@@ -1582,7 +1594,7 @@ describe("searchOutings", () => {
     });
 
     const params = calledUrl().searchParams;
-    expect(params.get("period")).toBe("2020-06-01,2020-06-30");
+    expect(params.get("period")).toBe("1991-06-01,2024-06-30");
     expect(params.get("date")).toBe("2015-01-01,2020-12-31");
   });
 

@@ -67,7 +67,8 @@ const isoDate = () =>
     .regex(DATE_FORMAT, DATE_MESSAGE)
     .refine((s) => !DATE_FORMAT.test(s) || isRealDate(s), DATE_MESSAGE);
 
-// A day of the year for `period`, checked in 2020 (a leap year), the year the API layer sends it in (01-01 aside).
+// A day of the year for `period`, checked in 2020, a leap year, so 02-29 is valid; the API layer picks the year each
+// bound is sent in (#271).
 const PERIOD_DAY_MESSAGE = "must be a real day in MM-DD format (e.g. 06-01; 02-29 allowed)";
 const PERIOD_DAY_FORMAT = /^\d{2}-\d{2}$/;
 const periodDay = () =>
@@ -88,9 +89,13 @@ function maxElevation(bound: string) {
 // On both bounds of each pair, moved from the search_outings description to keep it under 2048 characters (#211).
 const DATE_RANGE_NOTE =
   "An outing matches if its date range overlaps the requested range; give one bound only for 'since' / 'until'.";
-const PERIOD_LIMITS_NOTE =
-  "A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; " +
-  "Camptocamp's period filter can miss outings on the first or last day of the range.";
+// D3 on #271: what the period filter still misses, from the release after v1.4.0. The edge days are no longer
+// among them, so nothing tells the LLM to widen a period past the days it asked for.
+const PERIOD_GAPS =
+  "Unless the period is 01-01 → 12-31, Camptocamp's period filter can miss outings spanning the new year, and " +
+  "misses those starting on 1 January of 1991, 1995, 1999, 2003 and the leap years 1992–2024: " +
+  "use date_from / date_to for those.";
+const PERIOD_LIMITS_NOTE = `A period cannot wrap around the new year, so make two calls for 12-20 → 01-10. ${PERIOD_GAPS}`;
 
 // route_ids: routes per call, sent as one `r=a,b` (S2 on #255).
 const MAX_ROUTE_IDS = 10;
@@ -279,9 +284,9 @@ export function describeOutingFilters(params: OutingFilters): string[] {
   return filters;
 }
 
-// D1: the period is sent as given, so no outing outside it is shown, and the gap is stated.
-// Camptocamp computes it with a 365.2425-day year, so a boundary day can drop out depending on the year.
-export const PERIOD_NOTE = "Note: Camptocamp's period filter can miss outings on the first or last day of the range.";
+// D1: the period is sent as given, so no outing outside it is shown, and the gaps are stated.
+// Camptocamp computes it with a 365.2425-day year, so 1 January of some years lands after 31 December (#271).
+export const PERIOD_NOTE = `Note: ${PERIOD_GAPS}`;
 
 function formatOutingList(
   response: OutingListResponse,
