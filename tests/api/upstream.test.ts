@@ -343,6 +343,18 @@ describe("request context", () => {
     expect(fetches.calls[0].signal.aborted).toBe(true);
     expect(a.context.upstreamRequests).toBe(1);
   });
+
+  it("refuses a call in an aborted context without a cap too, without fetching", async () => {
+    const a = context();
+    a.controller.abort();
+
+    const outcome = await runInRequestContext(a.context, () => start("/routes/1"));
+
+    expect(outcome.ok).toBe(false);
+    expect((outcome as { error: Error }).error.name).toBe("AbortError");
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(a.context.upstreamRequests).toBe(0);
+  });
 });
 
 describe("userAgent", () => {

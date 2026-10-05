@@ -30,8 +30,9 @@ const LOCALHOST_NAMES = ["localhost", "127.0.0.1", "[::1]"];
 
 // RFC 6750 §2.1 b64token: 1*( ALPHA / DIGIT / "-" / "." / "_" / "~" / "+" / "/" ) *"="
 const BEARER_TOKEN = /^[A-Za-z0-9\-._~+/]+=*$/;
-// Printable ASCII (space to "~") without "(", ")" or ";", which would break the User-Agent comment.
-const CONTACT = /^[\x20-\x27\x2A-\x3A\x3C-\x7E]+$/;
+// Printable ASCII (space to "~") without "(", ")", ";" or "\", which would break the User-Agent comment: in an
+// HTTP comment "\" escapes the next character, so a contact ending in "\" would leave it unclosed.
+const CONTACT = /^[\x20-\x27\x2A-\x3A\x3C-\x5B\x5D-\x7E]+$/;
 const DIGITS = /^\d+$/;
 
 // In stdio mode nothing else is read, so stray HTTP settings never stop the stdio server.
@@ -100,7 +101,7 @@ function readContact(env: Env): string | undefined {
   const value = read(env, "MCP_OPERATOR_CONTACT");
   if (value !== undefined && (value.length > MAX_CONTACT_LENGTH || !CONTACT.test(value))) {
     throw new ConfigError(
-      `MCP_OPERATOR_CONTACT must be printable ASCII without "(", ")" or ";", at most ${MAX_CONTACT_LENGTH} characters`,
+      `MCP_OPERATOR_CONTACT must be printable ASCII without "(", ")", ";" or "\\", at most ${MAX_CONTACT_LENGTH} characters`,
     );
   }
   return value;

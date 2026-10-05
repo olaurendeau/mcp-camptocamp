@@ -2,6 +2,7 @@ import { createServer as createNodeServer, type IncomingMessage, type Server, ty
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { runInRequestContext } from "../api/upstream.js";
 import { createServer } from "../server.js";
 import { VERSION } from "../version.js";
 import { createTokenChecker } from "./auth.js";
@@ -30,7 +31,9 @@ export interface RunningHttpServer {
 
 interface InFlight {
   res: ServerResponse;
-  abort: AbortController; // aborted when the drain deadline passes
+  // The request's upstream context (src/api/upstream.ts) signal: aborted when the client disconnects before its
+  // response or when the drain deadline passes, which drops its queued Camptocamp requests and aborts its fetches.
+  abort: AbortController;
 }
 
 type HeaderMap = Record<string, string>;
@@ -144,8 +147,12 @@ export function startHttpServer(config: HttpConfig, log: (line: string) => void)
   const server = createNodeServer((req, res) => {
     const entry: InFlight = { res, abort: new AbortController() };
     inFlight.add(entry);
-    res.once("close", () => inFlight.delete(entry));
-    handle(req, res, entry.abort.signal).catch(() => {
+    res.once("close", () => {
+      inFlight.delete(entry);
+      if (!res.writableFinished) entry.abort.abort(); // closed before its response: the client went away
+    });
+    const context = { upstreamRequests: 0, signal: entry.abort.signal };
+    runInRequestContext(context, () => handle(req, res, entry.abort.signal)).catch(() => {
       respond(res, 500, JSON_TYPE, rpcError(-32603, "Internal error"));
     });
   });
