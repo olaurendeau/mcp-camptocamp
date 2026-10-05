@@ -354,6 +354,20 @@ describe("handleOutingStats", () => {
     expect(sum(lines.slice(4))).toBe(61);
   });
 
+  // #287: a year below 1000 is written with 4 digits, as counted, so its outings stay on its line.
+  it("counts years below 1000 on 4-digit lines, adding up to the total", async () => {
+    serveDocuments([
+      innominata([1, "0998-05-12", "0998-05-12", null]),
+      innominata([2, "1001-07-03", "1001-07-03", null]),
+    ]);
+
+    const result = await stats({ group_by: "year" });
+
+    const lines = ["0998: 1", "0999: 0", "1000: 0", "1001: 1"];
+    expect(result.split("\n\n")[1]).toBe(lines.join("\n"));
+    expect(sum(lines)).toBe(2);
+  });
+
   // AC4.3 on #255.
   it("counts them by condition, best first, then the outings without one", async () => {
     serveDocuments(INNOMINATA.map(innominata));

@@ -109,10 +109,11 @@ function groupsOf(groupBy: GroupBy, counts: Map<string, number>): string[] {
     const unknown = [...counts.keys()].filter((code) => !known.includes(code) && !OUTSIDE_GROUPS.has(code)).sort();
     return [...known, ...unknown, NOT_GIVEN];
   }
+  // Years are counted as written, 4 digits ("0999"), so they are printed padded back to 4 digits (#287).
   const years = [...counts.keys()].filter((key) => !OUTSIDE_GROUPS.has(key)).map(Number);
   if (years.length === 0) return [];
   const first = Math.min(...years);
-  return Array.from({ length: Math.max(...years) - first + 1 }, (_, i) => String(first + i));
+  return Array.from({ length: Math.max(...years) - first + 1 }, (_, i) => String(first + i).padStart(4, "0"));
 }
 
 function formatCounts(response: OutingListResponse, filters: OutingFilters, groupBy: GroupBy): string {
