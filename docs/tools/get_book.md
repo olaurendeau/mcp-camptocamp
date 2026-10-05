@@ -100,7 +100,7 @@ The book has no summary, no associated waypoint and no associated article, so th
 ## Limits
 
 - **Fields are shown as Camptocamp stores them.** Nothing is checked or normalised: book 14746 has `**ISBN**: 2 911755  57 X`, with its spaces.
-- **A missing line means an empty field, not a missing fact.** `get_book {id: 14746}`, captured from v1.3.0 on 2026-10-05, prints no `**Publication date**` and no `**Pages**` line: Camptocamp has no value in those fields. Its description, however, ends with `195 pages`. Read the summary and the description before saying that a value is not given on Camptocamp, and say which part of the page a value comes from.
+- **A missing line means an empty field, not a missing fact.** `get_book {id: 14746}`, captured from v1.3.0 on 2026-10-05, prints no `**Publication date**` and no `**Pages**` line: Camptocamp has no value in those fields. Its description, however, contains `195 pages`. Read the summary and the description before saying that a value is not given on Camptocamp, and say which part of the page a value comes from.
 - **The association lists are those of Camptocamp.** Its users link books to routes and waypoints by hand, so a route missing from the list may still be in the book.
 - **Long texts are cut at 8,000 characters**, ending with `[truncated, N more characters]`. Read the rest on the page given on the `**URL**` line.
 - **An unknown ID is an error.** `get_book {id: 999999999}`, captured from v1.3.0 on 2026-10-05:
