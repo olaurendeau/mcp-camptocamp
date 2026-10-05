@@ -6,7 +6,7 @@
 # - version tags (git tag/push vX.Y) → coordinator only, one named tag at a time
 # - bulk tag push (--tags/--follow-tags/--mirror/glob), moving or deleting a version tag → nobody
 # - tag creation through the API (POST …/git/refs, GraphQL createRef) → coordinator only
-# - moving or deleting a tag (PATCH/DELETE …/git/refs/…, GraphQL updateRef/updateRefs/deleteRef),
+# - moving or deleting a tag (PATCH/DELETE …/git/refs/… or …/git/$REF, GraphQL updateRef/updateRefs/deleteRef),
 #   or writing a release, through the API → nobody
 # - manual publication               → nobody (publish.yml publishes from the tag)
 # The human decides when to release and which version; agents only carry it out.
@@ -116,6 +116,10 @@ segments=$(perl -e '
   print "$_\n" for @out;
   print "\x01$_\n" for @bodies;
 ' <<<"$raw")
+# The whole line as the shell reads it, \⏎ continuations removed (a refs/tags may be split by one),
+# and on a single line, for patterns that may span several (a GraphQL mutation and its ().
+joined=$(perl -0pe 's/\\\n//g' <<<"$raw")
+flat=${joined//$'\n'/ }
 heredocs=()
 while IFS= read -r line; do
   case $line in $'\x01'*) heredocs+=("${line#?}") ;; esac
@@ -163,12 +167,17 @@ method='(-X|--method|--request)[[:space:]=]*'
 # gh api writes with -f/-F/--input, curl with -d/--data/--json/--form: both default to POST.
 write='[[:space:]](-f|-F|--field|--raw-field|--input|-d|--data[-a-z]*|--json|--form)([[:space:]=@"'\'']|$)|'"$method"'(POST|PUT|PATCH)'
 get="${method}GET"
-api_refs='git/refs([/"'\''[:space:]?]|$)'
+# A git/ path followed by a variable or a substitution (git/$REF, git/"${REF}", git/$(…)) may be a ref too.
+api_refs='git/(["'\'']*\$|refs([/"'\''[:space:]?$]|$))'
+# Any ref path other than a branch one: PATCH/DELETE on it may move a tag, whatever else the command names.
+other_ref='git/(?:["\x27]*\$|refs(?!/heads/)(?:[/"\x27\s?\$]|$))'
 api_releases='/releases([/"'\''[:space:]?]|$)'
-create_ref='createRef[[:space:]]*\('
+# A mutation and its ( may be split over lines, or by a newline a JSON body writes as \n.
+gap='([[:space:]]|\\[nrt])*'
+create_ref="createRef${gap}\\("
 # updateRef and deleteRef take a refId, so the command never names their target; updateRefs names its refs.
-move_ref_by_id='(updateRef|deleteRef)[[:space:]]*\('
-move_refs='updateRefs[[:space:]]*\('
+move_ref_by_id="(updateRef|deleteRef)${gap}\\("
+move_refs="updateRefs${gap}\\("
 # A body read from stdin: --input -, -d @-.
 stdin_body='(--input[[:space:]=]+|@)-(["'\''[:space:]]|$)'
 
@@ -187,9 +196,13 @@ sends() {
 }
 # The API call names only branches, in a field, the path or its own stdin body; another command's refs/heads/ does not count.
 # A tag named anywhere in the line voids the exemption: a variable set by another command may carry it.
-branch_only() { local text; text=$(sends "$1") || return 1; has "$text" 'refs/heads/' && ! has "$raw" 'refs/tags'; }
-# PATCH/DELETE on a …/git/refs/heads/… path targets that branch, whatever the body says.
-branch_path() { has "$1" "${method}(PATCH|PUT|DELETE)" && has "$1" 'git/refs/heads/' && ! has "$raw" 'refs/tags'; }
+branch_only() { local text; text=$(sends "$1") || return 1; has "$text" 'refs/heads/' && ! has "$joined" 'refs/tags'; }
+# PATCH/DELETE on a …/git/refs/heads/… path targets that branch, whatever the body says, if it names no other ref path.
+branch_path() {
+  has "$1" "${method}(PATCH|PUT|DELETE)" && has "$1" 'git/refs/heads/' && ! has_p "$1" "$other_ref" && ! has "$joined" 'refs/tags'
+}
+# PATCH/DELETE target their path, so only a branch path exempts them, not a refs/heads/ field; a creation (POST) names its ref.
+branch_target() { if has "$1" "${method}(PATCH|PUT|DELETE)"; then branch_path "$1"; else branch_only "$1"; fi; }
 
 while IFS= read -r seg; do
   case $seg in $'\x01'*) continue ;; esac
@@ -199,21 +212,22 @@ while IFS= read -r seg; do
 
   # Any ref write through the API that is not known to target a branch (refs/heads/) may be a tag.
   # Creating one (POST …/git/refs) is a tag push; updating or deleting one (PATCH/DELETE …/git/refs/…) moves it.
-  if has "$seg" "$api_refs" && api_writes "$seg" && ! branch_only "$seg" && ! branch_path "$seg"; then
+  if has "$seg" "$api_refs" && api_writes "$seg" && ! branch_target "$seg"; then
     if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$seg" 'git/refs/tags/'; then
-      deny "No agent moves or deletes a tag through the API (PATCH/DELETE on …/git/refs/… other than refs/heads/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
+      deny "No agent moves or deletes a tag through the API (PATCH/DELETE on …/git/refs/… or a git/\$REF path, other than refs/heads/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
     fi
     if [ "$agent" != "coordinator" ]; then
       deny "Only the coordinator creates version tags (POST …/git/refs or git push origin vX.Y.Z), on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
     fi
   fi
   # GraphQL: updateRef/updateRefs/deleteRef move or delete a ref, createRef creates one, like PATCH/DELETE and POST.
-  # The mutation may sit in a variable set by another command or in a heredoc, so look for it in the raw command.
+  # The mutation may sit in a variable set by another command or in a heredoc, so look for it in the whole line,
+  # its lines joined: the ( may follow on the next line.
   if has "$seg" 'graphql'; then
-    if has "$raw" "$move_ref_by_id" || { has "$raw" "$move_refs" && ! branch_only "$seg"; }; then
+    if has "$flat" "$move_ref_by_id" || { has "$flat" "$move_refs" && ! branch_only "$seg"; }; then
       deny "No agent moves or deletes a tag through the API (GraphQL updateRef/deleteRef, or updateRefs outside refs/heads/): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
     fi
-    if [ "$agent" != "coordinator" ] && has "$raw" "$create_ref" && ! branch_only "$seg"; then
+    if [ "$agent" != "coordinator" ] && has "$flat" "$create_ref" && ! branch_only "$seg"; then
       deny "Only the coordinator creates version tags (GraphQL createRef outside refs/heads/), on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
     fi
   fi

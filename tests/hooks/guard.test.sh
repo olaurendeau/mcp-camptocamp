@@ -398,6 +398,57 @@ for cmd in "${CREATE_FORMS[@]}"; do
   done
 done
 
+# A ref path from a variable (git/$REF) may be a tag: the text git/refs is not needed to refuse the write.
+# PATCH/DELETE target their path: only a git/refs/heads/… path exempts them, not a field or another path.
+# A mutation split over lines (or with a JSON \n before its () and a refs/tags split by \⏎ still count.
+SPLIT_TAG="$(lines 'gh api repos/o/r/git/refs -f ref=refs/ta\' 'gs/v1.0.5 -f sha=abc -f note=refs/heads/x')"
+GQL_SPLIT_CREATE_BODY="$(lines '{"query":"mutation { createRef' '(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { clientMutationId } }"}')"
+HIDDEN_MOVE_FORMS=(
+  "REF=refs/tags/v1.0.4; gh api -X PATCH \"repos/o/r/git/\$REF\" -f sha=abc -F force=true"
+  "$(lines 'REF=refs/tags/v1.0.4' 'gh api -X DELETE "repos/o/r/git/$REF"')"
+  'gh api -X PATCH "repos/o/r/git/$REF" -f sha=abc -F force=true'
+  'gh api --method DELETE repos/o/r/git/"${REF}"'
+  'curl -X DELETE "https://api.github.com/repos/o/r/git/$REF"'
+  'gh api -X DELETE "repos/o/r/git/$(cat ref.txt)"'
+  'gh api -X PATCH "repos/o/r/git/$REF" -f sha=abc -F force=true -f note=git/refs/heads/x'
+  'gh api -X PATCH "repos/o/r/git/refs/$REF" -f sha=abc -F force=true -f note=git/refs/heads/x'
+  'gh api -X PATCH "repos/o/r/git/refs/$REF" -f sha=abc -F force=true -f note=refs/heads/x'
+  "curl -X DELETE https://api.github.com/repos/o/r/git/refs/heads/feat/x \"https://api.github.com/repos/o/r/git/\$REF\""
+  "$(lines 'U=https://api.github.com/repos/o/r/git/refs/ta\' 'gs/v1.0.4; curl -X DELETE https://api.github.com/repos/o/r/git/refs/heads/feat/x "$U"')"
+  "$(lines 'gh api graphql -F query=@- <<EOF' 'mutation {' '  updateRef' '  (input: {refId: "REF_1", oid: "abc", force: true}) { clientMutationId }' '}' 'EOF')"
+  "$(lines "gh api graphql -f query='mutation {" '  deleteRef' '  (input: {refId: "REF_1"}) { clientMutationId }' "}'")"
+  "$(lines "gh api graphql -f query='mutation { updateRefs" "(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }' -f b=refs/heads/x")"
+  "curl https://api.github.com/graphql -d '{\"query\":\"mutation { updateRef\\n(input: {refId: \\\"REF_1\\\", oid: \\\"abc\\\", force: true}) { clientMutationId } }\"}'"
+)
+HIDDEN_CREATE_FORMS=(
+  "P=refs; gh api \"repos/o/r/git/\$P\" -f ref=refs/tags/v1.0.5 -f sha=abc"
+  "$SPLIT_TAG"
+  "$(lines 'R=refs/ta\' 'gs/v1.0.5; gh api repos/o/r/git/refs -f ref="$R" -f sha=abc -f note=refs/heads/x')"
+  "$(lines 'gh api graphql -F query=@- -f b=refs/heads/x <<EOF' 'mutation {' '  createRef' '  (input: {repositoryId: "R_1", name: "refs/tags/v1.0.5", oid: "abc"}) { clientMutationId }' '}' 'EOF')"
+  "$(lines 'gh api graphql --input - <<EOF' "$GQL_SPLIT_CREATE_BODY" 'EOF')"
+  "$(lines "Q='mutation { createRef" "(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { clientMutationId } }'" 'gh api graphql -f query="$Q"')"
+  "curl https://api.github.com/graphql -d '{\"query\":\"mutation { createRef\\n(input: {repositoryId: \\\"R_1\\\", name: \\\"refs/tags/v1.0.5\\\", oid: \\\"abc\\\"}) { clientMutationId } }\"}'"
+)
+for role in coordinator developer pr-reviewer ""; do
+  for cmd in "${HIDDEN_MOVE_FORMS[@]}"; do
+    check deny "$role" "$cmd"
+  done
+  # Branches and other git endpoints stay free
+  check allow "$role" 'B=feat/x; gh api -X DELETE "repos/o/r/git/refs/heads/$B"'
+  check allow "$role" 'gh api -X PATCH "repos/o/r/git/refs/heads/${B}" -f sha=abc -F force=true'
+  check allow "$role" 'gh api "repos/o/r/git/trees/$SHA?recursive=1"'
+  check allow "$role" 'gh api "repos/o/r/git/$KIND/$SHA"'
+  check allow "$role" 'gh api repos/o/r/git/commits -f tree=abc -f parents[]=def'
+  check allow "$role" 'gh api -X PATCH "repos/o/r/pulls/$PR" -f title=x'
+  check allow "$role" "$(lines 'gh api graphql -F query=@- <<EOF' 'mutation {' '  createRef' '  (input: {repositoryId: "R_1", name: "refs/heads/feat/x", oid: "abc"}) { clientMutationId }' '}' 'EOF')"
+done
+for cmd in "${HIDDEN_CREATE_FORMS[@]}"; do
+  check allow coordinator "$cmd"
+  for role in developer pr-reviewer ""; do
+    check deny "$role" "$cmd"
+  done
+done
+
 # make with options or other targets before publish
 for role in coordinator developer pr-reviewer ""; do
   check deny  "$role" 'make -C /repo publish'
