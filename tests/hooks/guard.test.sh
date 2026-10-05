@@ -361,6 +361,8 @@ MOVE_FORMS=(
   # updateRef and deleteRef take a refId: the command never names their target, so no refs/heads/ exempts them
   "gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }' -f x=refs/heads/y"
   "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { clientMutationId } }' # refs/heads/feat/x"
+  # A mutation set by another command may name a tag: the call's own refs/heads/ does not exempt it
+  "Q='mutation { updateRefs(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }'; gh api graphql -f query=\"\$Q\" -f branch=refs/heads/feat/x"
 )
 CREATE_FORMS=(
   "${BRANCH_THEN}gh api repos/o/r/git/refs --input ref.json"
@@ -369,6 +371,7 @@ CREATE_FORMS=(
   "${BRANCH_THEN}cat ref.json | gh api repos/o/r/git/refs --input -"
   'gh api repos/o/r/git/refs --input - < ref.json # refs/heads/'
   "$(lines 'cat > /tmp/b.json <<EOF' "$REST_BRANCH_BODY" 'EOF' 'gh api repos/o/r/git/refs --input - < /tmp/b.json')"
+  "Q='mutation { createRef(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { clientMutationId } }'; gh api graphql -f query=\"\$Q\" -f branch=refs/heads/feat/x"
 )
 for role in coordinator developer pr-reviewer ""; do
   for cmd in "${MOVE_FORMS[@]}"; do
@@ -377,6 +380,10 @@ for role in coordinator developer pr-reviewer ""; do
   check allow "$role" "${BRANCH_THEN}gh api repos/o/r/git/refs -f ref=refs/heads/feat/y -f sha=abc"
   check allow "$role" "$(lines 'gh api repos/o/r/git/refs --input - <<EOF' "$REST_BRANCH_BODY" 'EOF')"
   check allow "$role" "gh api repos/o/r/git/refs --input - <<<'$REST_BRANCH_BODY'"
+  # PATCH or DELETE on a git/refs/heads/ path targets that branch, whatever the body
+  check allow "$role" 'cat b.json | gh api -X PATCH repos/o/r/git/refs/heads/feat/x --input -'
+  check allow "$role" 'gh api -X PATCH repos/o/r/git/refs/heads/feat/x --input - < b.json'
+  check allow "$role" 'curl -X PATCH https://api.github.com/repos/o/r/git/refs/heads/feat/x -d @- < b.json'
 done
 for cmd in "${CREATE_FORMS[@]}"; do
   check allow coordinator "$cmd"
