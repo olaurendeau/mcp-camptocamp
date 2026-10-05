@@ -2,7 +2,7 @@
 
 Some clients connect only to remote MCP servers: you give them the URL of a server on the internet, and the vendor's cloud connects to it. They cannot start this server on your machine.
 
-From v1.4.0, the server also has an HTTP mode that you can host yourself, on your own domain and behind a secret token: see [Self-hosting over HTTP](../self-hosting.md). Of the clients below, Claude.ai custom connectors and Vibe Work can send that token, and the guide covers them. ChatGPT on the web cannot, and the guide doesn't cover the other surfaces.
+The server also has an HTTP mode (v1.4.0 or later) that you can host yourself, on your own domain and behind a secret token: see [Self-hosting over HTTP](../self-hosting.md). Of the clients below, Claude.ai custom connectors and Vibe Work can send that token, and the guide covers them. ChatGPT on the web cannot, and the guide doesn't cover the other surfaces.
 
 Each vendor below also has a client that starts the server on your machine, with nothing to host: it is linked in each section.
 
