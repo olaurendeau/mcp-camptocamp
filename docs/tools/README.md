@@ -26,7 +26,7 @@ Each page gives the tool's purpose, its inputs and the tools to call before or a
 | [`search_user_outings`](search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                            |
 | [`get_outing`](get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.                |
 | [`get_outings`](get_outings.md)                 | Up to 10 outings by ID in one call, in `get_outing` format, each section cut at 2,000 characters; from v1.4.0.   |
-| [`outing_stats`](outing_stats.md)               | Count the outings matching `search_outings` filters by start month, start year or condition; from v1.4.0.        |
+| [`outing_stats`](outing_stats.md)               | Count `search_outings` matches by start month, year or condition (from v1.4.0), or two of them (not in v1.4.0).  |
 
 ## Areas
 

@@ -2,9 +2,11 @@
 
 **v1.4.0 or later**: this tool is not in v1.3.0. On v1.3.0, page through [`search_outings`](search_outings.md) and count the result lines.
 
+**Not in v1.4.0:** `split_by` comes with the release after v1.4.0. v1.4.0 ignores it without an error and prints the `group_by` counts alone. On v1.4.0, make one call per value of the second axis instead, such as one `group_by: "month"` call per year with `date_from` and `date_to`.
+
 ## Purpose
 
-Count the trip reports that match a search, by the month or year they start in, or by the conditions their authors reported. Use it to see when a route is done, such as the months of the Innominata reports, without paging through [`search_outings`](search_outings.md) and counting by hand. It takes the filters of `search_outings`, and reads every matching outing, so the counts are exact. These are counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
+Count the trip reports that match a search, by the month or year they start in, or by the conditions their authors reported. Use it to see when a route is done, such as the months of the Innominata reports, without paging through [`search_outings`](search_outings.md) and counting by hand. It takes the filters of `search_outings`, and reads every matching outing, so the counts are exact. With `split_by` (not in v1.4.0), it counts on two of these axes in one call, such as month × year or month × condition, in a table with a total row and column. These are counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
 
 ## Inputs
 
@@ -35,6 +37,7 @@ Count the trip reports that match a search, by the month or year they start in, 
 | `user_id`            | integer          | no       |         | > 0                                         |
 | `lang`               | string           | no       |         |                                             |
 | `group_by`           | string           | yes      |         |                                             |
+| `split_by`           | string           | no       |         |                                             |
 
 - `query`: Keyword matched against outing titles (e.g. 'cosmiques').
 - `area_id`: Camptocamp area ID from search_areas (e.g. 14409 for Vanoise).
@@ -57,6 +60,7 @@ Count the trip reports that match a search, by the month or year they start in, 
 - `user_id`: Camptocamp user ID (the number in their profile URL): outings this user is listed on as a participant, not only those they wrote.
 - `lang`: Language of titles and texts, one of: fr, en, de, it, es, ca, eu, sl, zh (default fr). Values: `fr`, `en`, `de`, `it`, `es`, `ca`, `eu`, `sl`, `zh`
 - `group_by`: What to count by: month (of the start date, 01 to 12), year (of the start date) or condition (the conditions the author reported). Values: `month`, `year`, `condition`
+- `split_by`: A second axis, another of month, year or condition: prints a Markdown table of counts instead, one row per group_by value and one column per split_by value, with a total row and column. Values: `month`, `year`, `condition`
 
 <!-- generated:inputs end -->
 
@@ -84,6 +88,31 @@ Counts of trip reports published on Camptocamp, not of ascents; a month with no 
 - **`(no start date)`** counts the outings without a start date, for `month` and `year`. The end date is never used in its place.
 - **`(unexpected format)`** counts the outings Camptocamp sent in a shape the server could not read, and, for `month` and `year`, a start date not written `YYYY-MM-DD`. These outings never count in a month, a year or `(not given)`.
 - The last two lines are printed only when their count is above 0, so the counts always add up to the header's total.
+
+With `split_by` (not in v1.4.0), the groups are a Markdown table instead:
+
+```text
+<N> outing(s) counted (all matches), by <group_by label> and <split_by label>
+Filters: <filters>
+Note: Camptocamp's period filter can miss outings on the first or last day of the range.
+Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
+
+| <group_by label> | <split_by value> | … | total |
+| --- | ---: | … | ---: |
+| <group_by value> | <count> | … | <row total> |
+…
+| total | <column total> | … | <table total> |
+
+(no start date): <count>
+(unexpected format): <count>
+```
+
+- **The header** names both axes, such as `by start month and condition`. The `Filters:`, `Note:` and `Counts of trip reports…` lines are those printed without `split_by`.
+- **The rows** are the `group_by` values and **the columns** the `split_by` values, each in the order and with the zeros of the lines above: months `01` to `12`, every year from the first to the last start year, or the conditions then `(not given)`. A `|` in a condition code Camptocamp sends is escaped as `\|`.
+- **The `total` column** gives each row's count, which is the line `group_by` alone prints for it, and **the `total` row** each column's count. Its last cell is the number of outings in the table. Cells are counts only: no percentage, rate or average.
+- **`(no start date)` and `(unexpected format)`** count, below the table and after a blank line, the outings whose value is one of these on either axis. They are not in the table, so the table total and these lines add up to the header's total.
+- **No table is printed** when one axis is `year` and no outing has a readable start date, as no year line is printed without `split_by`.
+- **`split_by` equal to `group_by`** is refused before any request: `split_by must differ from group_by (<axis>): give another of month, year or condition, or leave it out`.
 
 ## Example
 
@@ -139,6 +168,52 @@ awful: 1
 
 The year lines run from 1994 to 2026, zeros included, and add up to 61; the 19 lines from 1996 to 2014 are left out above.
 
+The same route by month and condition, `outing_stats {route_id: 54513, group_by: "month", split_by: "condition"}` (not in v1.4.0), captured from main at f3db5e5 with `split_by` added (#307) on 2026-10-05, with a local build:
+
+```text
+61 outing(s) counted (all matches), by start month and condition
+Filters: route 54513
+Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition.
+
+| start month | excellent | good | average | poor | awful | (not given) | total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 01 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 02 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 03 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 04 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 05 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 06 | 3 | 6 | 2 | 0 | 0 | 2 | 13 |
+| 07 | 3 | 7 | 5 | 0 | 1 | 8 | 24 |
+| 08 | 5 | 9 | 0 | 0 | 0 | 4 | 18 |
+| 09 | 1 | 1 | 0 | 0 | 0 | 3 | 5 |
+| 10 | 0 | 1 | 0 | 0 | 0 | 0 | 1 |
+| 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 12 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| total | 12 | 24 | 7 | 0 | 1 | 17 | 61 |
+```
+
+The `total` column is the month count above, and the `total` row the condition count. Captured the same way, `{route_id: 54513, group_by: "year", split_by: "month"}` prints 33 rows, 1994 to 2026, after the header `61 outing(s) counted (all matches), by start year and start month` and the same two lines (the rows from 1995 to 2014 are left out):
+
+```text
+| start year | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12 | total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1994 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+…
+| 2015 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 2 | 0 | 0 | 0 | 0 | 4 |
+| 2016 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 2 | 1 | 1 | 0 | 0 | 9 |
+| 2017 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| 2018 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| 2019 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2020 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2021 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 |
+| 2022 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 3 |
+| 2023 | 0 | 0 | 0 | 0 | 0 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 5 |
+| 2024 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 3 |
+| 2025 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| 2026 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 |
+| total | 0 | 0 | 0 | 0 | 0 | 13 | 24 | 18 | 5 | 1 | 0 | 0 | 61 |
+```
+
 ## Limits
 
 - **At most 2,000 outings per call.** A search matching more is refused after its first request, before any counting, with its total: nothing is sampled. Narrow the filters with dates, an area, an activity or routes. `outing_stats {activity: "skitouring", group_by: "month"}`, captured as above:
@@ -147,8 +222,9 @@ The year lines run from 1994 to 2026, zeros included, and add up to 61; the 19 l
   Error: 123,415 outings match these filters, more than the 2,000 that can be counted in one call: narrow the filters (dates, area, activity, routes…) and call again.
   ```
 
-- **One request per 100 outings.** The server reads the first page, then the others 3 at a time. Measured on v1.4.0 on 2026-10-05, `outing_stats {area_id: 14410, activity: "mountain_climbing", date_from: "2023-01-01", group_by: "year"}` counts 1,948 outings in 20 requests and about 1 second. Each request times out after 15 s, and the call stops at the first failed request, so if Camptocamp stops responding, the call fails after 15 s. Only a slow API takes longer: if every page answers just under 15 s, 2,000 outings take 8 rounds of 15 s, 120 s. That is twice the MCP TypeScript SDK's default client timeout of 60 s, so a client may give up first. A [self-hosted HTTP instance](../self-hosting.md#settings) (v1.4.0 or later) also cuts any request at 90 s, with a 504.
-- **A mistyped year makes the year range very long.** `group_by: "year"` prints every year from the first to the last start year, so one outing dated far in the past adds hundreds of zero lines. Outing 1587426 is dated 1454-05-12, so `outing_stats {user_id: 881319, group_by: "year"}` prints 573 year lines, from 1454 to 2026. The counts stay exact: the outing counts in 1454, as dated.
+- **One request per 100 outings.** The server reads the first page, then the others 3 at a time. Measured on v1.4.0 on 2026-10-05, `outing_stats {area_id: 14410, activity: "mountain_climbing", date_from: "2023-01-01", group_by: "year"}` counts 1,948 outings in 20 requests and about 1 second. Each request times out after 15 s, and the call stops at the first failed request, so if Camptocamp stops responding, the call fails 15 s after its first unanswered request: 15 s after the call starts if the outage comes first, later if some slow pages came before it. In HTTP mode, the wait for an [upstream slot](../self-hosting.md) (up to 20 s per request) comes on top. Only a slow API takes longer: if every page answers just under 15 s, 2,000 outings take 8 rounds of 15 s, 120 s. That is twice the MCP TypeScript SDK's default client timeout of 60 s, so a client may give up first. A [self-hosted HTTP instance](../self-hosting.md#settings) (v1.4.0 or later) also cuts any request at 90 s, with a 504.
+- **A mistyped year makes the year range very long.** `group_by: "year"` prints every year from the first to the last start year, so one outing dated far in the past adds hundreds of zero lines. Outing 1587426 is dated 1454-05-12, so `outing_stats {user_id: 881319, group_by: "year"}` prints 573 year lines, from 1454 to 2026. The counts stay exact: the outing counts in 1454, as dated. With `split_by` (not in v1.4.0), the same year makes the table very wide or very long: `split_by: "year"` prints one column per year, so that call with `group_by: "month", split_by: "year"` prints 573 year columns on each of the table's 15 lines, 38,252 characters in all (measured as the example above). Narrow it with `date_from`, or put the years in rows with `group_by: "year"`.
+- **`split_by` adds no request.** The table is counted from the same outings as `group_by` alone, in the same requests: 1 request for the 61 Innominata outings. It counts on two axes only, among month, year and condition, and prints counts only, never a percentage or a rate. v1.4.0 ignores `split_by`, as said at the top of this page.
 - **The counts reflect one state of Camptocamp.** When an outing is published, edited or deleted between two pages, the call fails with `Camptocamp's results changed while counting; call again.` Two changes that cancel out between pages (one outing deleted, another published) keep the total and are not detected: the counts may then mix the data before and after them.
 - **Counts are of published reports, not of ascents.** Many ascents have no report, older reports may have no condition, and one report can cover several days. A month with no report is not evidence the route is out of condition.
 - **No count of partial trips, and no success rate.** Camptocamp neither indexes nor lists `partial_trip` ("Parcours partiel" on camptocamp.org), so no filter or count on it is possible: reading it takes one detail request per outing. It has no field for a failed attempt either, and attempts never written up are absent from the data. Measured on the live API on 2026-10-05, of the 61 outings of the Innominata (route 54513), 1 has `partial_trip` ticked (219347), 17 unticked and 43 unset. To read the flag, use [`get_outings`](get_outings.md) (v1.4.0 or later), which prints `**Partial trip**: yes` only when it is ticked. `false` is the form default, so no line does not mean the route was completed: never present these counts as a success rate.

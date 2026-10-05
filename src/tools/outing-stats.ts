@@ -1,6 +1,6 @@
-// outing_stats (S4 on #255): counts the outings matching a search by start month, start year or condition. Counts
-// come from the listed outings, never from separate API queries, so every page must be read and must agree with
-// the others.
+// outing_stats (S4 on #255): counts the outings matching a search by start month, start year or condition, and
+// with split_by (S3 of #303) on a second of these axes, in a table. Counts come from the listed outings, never from
+// separate API queries, so every page must be read and must agree with the others.
 import { z } from "zod";
 import { searchOutings } from "../api/camptocamp.js";
 import type { OutingListResponse } from "../api/camptocamp.js";
@@ -62,15 +62,22 @@ export async function collectMatchingOutings(filters: OutingFilters): Promise<Ou
   return { total, documents };
 }
 
-const GROUP_BYS = ["month", "year", "condition"] as const;
-type GroupBy = (typeof GROUP_BYS)[number];
+const AXES = ["month", "year", "condition"] as const;
+type Axis = (typeof AXES)[number];
 
 // The search_outings filters, without paging (AC4.4 on #255); lang is kept, as every tool takes it.
 export const outingStatsSchema = searchOutingsSchema.omit({ limit: true, offset: true }).extend({
-  group_by: enumValue(GROUP_BYS).describe(
+  group_by: enumValue(AXES).describe(
     "What to count by: month (of the start date, 01 to 12), year (of the start date) or condition (the conditions " +
       "the author reported)",
   ),
+  // No zod default and no .refine: server.ts reads the shape, so split_by equal to group_by is refused by the handler.
+  split_by: enumValue(AXES)
+    .optional()
+    .describe(
+      "A second axis, another of month, year or condition: prints a Markdown table of counts instead, one row per " +
+        "group_by value and one column per split_by value, with a total row and column",
+    ),
 });
 
 export type OutingStatsInput = z.infer<typeof outingStatsSchema>;
@@ -80,56 +87,127 @@ export const COUNTS_NOTE =
   "Counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route " +
   "is out of condition.";
 
-const GROUP_LABELS: Record<GroupBy, string> = { month: "start month", year: "start year", condition: "condition" };
+const AXIS_LABELS: Record<Axis, string> = { month: "start month", year: "start year", condition: "condition" };
 
 // The lines of outings counted outside the groups, so that the lines add up to the total.
 const NO_START_DATE = "(no start date)";
 const NOT_GIVEN = "(not given)";
 const UNEXPECTED_FORMAT = "(unexpected format)";
 const OUTSIDE_GROUPS = new Set([NO_START_DATE, NOT_GIVEN, UNEXPECTED_FORMAT]);
+// The lines counted below a table; (not given) is a condition row or column of the table.
+const OUTSIDE_TABLE = [NO_START_DATE, UNEXPECTED_FORMAT];
 
 const START_DATE = /^\d{4}-(0[1-9]|1[0-2])-\d{2}$/;
 
-// The line an outing is counted on. A start date is read as sent, never taken from the end date; an item that
-// failed its schema has no readable date or condition, and a start date not in YYYY-MM-DD form is not read either.
-function lineOf(outing: OutingListResponse["documents"][number], groupBy: GroupBy): string {
+type Outing = OutingListResponse["documents"][number];
+
+// The value an outing is counted on, for one axis. A start date is read as sent, never taken from the end date; an
+// item that failed its schema has no readable date or condition, and a start date not in YYYY-MM-DD form is not
+// read either.
+function keyOf(outing: Outing, axis: Axis): string {
   if (isMalformed(outing)) return UNEXPECTED_FORMAT;
-  if (groupBy === "condition") return isPresent(outing.condition_rating) ? outing.condition_rating : NOT_GIVEN;
+  if (axis === "condition") return isPresent(outing.condition_rating) ? outing.condition_rating : NOT_GIVEN;
   const start = outing.date_start;
   if (!isPresent(start)) return NO_START_DATE;
   if (!START_DATE.test(start)) return UNEXPECTED_FORMAT;
-  return groupBy === "month" ? start.slice(5, 7) : start.slice(0, 4);
+  return axis === "month" ? start.slice(5, 7) : start.slice(0, 4);
 }
 
-// The groups printed for these counts, in order, zeros included.
-function groupsOf(groupBy: GroupBy, counts: Map<string, number>): string[] {
-  if (groupBy === "month") return Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-  if (groupBy === "condition") {
+// The values printed for an axis whose counted outings have these keys, in order, zeros included.
+function axisValues(axis: Axis, keys: Iterable<string>): string[] {
+  if (axis === "month") return Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+  if (axis === "condition") {
     const known: readonly string[] = CONDITION_RATINGS;
-    const unknown = [...counts.keys()].filter((code) => !known.includes(code) && !OUTSIDE_GROUPS.has(code)).sort();
+    const unknown = [...new Set(keys)].filter((code) => !known.includes(code) && !OUTSIDE_GROUPS.has(code)).sort();
     return [...known, ...unknown, NOT_GIVEN];
   }
   // Years are counted as written, 4 digits ("0999"), so they are printed padded back to 4 digits (#287).
-  const years = [...counts.keys()].filter((key) => !OUTSIDE_GROUPS.has(key)).map(Number);
+  const years = [...keys].filter((key) => !OUTSIDE_GROUPS.has(key)).map(Number);
   if (years.length === 0) return [];
   const first = Math.min(...years);
   return Array.from({ length: Math.max(...years) - first + 1 }, (_, i) => String(first + i).padStart(4, "0"));
 }
 
-function formatCounts(response: OutingListResponse, filters: OutingFilters, groupBy: GroupBy): string {
+function increment(counts: Map<string, number>, key: string): void {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+
+// The lines of the outings counted outside the groups or the table, printed only when there are any.
+function outsideLines(counts: Map<string, number>): string[] {
+  return OUTSIDE_TABLE.flatMap((key) => {
+    const count = counts.get(key);
+    return count === undefined ? [] : [`${key}: ${String(count)}`];
+  });
+}
+
+function formatCounts(documents: Outing[], groupBy: Axis): string[] {
   const counts = new Map<string, number>();
-  for (const outing of response.documents) {
-    const line = lineOf(outing, groupBy);
-    counts.set(line, (counts.get(line) ?? 0) + 1);
+  for (const outing of documents) increment(counts, keyOf(outing, groupBy));
+  const lines = axisValues(groupBy, counts.keys()).map((group) => `${group}: ${String(counts.get(group) ?? 0)}`);
+  return [...lines, ...outsideLines(counts)];
+}
+
+// A condition code is printed as Camptocamp sends it, so a | in it is escaped to stay in its cell.
+const cell = (value: string) => value.replaceAll("|", "\\|");
+const tableRow = (cells: string[]) => `| ${cells.join(" | ")} |`;
+
+// Rows from group_by, columns from split_by, with a total column and row: counts only (AC3.3 of #303). An outing
+// with either value outside the axes is counted below the table, so the table and those lines add up to N.
+function formatTable(documents: Outing[], rowAxis: Axis, columnAxis: Axis): string[] {
+  const cells = new Map<string, number>();
+  const outside = new Map<string, number>();
+  const rowKeys: string[] = [];
+  const columnKeys: string[] = [];
+  for (const outing of documents) {
+    const row = keyOf(outing, rowAxis);
+    const column = keyOf(outing, columnAxis);
+    const off = OUTSIDE_TABLE.find((key) => key === row || key === column);
+    if (off !== undefined) {
+      increment(outside, off);
+    } else {
+      rowKeys.push(row);
+      columnKeys.push(column);
+      increment(cells, JSON.stringify([row, column]));
+    }
   }
-  const lines = groupsOf(groupBy, counts).map((group) => `${group}: ${String(counts.get(group) ?? 0)}`);
-  for (const extra of [NO_START_DATE, UNEXPECTED_FORMAT]) {
-    const count = counts.get(extra);
-    if (count !== undefined) lines.push(`${extra}: ${String(count)}`);
+  const rows = axisValues(rowAxis, rowKeys);
+  const columns = axisValues(columnAxis, columnKeys);
+  const below = outsideLines(outside);
+  // Without a year with a start date there is no row or column to print, as there is no year line without split_by.
+  if (rows.length === 0 || columns.length === 0) return below;
+
+  const count = (row: string, column: string) => cells.get(JSON.stringify([row, column])) ?? 0;
+  const totals = columns.map((column) => sum(rows.map((row) => count(row, column))));
+  const table = [
+    tableRow([AXIS_LABELS[rowAxis], ...columns.map(cell), "total"]),
+    tableRow(["---", ...columns.map(() => "---:"), "---:"]),
+    ...rows.map((row) => {
+      const counts = columns.map((column) => count(row, column));
+      return tableRow([cell(row), ...[...counts, sum(counts)].map(String)]);
+    }),
+    tableRow(["total", ...[...totals, sum(totals)].map(String)]),
+  ];
+  // A blank line ends the table: a line right after it would be read as one more row.
+  return below.length > 0 ? [...table, "", ...below] : table;
+}
+
+// split_by equal to group_by is refused first, then the filters are checked, all before any request: the
+// collector's input type allows route_id with route_ids.
+export async function handleOutingStats({ group_by, split_by, ...input }: OutingStatsInput): Promise<string> {
+  if (split_by === group_by) {
+    throw new Error(
+      `split_by must differ from group_by (${group_by}): give another of month, year or condition, or leave it out`,
+    );
   }
+  const filters = outingFilterParams(input);
+  const { total, documents } = await collectMatchingOutings(filters);
+  const lines = split_by === undefined ? formatCounts(documents, group_by) : formatTable(documents, group_by, split_by);
 
   const filterText = describeOutingFilters(filters).join(", ");
-  const output = [`${String(response.total)} outing(s) counted (all matches), by ${GROUP_LABELS[groupBy]}`];
+  const axes = AXIS_LABELS[group_by] + (split_by === undefined ? "" : ` and ${AXIS_LABELS[split_by]}`);
+  const output = [`${String(total)} outing(s) counted (all matches), by ${axes}`];
   if (filterText) output.push(`Filters: ${filterText}`);
   if (filters.period !== undefined) output.push(PERIOD_NOTE);
   output.push(COUNTS_NOTE);
@@ -137,19 +215,12 @@ function formatCounts(response: OutingListResponse, filters: OutingFilters, grou
   return output.join("\n");
 }
 
-// The filters are checked before any request: the collector's input type allows route_id with route_ids.
-export async function handleOutingStats({ group_by, ...input }: OutingStatsInput): Promise<string> {
-  const filters = outingFilterParams(input);
-  const response = await collectMatchingOutings(filters);
-  return formatCounts(response, filters, group_by);
-}
-
 export const outingStatsToolDefinitions = [
   {
     name: "outing_stats",
     title: "Count outings",
     description:
-      "Count the outings (trip reports) on Camptocamp.org that match a search, by start month, start year or condition: for example, in which months a route's reports were written. It takes the filters of search_outings (query, area_id, activity, rating_system with rating_min / rating_max, condition_at_least, max_elevation_min / max_elevation_max, height_diff_up_min / height_diff_up_max, date_from / date_to, period_start / period_end, route_id or route_ids, waypoint_id, user_id), without limit and offset, and group_by: month, year or condition. Every matching outing is read, 100 per request, so the counts are exact. The output starts with 'N outing(s) counted (all matches), by start month' and the Filters line of search_outings, then one line per group, zeros included: months 01 to 12 of the start date; every year from the first to the last start date; or conditions excellent, good, average, poor, awful, any other code as sent, then '(not given): N'. A trip over several days counts in the month and year it starts. Outings without a start date count on '(no start date): N', and items Camptocamp sent in an unexpected format on '(unexpected format): N', so the lines add up to N. A search matching more than 2,000 outings is refused before counting, with its total: narrow the filters (dates, area, activity, routes). If Camptocamp's results change while counting, the call fails: call again. These are counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition. To read the reports, list them with search_outings and read them with get_outings. " +
+      "Count the outings (trip reports) on Camptocamp.org that match a search, by start month, start year or condition: for example, in which months a route's reports were written. It takes the filters of search_outings (query, area_id, activity, rating_system with rating_min / rating_max, condition_at_least, max_elevation_min / max_elevation_max, height_diff_up_min / height_diff_up_max, date_from / date_to, period_start / period_end, route_id or route_ids, waypoint_id, user_id), without limit and offset, and group_by: month, year or condition. Every matching outing is read, 100 per request, so the counts are exact. The output starts with 'N outing(s) counted (all matches), by start month' and the Filters line of search_outings, then one line per group, zeros included: months 01 to 12 of the start date; every year from the first to the last start date; or conditions excellent, good, average, poor, awful, any other code as sent, then '(not given): N'. A trip over several days counts in the month and year it starts. Outings without a start date count on '(no start date): N', and items Camptocamp sent in an unexpected format on '(unexpected format): N', so the lines add up to N. With split_by (another of month, year or condition), a Markdown table instead: group_by rows, split_by columns, a total row and column, counts only; those two lines follow it. A search matching more than 2,000 outings is refused before counting, with its total: narrow the filters (dates, area, activity, routes). If Camptocamp's results change while counting, the call fails: call again. These are counts of trip reports published on Camptocamp, not of ascents; a month with no report is not evidence the route is out of condition. To read the reports, list them with search_outings and read them with get_outings. " +
       LANG_NOTE,
     inputSchema: outingStatsSchema,
     handler: handleOutingStats,
