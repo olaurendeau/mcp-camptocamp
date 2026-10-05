@@ -244,14 +244,17 @@ export function checkMcpServers(text: string): string[] {
   );
 }
 
-// "Bearer " or "MCP_AUTH_TOKENS=" then 20 or more characters of a bearer token (RFC 6750 b64token): a real token,
-// not `$VAR`, `${VAR}` or `%s`.
+// "Bearer " then 20 or more characters of a bearer token (RFC 6750 b64token): a real token, not `$VAR`, `${VAR}` or
+// `%s`. Same for any entry of an MCP_AUTH_TOKENS list, set with `=` (env, docker -e), `:` (YAML) or `": "` (JSON).
 const LITERAL_TOKENS: [RegExp, string][] = [
   [/\bBearer +[A-Za-z0-9\-._~+/]{20,}/gi, "a literal bearer token"],
-  [/\bMCP_AUTH_TOKENS=["']?[A-Za-z0-9\-._~+/]{20,}/g, "a literal MCP_AUTH_TOKENS value"],
+  [
+    /\bMCP_AUTH_TOKENS["']?\s*[=:]\s*["']?(?:[A-Za-z0-9\-._~+/=]*\s*,\s*)*[A-Za-z0-9\-._~+/]{20,}/g,
+    "a literal MCP_AUTH_TOKENS value",
+  ],
 ];
 
-/** Problems with `text`: each `Bearer <token>` or `MCP_AUTH_TOKENS=<token>` with a literal token, anywhere. */
+/** Problems with `text`: each `Bearer <token>` or MCP_AUTH_TOKENS value with a literal token, anywhere. */
 export function checkTokenLiterals(text: string): string[] {
   // The problem names the line only: repeating the token would print it in the test output.
   return LITERAL_TOKENS.flatMap(([pattern, what]) => [...text.matchAll(pattern)].map(({ index }) => ({ index, what })))
