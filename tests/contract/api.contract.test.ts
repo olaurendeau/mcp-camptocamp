@@ -23,6 +23,7 @@ import { pickLocale, type ListOf } from "../../src/tools/format.js";
 import { handleGetRoute } from "../../src/tools/routes.js";
 import { handleGetWaypoint } from "../../src/tools/waypoints.js";
 import { handleGetOuting } from "../../src/tools/outings.js";
+import { handleOutingStats } from "../../src/tools/outing-stats.js";
 import { handleGetBook } from "../../src/tools/books.js";
 import { handleGetArticle } from "../../src/tools/articles.js";
 import { wellFormed } from "../api/well-formed.js";
@@ -105,6 +106,8 @@ function expectStrictlyByDateEndThenIdDescending(result: OutingListResponse): vo
     expect(ordered, `outing ${current.id} (${current.date}) after ${previous.id} (${previous.date})`).toBe(true);
   }
 }
+
+const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
 
 const VANOISE = 14409;
 const routesInVanoise = once(() => searchRoutes({ area_id: VANOISE }));
@@ -233,6 +236,26 @@ describe("searches (AC8.2, AC8.3)", () => {
   // outings tell the two sorts apart: without `-id`, 63 of their 94 ties came back ascending (2026-10-05).
   it("the latest 100 outings with tiebreak_by_id, by (date_end, id) descending", async () => {
     expectStrictlyByDateEndThenIdDescending(await searchOutings({ tiebreak_by_id: true, limit: 100 }));
+  });
+
+  // outing_stats reads pages of 100 (collectMatchingOutings): if Camptocamp served fewer, every count over one
+  // page would fail with "results changed while counting; call again", on every call.
+  it("a full page of 100 outings at limit 100, past the first page", async () => {
+    const result = await searchOutings({ tiebreak_by_id: true, limit: 100, offset: 100 });
+
+    expect(result.total).toBeGreaterThan(200);
+    expect(result.documents).toHaveLength(100);
+  });
+
+  // S4 on #255: every outing of route 54513 counted once, in 12 month lines that add up to the header's total.
+  it("outing_stats counts the outings of route 54513 by start month", async () => {
+    const [header, , , , ...lines] = (await handleOutingStats({ route_id: 54513, group_by: "month" })).split("\n");
+    const total = Number(/^(\d+) outing\(s\) counted \(all matches\), by start month$/.exec(header)?.[1]);
+    const counts = lines.map((line) => /^(\d{2}): (\d+)$/.exec(line));
+
+    expect(total).toBeGreaterThan(0);
+    expect(counts.map((match) => match?.[1])).toEqual(MONTHS);
+    expect(counts.reduce((sum, match) => sum + Number(match?.[2]), 0)).toBe(total);
   });
 
   it("areas by keyword", async () => {

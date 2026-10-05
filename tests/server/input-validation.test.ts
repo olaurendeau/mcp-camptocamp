@@ -325,6 +325,58 @@ describe("get_outings ids", () => {
   });
 });
 
+// S4 on #255: outing_stats requires group_by, and checks the search_outings filters before any request.
+describe("outing_stats inputs", () => {
+  it.each<[string, Record<string, unknown>, string]>([
+    ["a missing group_by", { route_id: 54513 }, "must be one of: month, year, condition at group_by"],
+    ["an unknown group_by", { group_by: "week" }, "must be one of: month, year, condition at group_by"],
+    [
+      "a filter of the wrong type",
+      { group_by: "month", route_ids: 54513 },
+      "Expected array, received number at route_ids",
+    ],
+  ])("rejects %s naming the field without calling Camptocamp", async (_label, args, issue) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "outing_stats", arguments: args });
+
+    expect(validationIssues(result, "outing_stats")).toEqual([issue]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses route_id with route_ids without calling Camptocamp", async () => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "outing_stats",
+      arguments: { route_id: 54513, route_ids: [1148298], group_by: "month" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/^Error: give route_id or route_ids, not both/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reads pages of 100 sorted by end date then ID", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "outing_stats", arguments: { route_id: 54513, group_by: "year" } });
+
+    expect(resultText(result)).toMatch(/^0 outing\(s\) counted \(all matches\), by start year\nFilters: route 54513\n/);
+    const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
+    expect(Object.fromEntries(params)).toEqual({
+      r: "54513",
+      sort: "-date_end,-id",
+      limit: "100",
+      offset: "0",
+      pl: "fr",
+    });
+  });
+});
+
 // AC5.5: rules across several fields keep their exact messages through MCP.
 describe("cross-field rules", () => {
   it.each<[string, string, Record<string, unknown>, string]>([
@@ -854,14 +906,15 @@ describe("get_* lang input", () => {
   });
 });
 
-// AC5.1, AC5.2 on #153: the seven searches take an optional lang, checked before any request and sent as pl
-// (default fr); the Language line stays on the get_* tools.
+// AC5.1, AC5.2 on #153: the seven searches and outing_stats take an optional lang, checked before any request and
+// sent as pl (default fr); the Language line stays on the get_* tools.
 describe("search lang input", () => {
   const SEARCH_CASES: Array<[string, Record<string, unknown>]> = [
     ["search_routes", { query: "Glacier du Geay" }],
     ["search_waypoints", { query: "Mont Pourri" }],
     ["search_user_outings", { user_id: ACCEPTED_ID }],
     ["search_outings", {}],
+    ["outing_stats", { group_by: "month" }],
     ["search_areas", { query: "Vanoise" }],
     ["search_books", { query: "Vallot" }],
     ["search_articles", { query: "crampons" }],
