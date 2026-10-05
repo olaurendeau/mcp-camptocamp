@@ -118,7 +118,7 @@ CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH=4096 claude
 
 ### Tool output: warning at 10,000 tokens, cap at 25,000
 
-Claude Code shows a warning when an MCP tool's output exceeds 10,000 tokens, and limits output to 25,000 tokens by default. When a text result exceeds the limit, Claude Code saves it to a file and replaces it in the conversation with a message that names the file, which Claude reads when it needs the content. It does the same with a text result longer than 50,000 characters, whatever its token count and `MAX_MCP_OUTPUT_TOKENS`.
+Claude Code shows a warning when an MCP tool's output exceeds 10,000 tokens, and limits output to 25,000 tokens by default. When a successful text result exceeds the limit, Claude Code saves it to a file and replaces it in the conversation with a message that names the file, which Claude reads when it needs the content. It does the same with a successful text result longer than 50,000 characters, whatever its token count and `MAX_MCP_OUTPUT_TOKENS`. An error result follows another rule: Claude gets its text as the tool's error message, and text longer than about 11,000 characters keeps only its first and last 5,000 characters.
 
 To keep results small, ask for fewer results per call: the search tools take a `limit`. Or raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable:
 
