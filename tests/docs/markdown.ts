@@ -244,15 +244,19 @@ export function checkMcpServers(text: string): string[] {
   );
 }
 
-// "Bearer" then 20 or more characters of a bearer token (RFC 6750 b64token): a real token, not `$VAR` or `${VAR}`.
-const LITERAL_BEARER = /\bBearer +[A-Za-z0-9\-._~+/]{20,}=*/gi;
+// "Bearer " or "MCP_AUTH_TOKENS=" then 20 or more characters of a bearer token (RFC 6750 b64token): a real token,
+// not `$VAR`, `${VAR}` or `%s`.
+const LITERAL_TOKENS: [RegExp, string][] = [
+  [/\bBearer +[A-Za-z0-9\-._~+/]{20,}/gi, "a literal bearer token"],
+  [/\bMCP_AUTH_TOKENS=["']?[A-Za-z0-9\-._~+/]{20,}/g, "a literal MCP_AUTH_TOKENS value"],
+];
 
-/** Problems with `text`: each `Bearer <token>` with a literal token of 20 or more characters, anywhere. */
-export function checkBearerLiterals(text: string): string[] {
+/** Problems with `text`: each `Bearer <token>` or `MCP_AUTH_TOKENS=<token>` with a literal token, anywhere. */
+export function checkTokenLiterals(text: string): string[] {
   // The problem names the line only: repeating the token would print it in the test output.
-  return [...text.matchAll(LITERAL_BEARER)].map(
-    ({ index }) => `line ${text.slice(0, index).split("\n").length}: a literal bearer token; use an env var`,
-  );
+  return LITERAL_TOKENS.flatMap(([pattern, what]) => [...text.matchAll(pattern)].map(({ index }) => ({ index, what })))
+    .sort((a, b) => a.index - b.index)
+    .map(({ index, what }) => `line ${text.slice(0, index).split("\n").length}: ${what}; use an env var`);
 }
 
 const ALLOWED_NAMES = new Set([
@@ -279,7 +283,7 @@ export function checkNames(text: string): string[] {
 const NODE_VERSION =
   /\b(older\s+)?node(?:\.js)?(?:\]\([^)]*\))?(?:\s+versions?)?(?:\s*>=?\s*|\s+v?|@|:)(\d+(?:\s*(?:,|and|or)\s*\d+)*)/gi;
 /** The one phrase allowed to name versions other than the minimum, all below it: a statement about unsupported ones. */
-const OLDER_VERSIONS = "older Node.js versions ";
+const OLDER_VERSIONS = /^older\s+node\.js\s+versions\s/i;
 
 /** Problems with the Node.js version mentions of `text` that name a major version other than the `>=NN` of `engines`. */
 export function checkNodeVersion(text: string, engines: string): string[] {
@@ -290,16 +294,18 @@ export function checkNodeVersion(text: string, engines: string): string[] {
   const minimum = Number(minimumMatch[1]);
   return [...text.matchAll(NODE_VERSION)].flatMap(([mention, , list]) => {
     const majors = list.split(/\s*(?:,|and|or)\s*/i).map(Number);
-    if (mention.startsWith(OLDER_VERSIONS)) {
+    if (OLDER_VERSIONS.test(mention)) {
       return majors.every((major) => major < minimum)
         ? []
-        : [`${mention}: "${OLDER_VERSIONS.trim()}" must name versions below ${minimum}`];
+        : [`${mention}: "older Node.js versions" must name versions below ${minimum}`];
     }
     return majors.every((major) => major === minimum)
       ? []
       : [`${mention.replace(/^older\s+/i, "")}: engines.node in package.json is "${engines}"`];
   });
 }
+
+const LAST_VERIFIED = /^Last verified: (\d{4}-\d{2}-\d{2}) against official docs$/m;
 
 /** Problems with the `## Sources` section and the `Last verified` line a client or SDK page ends with. */
 export function checkSources(text: string): string[] {
@@ -310,7 +316,7 @@ export function checkSources(text: string): string[] {
   } else if (!/https:\/\/\S+/.test(sources[1])) {
     problems.push("the Sources section has no https URL");
   }
-  if (!/^Last verified: \d{4}-\d{2}-\d{2} against official docs$/m.test(text)) {
+  if (!LAST_VERIFIED.test(text)) {
     problems.push('no line "Last verified: YYYY-MM-DD against official docs"');
   }
   return problems;
@@ -321,7 +327,6 @@ function readExistingFile(path: string): string | undefined {
   return existsSync(path) && statSync(path).isFile() ? readFileSync(path, "utf8") : undefined;
 }
 
-const LAST_VERIFIED = /^Last verified: (\d{4}-\d{2}-\d{2}) against official docs$/m;
 const MATRIX_COLUMNS = ["Client", "Works?", "Page", "Last verified"];
 
 /** The body of the `## <title>` section of `text`, up to the next `## ` heading, or undefined without one. */
