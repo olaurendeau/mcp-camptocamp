@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Start with the [smoke test](getting-started.md#smoke-test): if it prints the server's version and `13` (`14` from the release after v1.3.0), the server works on this machine and the problem is in the client's configuration.
+Start with the [smoke test](getting-started.md#smoke-test): if it prints the server's version and `13` (`15` from the release after v1.3.0), the server works on this machine and the problem is in the client's configuration.
 
 ## The server times out on its first start
 

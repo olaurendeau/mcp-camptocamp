@@ -93,7 +93,7 @@ OpenAI's docs don't say whether an open app or Codex session reloads the file wh
 
 > Supported values are auto, prompt, writes, and approve. The writes mode prompts for tools that aren't marked read-only.
 
-The 13 tools (14 from the release after v1.3.0) of this server are read-only: each one declares the MCP annotation `readOnlyHint: true`.
+The 13 tools (15 from the release after v1.3.0) of this server are read-only: each one declares the MCP annotation `readOnlyHint: true`.
 
 The Codex docs say "marked read-only" without naming the annotation. The OpenAI quote that names it comes from the docs of a different client, [ChatGPT developer mode](https://developers.openai.com/api/docs/guides/developer-mode) on the web: "We respect the `readOnlyHint` tool annotation … Tools without this hint are treated as write actions."
 

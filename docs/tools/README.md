@@ -1,6 +1,6 @@
 # Tool reference
 
-The server registers 13 read-only tools in v1.3.0, one search and one detail tool per kind of Camptocamp document, plus a shortcut for a user's outings. The release after v1.3.0 registers 14: it adds `get_outings`, to read several outings in one call. Every tool takes `lang`, the language of titles and texts (`fr` by default).
+The server registers 13 read-only tools in v1.3.0, one search and one detail tool per kind of Camptocamp document, plus a shortcut for a user's outings. The release after v1.3.0 registers 15: it adds `get_outings`, to read several outings in one call, and `outing_stats`, to count outings by month, year or condition. Every tool takes `lang`, the language of titles and texts (`fr` by default).
 
 Each page gives the tool's purpose, its inputs and the tools to call before or after it. The Inputs section is generated from the input schema the server registers, so its parameters, types, defaults, bounds and allowed values match the code.
 
@@ -26,6 +26,7 @@ Each page gives the tool's purpose, its inputs and the tools to call before or a
 | [`search_user_outings`](search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                            |
 | [`get_outing`](get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.                |
 | [`get_outings`](get_outings.md)                 | Up to 10 outings by ID in one call, in `get_outing` format, each section cut at 2,000 characters; not in v1.3.0. |
+| [`outing_stats`](outing_stats.md)               | Count the outings matching `search_outings` filters by start month, start year or condition; not in v1.3.0.      |
 
 ## Areas
 
