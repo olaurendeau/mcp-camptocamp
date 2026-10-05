@@ -117,6 +117,17 @@ describe("response schemas", () => {
     expect(outingDetailSchema.parse({ ...outing, associations: {} }).associations?.users).toBeUndefined();
   });
 
+  // S3 of #255: outings 219347, 1924138 and 669600 send true, false and null; older outings may lack the key.
+  it("keep an outing's partial_trip flag as sent: true, false, null or missing", () => {
+    const outing = { document_id: 219347, locales: [], activities: ["snow_ice_mixed"] };
+
+    for (const flag of [true, false, null]) {
+      expect(outingDetailSchema.parse({ ...outing, partial_trip: flag }).partial_trip).toBe(flag);
+    }
+    expect(outingDetailSchema.parse(outing).partial_trip).toBeUndefined();
+    expect(() => outingDetailSchema.parse({ ...outing, partial_trip: "yes" })).toThrow();
+  });
+
   it("reject a response missing a field the formatters dereference", () => {
     expect(routeDetailSchema.safeParse({ ...route53914, activities: undefined }).success).toBe(false);
     expect(routeSearchResponseSchema.safeParse({ documents: [] }).success).toBe(false);
