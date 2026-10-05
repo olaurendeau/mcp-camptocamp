@@ -91,7 +91,7 @@ describe("renderInputs", () => {
     expect(row(block, "offset")).toBe("| `offset` | integer | no | `0` | ≥ 0 |");
   });
 
-  it("renders an array type, its item count and its values", () => {
+  it("renders an enum array's type, item count and values, with no item bounds", () => {
     expect(row(block, "route_types")).toBe("| `route_types` | array of string | no | | at least 1 item |");
     expect(block).toContain(
       "- `route_types`: Route types, matching any of: return_same_way, loop. Values: `return_same_way`, `loop`",
@@ -140,6 +140,44 @@ describe("renderInputs", () => {
     expect(row(rendered, "tags")).toBe("| `tags` | array of string | no | | at least 2 items, at most 1 item |");
   });
 
+  it("renders the bounds of an ID array's items, without the safe-integer maximum", () => {
+    const rendered = renderInputs(
+      withProperty("route_ids", {
+        type: "array",
+        items: { type: "integer", exclusiveMinimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+        minItems: 1,
+        maxItems: 10,
+        description: "Camptocamp route IDs",
+      }),
+    );
+    expect(row(rendered, "route_ids")).toBe(
+      "| `route_ids` | array of integer | no | | at least 1 item, at most 10 items, each > 0 |",
+    );
+    expect(rendered).toContain("- `route_ids`: Camptocamp route IDs.\n");
+    expect(rendered).not.toContain(String(Number.MAX_SAFE_INTEGER));
+  });
+
+  it("renders every kind of item bound", () => {
+    const tool = fixtureTool();
+    const rendered = renderInputs({
+      ...tool,
+      inputSchema: {
+        ...tool.inputSchema,
+        required: undefined,
+        properties: {
+          grades: { type: "array", items: { type: "integer", minimum: 1, maximum: 5 } },
+          floors: { type: "array", items: { type: "integer", minimum: 0 } },
+          ceilings: { type: "array", items: { type: "number", maximum: 4810 } },
+          ratios: { type: "array", items: { type: "number", exclusiveMinimum: 0, exclusiveMaximum: 1 } },
+        },
+      },
+    });
+    expect(row(rendered, "grades")).toBe("| `grades` | array of integer | no | | each 1 to 5 |");
+    expect(row(rendered, "floors")).toBe("| `floors` | array of integer | no | | each ≥ 0 |");
+    expect(row(rendered, "ceilings")).toBe("| `ceilings` | array of number | no | | each ≤ 4810 |");
+    expect(row(rendered, "ratios")).toBe("| `ratios` | array of number | no | | each > 0, each < 1 |");
+  });
+
   it("escapes Markdown punctuation in descriptions", () => {
     const rendered = renderInputs(withProperty("q", { type: "string", description: "a*b <c> [d] e|f `g` _h_ ~i~ \\" }));
     expect(rendered).toContain("- `q`: a\\*b \\<c\\> \\[d\\] e\\|f \\`g\\` \\_h\\_ \\~i\\~ \\\\.");
@@ -152,6 +190,12 @@ describe("renderInputs", () => {
     expect(() =>
       renderInputs(withProperty("tags", { type: "array", items: { type: "string", minLength: 1 } })),
     ).toThrow('Unsupported JSON Schema keyword "minLength" in search_fixture.tags.items');
+    expect(() =>
+      renderInputs(withProperty("dates", { type: "array", items: { type: "string", pattern: "^\\d{4}$" } })),
+    ).toThrow('Unsupported JSON Schema keyword "pattern" in search_fixture.dates.items');
+    expect(() =>
+      renderInputs(withProperty("ids", { type: "array", items: { type: "integer", minimum: "1" } })),
+    ).toThrow('Unsupported JSON Schema value for "minimum" in search_fixture.ids.items');
     const tool = fixtureTool();
     expect(() => renderInputs({ ...tool, inputSchema: { ...tool.inputSchema, definitions: {} } })).toThrow(
       'Unsupported JSON Schema keyword "definitions" in search_fixture',
