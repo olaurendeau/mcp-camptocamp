@@ -1,12 +1,12 @@
 # Remote-only clients
 
-Some clients connect only to remote MCP servers: you give them the URL of a server on the internet, and the vendor's cloud connects to it. They cannot start this server on your machine, so they cannot use it as these docs set it up.
+Some clients connect only to remote MCP servers: you give them the URL of a server on the internet, and the vendor's cloud connects to it. They cannot start this server on your machine.
 
-This server has no HTTP transport today. It is a local program that your client starts on your machine and talks to over stdio, and both of its packages in the MCP registry, npm and Docker, declare the `stdio` transport. It has no URL to give to a remote-only client.
+The server also has an HTTP mode (v1.4.0 or later) that you can host yourself, on your own domain and behind a secret token: see [Self-hosting over HTTP](../self-hosting.md). Of the clients below, Claude.ai custom connectors and Vibe Work can send that token, and the guide covers them. ChatGPT on the web cannot, and the guide doesn't cover the other surfaces.
 
-Each vendor below also has a client that starts local servers. Use that one instead: it is linked in each section.
+Each vendor below also has a client that starts the server on your machine, with nothing to host: it is linked in each section.
 
-## Why a bridge on your machine doesn't help with Claude.ai
+## Why Claude.ai needs a server on the public internet
 
 For Claude's custom connectors, the connection to the MCP server starts in Anthropic's cloud, not on your computer. [Anthropic's help center](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp) says:
 
@@ -16,7 +16,7 @@ And:
 
 > Servers hosted on a private corporate network, behind a VPN, or blocked by a firewall won't connect, even if you can reach them from your own machine.
 
-A program on your computer that turns this stdio server into an HTTP one would still be reachable only from your computer, or your network. For Anthropic's cloud to reach it, you would have to publish it on the public internet, open to anyone who finds the address: the server has no authentication. These docs give no recipe for that. The other clients below also take the URL of a server that their vendor's cloud connects to.
+A server on your computer, even in HTTP mode, is reachable only from your computer or your network. For Anthropic's cloud to reach it, it must be published on the public internet, with a valid certificate and a secret token so that strangers who find the address cannot use it: the self-hosting guide linked at the top of this page sets that up. The other clients below also take the URL of a server that their vendor's cloud connects to.
 
 ## OpenAI's Secure MCP Tunnel
 
@@ -24,15 +24,15 @@ OpenAI documents another path. Its [Secure MCP Tunnel](https://developers.openai
 
 ## Which clients are remote-only
 
-| Client                                                                        | Vendor    | Use instead                                                                                       |
-| ----------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------- |
-| [Claude.ai custom connectors](#claudeai-custom-connectors)                    | Anthropic | [Claude Desktop](claude-desktop.md) or [Claude Code](claude-code.md)                              |
-| [ChatGPT on the web](#chatgpt-on-the-web)                                     | OpenAI    | [ChatGPT desktop app or Codex](chatgpt-desktop-and-codex.md)                                      |
-| [OpenAI hosted MCP tools](#openai-hosted-mcp-tools)                           | OpenAI    | [`MCPServerStdio` in the OpenAI Agents SDK](../agent-sdks.md#openai-agents-sdk-python)            |
-| [Vibe Work (formerly Le Chat)](#vibe-work-formerly-le-chat)                   | Mistral   | [Mistral Vibe Code](mistral-vibe-code.md)                                                         |
-| [Mistral Studio Connectors](#mistral-studio-connectors)                       | Mistral   | [The Mistral Python SDK](../agent-sdks.md#mistral-python-sdk)                                     |
-| [Gemini API remote MCP](#gemini-api-remote-mcp)                               | Google    | [google-genai](../agent-sdks.md#google-genai-python-experimental), or [Gemini CLI](gemini-cli.md) |
-| [Gemini app (gemini.google.com)](#gemini-app-geminigooglecom), not documented | Google    | [Gemini CLI or Gemini Code Assist](gemini-cli.md)                                                 |
+| Client                                                                        | Vendor    | Use instead                                                                                                                                   |
+| ----------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Claude.ai custom connectors](#claudeai-custom-connectors)                    | Anthropic | [A self-hosted instance](../self-hosting.md#claudeai-custom-connectors), [Claude Desktop](claude-desktop.md) or [Claude Code](claude-code.md) |
+| [ChatGPT on the web](#chatgpt-on-the-web)                                     | OpenAI    | [ChatGPT desktop app or Codex](chatgpt-desktop-and-codex.md)                                                                                  |
+| [OpenAI hosted MCP tools](#openai-hosted-mcp-tools)                           | OpenAI    | [`MCPServerStdio` in the OpenAI Agents SDK](../agent-sdks.md#openai-agents-sdk-python)                                                        |
+| [Vibe Work (formerly Le Chat)](#vibe-work-formerly-le-chat)                   | Mistral   | [A self-hosted instance](../self-hosting.md#vibe-work-formerly-le-chat) or [Mistral Vibe Code](mistral-vibe-code.md)                          |
+| [Mistral Studio Connectors](#mistral-studio-connectors)                       | Mistral   | [The Mistral Python SDK](../agent-sdks.md#mistral-python-sdk)                                                                                 |
+| [Gemini API remote MCP](#gemini-api-remote-mcp)                               | Google    | [google-genai](../agent-sdks.md#google-genai-python-experimental), or [Gemini CLI](gemini-cli.md)                                             |
+| [Gemini app (gemini.google.com)](#gemini-app-geminigooglecom), not documented | Google    | [Gemini CLI or Gemini Code Assist](gemini-cli.md)                                                                                             |
 
 ## Claude.ai custom connectors
 
@@ -42,7 +42,9 @@ Custom connectors add a remote MCP server to Claude by URL, on claude.ai, in the
 
 The same page says that local servers configured in `claude_desktop_config.json` "aren't available in Cowork or claude.ai".
 
-Use instead: [Claude Desktop](claude-desktop.md), with this server in `claude_desktop_config.json` rather than as a custom connector, or [Claude Code](claude-code.md).
+With a [self-hosted instance](../self-hosting.md#claudeai-custom-connectors) (v1.4.0 or later), add it as a custom connector with the token under Request headers, a beta feature that not every organization has yet.
+
+Or use instead: [Claude Desktop](claude-desktop.md), with this server in `claude_desktop_config.json` rather than as a custom connector, or [Claude Code](claude-code.md).
 
 ## ChatGPT on the web
 
@@ -50,7 +52,7 @@ ChatGPT on the web (chatgpt.com) adds MCP servers in developer mode, as a "devel
 
 > Supported MCP protocols: SSE and streaming HTTP.
 
-[OpenAI's Secure MCP Tunnel](#openais-secure-mcp-tunnel) is the exception described [above](#openais-secure-mcp-tunnel); these docs don't cover it.
+ChatGPT on the web cannot use a [self-hosted instance](../self-hosting.md#chatgpt-on-the-web-unsupported) either: it cannot send a token. [OpenAI's Secure MCP Tunnel](#openais-secure-mcp-tunnel) is the exception described [above](#openais-secure-mcp-tunnel); these docs don't cover it.
 
 Use instead: the [ChatGPT desktop app, Codex CLI or the Codex IDE extension](chatgpt-desktop-and-codex.md), which start this server on your machine. That page explains [why ChatGPT on the web cannot](chatgpt-desktop-and-codex.md#chatgpt-on-the-web).
 
@@ -70,7 +72,9 @@ Vibe Work, Mistral's web and mobile assistant, adds a custom MCP connector by it
 
 > Server reachability: the server must be accessible over HTTPS with a valid TLS certificate.
 
-Use instead: [Mistral Vibe Code](mistral-vibe-code.md), the CLI or its VS Code extension.
+With a [self-hosted instance](../self-hosting.md#vibe-work-formerly-le-chat) (v1.4.0 or later), an administrator adds it as a custom connector. Mistral says Vibe Work detects bearer-token authentication but not where the token is typed; this was not yet tried.
+
+Or use instead: [Mistral Vibe Code](mistral-vibe-code.md), the CLI or its VS Code extension.
 
 ## Mistral Studio Connectors
 

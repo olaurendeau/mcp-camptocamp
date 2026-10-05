@@ -2,7 +2,7 @@
 
 This MCP server gives an LLM read-only access to [Camptocamp.org](https://www.camptocamp.org): routes, summits and huts, trip reports (outings), areas, books and articles. The LLM can then quote altitudes, ratings and route descriptions from Camptocamp instead of guessing them.
 
-The server runs on your machine and talks to its client over stdio. A client that can start a local command can use it. A client that only connects to remote servers by URL cannot: see [Remote-only clients](clients/remote-only.md).
+The server runs on your machine and talks to its client over stdio. A client that can start a local command can use it. A client that only connects to remote servers by URL needs an instance you host yourself over HTTP (v1.4.0 or later): see [Self-hosting over HTTP](self-hosting.md) and [Remote-only clients](clients/remote-only.md).
 
 ## Start here
 
@@ -16,7 +16,7 @@ The server runs on your machine and talks to its client over stdio. A client tha
 - [ChatGPT desktop app and Codex](clients/chatgpt-desktop-and-codex.md): the ChatGPT desktop app, Codex CLI and the Codex IDE extension, which share one configuration on the same Codex host. ChatGPT on the web cannot use this server.
 - [Mistral Vibe Code](clients/mistral-vibe-code.md): the Vibe Code CLI and its VS Code extension, with the `config.toml` entry and per-tool permissions.
 - [Gemini CLI and Gemini Code Assist](clients/gemini-cli.md): `settings.json`, folder trust, and a policy rule that allows the read-only tools.
-- [Remote-only clients](clients/remote-only.md): Claude.ai custom connectors, ChatGPT on the web, OpenAI hosted MCP tools, Vibe Work, Mistral Studio Connectors and the Gemini API's remote MCP, which cannot use this server, and the local client of the same vendor to use instead.
+- [Remote-only clients](clients/remote-only.md): Claude.ai custom connectors, ChatGPT on the web, OpenAI hosted MCP tools, Vibe Work, Mistral Studio Connectors and the Gemini API's remote MCP, which cannot start this server; which of them can use a self-hosted instance, and the local client of the same vendor to use instead.
 
 For a client without its own page here, use the [configuration for other MCP clients](getting-started.md#other-mcp-clients).
 
@@ -28,14 +28,14 @@ Whether each client can use this server today, the page that explains it, and th
 | ----------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ | ------------- |
 | Claude Desktop                                                    | Yes, stdio                      | [Claude Desktop](clients/claude-desktop.md)                                                      | 2026-10-05    |
 | Claude Code                                                       | Yes, stdio                      | [Claude Code](clients/claude-code.md)                                                            | 2026-10-05    |
-| Claude.ai custom connectors (web, mobile, Cowork, Claude Desktop) | No, remote servers only         | [Remote-only clients](clients/remote-only.md#claudeai-custom-connectors)                         | 2026-10-05    |
+| Claude.ai custom connectors (web, mobile, Cowork, Claude Desktop) | Self-hosted HTTP instance only  | [Self-hosting over HTTP](self-hosting.md#claudeai-custom-connectors)                             | 2026-10-05    |
 | ChatGPT desktop app                                               | Yes, stdio                      | [ChatGPT desktop app and Codex](clients/chatgpt-desktop-and-codex.md#in-the-chatgpt-desktop-app) | 2026-10-05    |
 | Codex CLI and Codex IDE extension                                 | Yes, stdio                      | [ChatGPT desktop app and Codex](clients/chatgpt-desktop-and-codex.md)                            | 2026-10-05    |
 | ChatGPT on the web (developer mode)                               | No, remote servers only         | [Remote-only clients](clients/remote-only.md#chatgpt-on-the-web)                                 | 2026-10-05    |
 | OpenAI Agents SDK (Python and JS), `MCPServerStdio`               | Yes, stdio                      | [Agent SDKs](agent-sdks.md#openai-agents-sdk-python)                                             | 2026-10-05    |
 | OpenAI hosted MCP tools (`HostedMCPTool`)                         | No, remote servers only         | [Remote-only clients](clients/remote-only.md#openai-hosted-mcp-tools)                            | 2026-10-05    |
 | Mistral Vibe Code CLI and VS Code extension                       | Yes, stdio                      | [Mistral Vibe Code](clients/mistral-vibe-code.md)                                                | 2026-10-05    |
-| Vibe Work (formerly Le Chat)                                      | No, remote servers only         | [Remote-only clients](clients/remote-only.md#vibe-work-formerly-le-chat)                         | 2026-10-05    |
+| Vibe Work (formerly Le Chat)                                      | Self-hosted HTTP instance only  | [Self-hosting over HTTP](self-hosting.md#vibe-work-formerly-le-chat)                             | 2026-10-05    |
 | Mistral Studio Connectors                                         | No, remote servers only         | [Remote-only clients](clients/remote-only.md#mistral-studio-connectors)                          | 2026-10-05    |
 | Mistral Python SDK                                                | Yes, stdio                      | [Agent SDKs](agent-sdks.md#mistral-python-sdk)                                                   | 2026-10-05    |
 | Gemini CLI                                                        | Yes, stdio, in a trusted folder | [Gemini CLI and Gemini Code Assist](clients/gemini-cli.md)                                       | 2026-10-05    |
@@ -46,6 +46,7 @@ Whether each client can use this server today, the page that explains it, and th
 
 ## Guides
 
+- [Self-hosting over HTTP](self-hosting.md): run an instance on your own domain behind a secret token (v1.4.0 or later), with Docker or npx and Caddy, then connect Claude.ai, Vibe Work, Claude Code, Codex, Gemini CLI or Vibe Code to it.
 - [Agent SDKs](agent-sdks.md): start the server from your own agent code with the OpenAI Agents SDK (Python and JS), the Mistral Python SDK or google-genai (Python and JS).
 - [Using the tools with an LLM](using-with-llms.md): which tools to chain for a region, a summit altitude, a hut, recent conditions or guidebooks; what each output line means (URL, Language, user-written text, paging, missing data, errors); and a real June ski-tour example.
 - [System prompt](system-prompt.md): a prompt to paste into your agent, so the model quotes Camptocamp, cites it and says when a value is missing.
