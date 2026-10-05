@@ -223,6 +223,7 @@ export function checkMcpServers(text: string): string[] {
 const ALLOWED_NAMES = new Set([
   "@olaurendeau/mcp-camptocamp", // npm package
   "ghcr.io/olaurendeau/mcp-camptocamp:latest", // Docker image
+  "mcp-camptocamp-mcp", // local image built by docker compose build mcp
   "io.github.olaurendeau/mcp-camptocamp", // MCP registry name
   "mcp-camptocamp", // serverInfo name and npm bin
 ]);

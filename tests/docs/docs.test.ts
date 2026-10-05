@@ -249,9 +249,10 @@ describe("docs checks fail on bad fixtures", () => {
     ]);
   });
 
-  it("accepts the package, the image, the registry name, the server name and the repository URLs", () => {
+  it("accepts the package, the image, the local image, the registry name, the server name and the repository URLs", () => {
     const text = [
       "`npx -y @olaurendeau/mcp-camptocamp`, `docker pull ghcr.io/olaurendeau/mcp-camptocamp:latest`.",
+      "`docker compose build mcp` tags the local image `mcp-camptocamp-mcp`.",
       "Registry name io.github.olaurendeau/mcp-camptocamp; serverInfo name mcp-camptocamp.",
       "[repo](https://github.com/olaurendeau/mcp-camptocamp/issues) and https://github.com/olaurendeau/mcp-camptocamp.",
     ].join("\n");

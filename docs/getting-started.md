@@ -104,7 +104,7 @@ The `--` is required: everything after it is the command that starts the server.
 
 ### Other MCP clients
 
-Clients configured with an `mcpServers` JSON object, such as Claude Desktop (`claude_desktop_config.json`) and Gemini CLI (`settings.json`), take this entry:
+Clients configured with an `mcpServers` JSON object, such as Claude Desktop (`claude_desktop_config.json`), Gemini CLI (`settings.json`) and Cursor (`~/.cursor/mcp.json` for every project, or `.cursor/mcp.json` in one project), take this entry:
 
 ```json
 {
@@ -144,6 +144,7 @@ If the file already has an `mcpServers` object, add the `camptocamp` entry to it
 - Codex: https://learn.chatgpt.com/docs/extend/mcp
 - Mistral Vibe Code: https://docs.mistral.ai/vibe/code/cli/mcp-servers and https://github.com/mistralai/mistral-vibe
 - Gemini CLI: https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md
+- Cursor: https://cursor.com/docs/context/mcp (checked on 2026-10-05)
 - npx: https://docs.npmjs.com/cli/v11/commands/npx
 - docker run: https://docs.docker.com/reference/cli/docker/container/run/
 

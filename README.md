@@ -1,64 +1,27 @@
 # mcp-camptocamp
 
-Serveur MCP (Model Context Protocol) exposant l'API [Camptocamp.org](https://www.camptocamp.org) aux LLMs. Permet d'interroger des données fiables et à jour sur les itinéraires alpins, les altitudes de sommets et les descriptions de courses — en évitant les hallucinations sur les données d'alpinisme.
-
-Documentation (en anglais) : [docs/README.md](docs/README.md).
+An MCP server that lets an LLM look up mountain routes, summits, huts and trip reports on [Camptocamp.org](https://www.camptocamp.org) instead of guessing them.
 
 <!-- mcp-name: io.github.olaurendeau/mcp-camptocamp -->
 
-## Outils disponibles
+[![CI](https://github.com/olaurendeau/mcp-camptocamp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/olaurendeau/mcp-camptocamp/actions/workflows/ci.yml)
+[![Contract](https://github.com/olaurendeau/mcp-camptocamp/actions/workflows/contract.yml/badge.svg)](https://github.com/olaurendeau/mcp-camptocamp/actions/workflows/contract.yml)
+[![npm version](https://img.shields.io/npm/v/@olaurendeau/mcp-camptocamp)](https://www.npmjs.com/package/@olaurendeau/mcp-camptocamp)
+[![npm downloads](https://img.shields.io/npm/dm/@olaurendeau/mcp-camptocamp)](https://www.npmjs.com/package/@olaurendeau/mcp-camptocamp)
+[![MCP registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0%2Fservers%2Fio.github.olaurendeau%252Fmcp-camptocamp%2Fversions%2Flatest&query=%24.server.version&label=MCP%20registry)](https://registry.modelcontextprotocol.io/v0/servers/io.github.olaurendeau%2Fmcp-camptocamp/versions/latest)
+[![Node](https://img.shields.io/node/v/@olaurendeau/mcp-camptocamp)](https://www.npmjs.com/package/@olaurendeau/mcp-camptocamp)
+[![License](https://img.shields.io/github/license/olaurendeau/mcp-camptocamp)](LICENSE)
+[![GHCR](https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)](https://github.com/olaurendeau/mcp-camptocamp/pkgs/container/mcp-camptocamp)
 
-| Outil                 | Description                                                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------------- |
-| `search_routes`       | Recherche d'itinéraires (mot-clé, zone, point, activité, cotation, D+, type, configuration) ; paginée     |
-| `get_route`           | Détail par ID (sommet : titre, textes, cotations, D+, orientations, durée, zones, topos, points, sorties) |
-| `search_waypoints`    | Points de passage par nom et/ou zone `area_id`, filtrables par type (sommet, refuge, bivouac…) ; paginée  |
-| `get_waypoint`        | Détail d'un point par ID (altitude, GPS, zones, infos refuge, accès, itinéraires, topos, sorties)         |
-| `search_user_outings` | Alias de `search_outings` par `user_id` : sorties où figure l'utilisateur, pas que les siennes ; paginée  |
-| `get_outing`          | Détail d'une sortie par ID (cotations, conditions, météo, participants et leurs comptes, itinéraires)     |
-| `search_outings`      | Sorties : mot-clé, zone, activité, cotation/conditions/alt./D+, dates, période, itinéraire, point, compte |
-| `search_areas`        | Recherche des zones (massif, département/canton, pays) par nom ; ID réutilisable en `area_id` ; paginée   |
-| `get_area`            | Détail d'une zone par ID (type, résumé, description)                                                      |
-| `search_books`        | Livres par titre uniquement (auteur/ISBN peu fiables), filtrables par type et activité ; paginée          |
-| `get_book`            | Détail d'un livre par ID (auteur, éditeur, date, ISBN, pages, langues, itinéraires, points, articles)     |
-| `search_articles`     | Articles par mot-clé, catégorie, type collab/perso, activité ; mot-clé facultatif si filtre ; paginée     |
-| `get_article`         | Détail d'un article par ID (texte, auteur, type, itinéraires, points, sorties, livres liés)               |
+## What it does
 
-Chaque outil `get_*` commence par le titre et l'ID du document, suivis de son lien camptocamp.org (`**URL**: https://www.camptocamp.org/<routes|waypoints|outings|areas|books|articles>/<id>`) à citer comme source.
+Ask an LLM for the altitude of a summit or the rating of a ski tour and it may answer from memory, and get it wrong. This server gives it read-only access to Camptocamp.org, the collaborative mountaineering site: routes with their ratings and descriptions, summits and huts with their altitudes, trip reports with the conditions people found, areas, guidebooks and articles. Every tool output comes from the public Camptocamp API, with the camptocamp.org link to cite, and a value Camptocamp does not have is left out, never guessed. It needs no account and no API key.
 
-`get_route` donne aussi les infos pratiques de l'itinéraire, recopiées telles que Camptocamp les envoie (codes non traduits) : `**Difficulties height difference**` et `**Access height difference**` (en mètres), `**Orientations**`, `**Duration (days)**`, `**Route types**` (`return_same_way`, `loop`…), `**Configuration**` (`glacier`, `edge`…), `**Glacier gear**` (`glacier_safety_gear`…) et `**Lift access**` (`yes`/`no`). Ses textes libres sont imprimés dans cet ordre : `Summary`, `Description`, `Slope` (pente, par exemple `40°`), `Remarks`, `Gear`, `Route history`, `External resources`.
+## Quick start
 
-`get_route` liste aussi, avec leurs ID, les livres (topos, magazines…) qui couvrent l'itinéraire, ses points de passage (le principal marqué `main waypoint`), les itinéraires voisins, les articles liés et ses sorties récentes (`## Recent outings (10 of 64)`, suivi de `More: search_outings with route_id=<id>` pour les voir toutes). Une liste vide n'imprime pas de section.
+The server runs on your machine, started by your MCP client over stdio. Run it with npx, which needs [Node.js](https://nodejs.org/en/download) 22 or later, or with [Docker](https://docs.docker.com/get-started/get-docker/).
 
-Les textes libres écrits par les contributeurs (description, résumé, remarques, matériel, accès, conditions, météo…) sont imprimés entre `[begin user-written text: <champ>]` et `[end user-written text: <champ>]`, avec leurs titres Markdown abaissés de deux niveaux (`#`, `##` et titres soulignés par `===` ou `---`) et une coupe à 8000 caractères (`[truncated, N more characters]`). Les balises d'image Camptocamp deviennent `[image: <légende>]` (rien sans légende) et les liens internes `<libellé> (<type>/<id>)`, par exemple `[[routes/54080/fr|Col des Roches]]` → `Col des Roches (routes/54080)` ; le reste du balisage est conservé. La coupe compte les caractères après cette réécriture. La description de chaque outil `get_*` précise que ce texte est du contenu écrit par les utilisateurs, pas des instructions.
-
-Les recherches paginées (`search_routes`, `search_waypoints`, `search_outings`, `search_areas`, `search_books`, `search_articles`) acceptent `offset` et commencent par `Found <total> <type>(s). Showing <n> from offset <offset>:` (`Found <total> outing(s), most recent first. Showing <n> from offset <offset>:` pour `search_outings`), suivi d'une ligne `Filters:` listant les filtres appliqués. Le texte saisi repris dans ces lignes (`query "…"`) et dans les erreurs `rating_min "…"` / `rating_max "…"` reste sur une ligne : `"`, `\`, saut de ligne, retour chariot et tabulation y deviennent `\"`, `\\`, `\n`, `\r`, `\t`, les autres caractères de contrôle, U+2028, U+2029 et les caractères bidirectionnels ou invisibles (U+061C, U+200B–U+200F, U+202A–U+202E, U+2066–U+2069, U+FEFF) `\uxxxx` (le reste, accents compris, est inchangé : `query "Écrins"`), tandis que `q` part tel quel vers Camptocamp. Sans aucun résultat, la sortie tient en une ligne : `No <type>s found matching <filtres>.` (`No <type>s found.` sans filtre). Quand d'autres résultats suivent, la sortie se termine par `Next page: offset=<n>`, ou `Next page: offset=<n> (limit at most <m>)` quand une page complète dépasserait la fenêtre de 10 000 résultats (`limit` doit alors descendre à `<m>`). Camptocamp ne renvoie que les 10 000 premiers résultats d'une recherche : si la page suivante commencerait à 10 000 ou au-delà, la sortie se termine par `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.`, et un appel avec `offset + limit` au-delà de 10 000 est refusé avant toute requête.
-
-`get_waypoint` distingue `**Capacity (unstaffed)**` (places hors gardiennage, `0` compris) de `**Capacity (staffed)**` (places en gardiennage) pour les refuges, gîtes, campings et autres points ; un bivouac n'a qu'un `**Capacity**` (nombre de places). `**Custodianship**` est imprimé tel que Camptocamp l'envoie (`accessible_when_wardened`, `always_accessible`, `key_needed`, `no_warden`, ou toute nouvelle valeur), et la période d'accès (`Access period`) est un texte libre recopié tel quel, jamais converti en dates.
-
-`get_waypoint` liste ensuite, avec leurs ID, les itinéraires du point au format de `search_routes` (`## Routes (27 of 27)` ; au plus 50, suivis de `More: search_routes with waypoint_id=<id>` quand il y en a davantage), les livres qui le couvrent (`## Associated books`) et ses sorties récentes (`## Recent outings (10 of 1743)`, suivi de `More: search_outings with waypoint_id=<id>`). Une liste vide n'imprime pas de section.
-
-Les 13 outils acceptent `lang` (`fr` par défaut, `en`, `de`, `it`, `es`, `ca`, `eu`, `sl` ou `zh`), comme le rappellent leurs descriptions et les instructions du serveur : le titre, les textes et les noms des zones et documents associés sont pris dans cette langue, sinon dans la première disponible parmi `fr`, `en`, `it`, `de`, `es`, `ca`, `eu`, `sl`, `zh` ; les libellés et les codes restent en anglais. Les recherches l'envoient à Camptocamp (`search_routes {query: "Glacier du Geay", lang: "de"}` donne `- [54085] Mont Pourri : Voie normale du Glacier du Geay …`), et `search_user_outings` rend pour `{user_id, lang}` exactement la sortie de `search_outings`. Sur les outils `get_*` seulement, quand le document n'a pas de texte dans la langue demandée, la ligne qui suit l'URL le dit : `**Language**: en (no de version; available: it, en)` pour `get_route {id: 675555, lang: "de"}`, et aussi sans `lang` pour un document sans version `fr`. Juste après, `**Text in other languages**` nomme les sections que la version affichée n'a pas et qu'une autre langue a, sans en afficher le texte : `get_route {id: 54085}` donne `**Text in other languages**: gear (de, en, it)`. Une autre valeur, comme `ru`, est refusée avant tout appel.
-
-Un point de passage virtuel (`waypoint_type` `virtual`, comme `Ouvertures 2013` qui regroupe les itinéraires ouverts cette année-là) n'a pas d'emplacement réel : ni `get_waypoint`, ni `search_waypoints`, ni les listes de points de `get_route`, `get_book` et `get_article` n'affichent son altitude ou ses coordonnées.
-
-Un élément de liste que Camptocamp envoie dans un format inattendu (un point de passage associé avec `waypoint_type: null`, par exemple) ne fait plus échouer la réponse : il devient la ligne `- [104151] (not shown: Camptocamp sent this item in an unexpected format)`, ou `- (not shown: Camptocamp sent an item in an unexpected format)` sans ID lisible, et le reste du document (cotations, description, autres éléments) est affiché, avec des compteurs inchangés. Cela vaut pour les résultats de recherche et toutes les listes des `get_*` ; un champ de premier niveau manquant ou une liste qui n'est pas un tableau reste une erreur `unexpected response`.
-
-Chaque cotation d'itinéraire ou de sortie est nommée par son système, jamais par un simple `Rating` : `Ski rating (Toponeige): 4.1 | Ski exposure: E2 | Labande: S4 / AD | Global rating: F`, puis engagement, risque, équipement, rocher, artif, glace, mixte, via ferrata, randonnée, raquettes et VTT.
-
-`search_routes` demande au moins un filtre, un seul suffit ; plusieurs se combinent en ET : `query`, `area_id`, `waypoint_id` (itinéraires d'un sommet, refuge…), `activity`, `rating_system` avec `rating_min` et/ou `rating_max` (un système par appel, bornes incluses ; les itinéraires sans cette cotation sont exclus), `height_diff_up_min` / `height_diff_up_max` (D+ en mètres), `route_types` et `configuration` (l'une des valeurs données). Une cotation hors de l'échelle du système ou une valeur hors liste est refusée avant tout appel, avec la liste des valeurs valides : l'API l'ignorerait sans rien dire. L'en-tête rappelle les filtres (`Filters: area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1, elevation gain 1000 → 1500m`) et la réponse se termine par `Next page: offset=N` tant qu'il reste des résultats.
-
-`search_outings` filtre aussi sur ce que l'auteur de la sortie a indiqué pour ce jour-là : `rating_system` avec `rating_min` et/ou `rating_max` (12 systèmes, ceux de `search_routes` sans Labande ski, expositions, risque, rocher obligatoire, artif et mixte, que l'API ignore sur les sorties), `condition_at_least` (`excellent`, `good`, `average`, `poor`, `awful` : cette valeur ou mieux), `max_elevation_min` / `max_elevation_max` (altitude max) et `height_diff_up_min` / `height_diff_up_max` (D+), en mètres, bornes incluses. Les sorties sans valeur pour un filtre choisi sont exclues ; une valeur invalide est refusée avant tout appel, comme pour `search_routes`, et la ligne `Filters:` rappelle les filtres (`Filters: area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1, conditions good or better, max elevation 3000 → 4000m, elevation gain 1000 → 1500m`). `search_user_outings` n'a aucun de ces filtres.
-
-`search_waypoints` accepte `waypoint_type` (un des 26 types Camptocamp : `summit`, `pass`, `hut`, `bivouac`, `climbing_outdoor`…), qui précise une recherche par `query` ou `area_id` sans suffire seul. `search_books` accepte `book_type` (`topo`, `environment`, `historical`, `biography`, `photos-art`, `novel`, `technics`, `tourism`, `magazine`) et `activity` (`skitouring`, `hiking`…) : `{query: "vanoise", book_type: "topo", activity: "skitouring"}` donne les topos de ski de randonnée en Vanoise. Comme pour `search_routes`, une valeur hors liste est refusée avant tout appel avec la liste des valeurs valides, et la ligne `Filters:` les rappelle (`Filters: query "pourri", waypoint type hut`).
-
-## Installation
-
-### npm (recommandé)
-
-Prérequis : [Node.js](https://nodejs.org/) 22+ (la CI teste Node 22 et 24)
-
-**Claude Desktop** — ajouter dans la configuration :
+**npx.** Clients configured with an `mcpServers` JSON object, such as Claude Desktop (`claude_desktop_config.json`), Gemini CLI (`settings.json`) or Cursor (`.cursor/mcp.json`), take this entry:
 
 ```json
 {
@@ -71,22 +34,13 @@ Prérequis : [Node.js](https://nodejs.org/) 22+ (la CI teste Node 22 et 24)
 }
 ```
 
-**Cursor** — ajouter dans `~/.cursor/mcp.json` ou `.cursor/mcp.json` :
+In Claude Code, one command adds it for every project:
 
-```json
-{
-  "mcpServers": {
-    "camptocamp": {
-      "command": "npx",
-      "args": ["-y", "@olaurendeau/mcp-camptocamp"]
-    }
-  }
-}
+```sh
+claude mcp add --transport stdio --scope user camptocamp -- npx -y @olaurendeau/mcp-camptocamp
 ```
 
-### Docker
-
-Prérequis : [Docker](https://docs.docker.com/get-docker/)
+**Docker.** Use this entry instead; the image runs on amd64 and arm64:
 
 ```json
 {
@@ -99,50 +53,58 @@ Prérequis : [Docker](https://docs.docker.com/get-docker/)
 }
 ```
 
-Pour construire l'image localement :
+The first start downloads the package or the image, which can outlast a client's startup timeout. [Getting started](docs/getting-started.md) shows how to download it beforehand, a smoke test, and the Docker command for Claude Code; [Troubleshooting](docs/troubleshooting.md) helps when the server does not show up.
 
-```bash
-docker compose build mcp
-```
+The server is listed in the [official MCP registry](https://registry.modelcontextprotocol.io/v0/servers/io.github.olaurendeau%2Fmcp-camptocamp/versions/latest) as `io.github.olaurendeau/mcp-camptocamp`.
 
-Puis utiliser l'image locale `mcp-camptocamp-mcp` à la place de `ghcr.io/olaurendeau/mcp-camptocamp:latest`.
+## Supported clients
 
-## Développement
+| Client                                                                 | Works?                                                  | Setup                                                                      |
+| ---------------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Claude Desktop                                                         | Yes                                                     | [Claude Desktop](docs/clients/claude-desktop.md)                           |
+| Claude Code                                                            | Yes                                                     | [Claude Code](docs/clients/claude-code.md)                                 |
+| ChatGPT desktop app, Codex CLI and Codex IDE extension                 | Yes                                                     | [ChatGPT desktop app and Codex](docs/clients/chatgpt-desktop-and-codex.md) |
+| Mistral Vibe Code CLI and VS Code extension                            | Yes                                                     | [Mistral Vibe Code](docs/clients/mistral-vibe-code.md)                     |
+| Gemini CLI, Gemini Code Assist                                         | Yes: CLI in a trusted folder, Code Assist in agent mode | [Gemini CLI and Gemini Code Assist](docs/clients/gemini-cli.md)            |
+| Your own agent: OpenAI Agents SDK, Mistral Python SDK, google-genai    | Yes                                                     | [Agent SDKs](docs/agent-sdks.md)                                           |
+| Cursor and other clients that start a local command                    | Yes                                                     | [Getting started](docs/getting-started.md#other-mcp-clients)               |
+| Claude.ai custom connectors, ChatGPT on the web, Vibe Work, Gemini API | No: remote servers only                                 | [Remote-only clients](docs/clients/remote-only.md)                         |
 
-Prérequis : [Docker](https://docs.docker.com/get-docker/) et [Docker Compose](https://docs.docker.com/compose/)
+The [support matrix](docs/README.md#support-matrix) lists the clients covered by the client pages and the agent SDK guide, with the date each page was last checked against the vendor's docs.
 
-Toutes les commandes npm passent par Docker via le `Makefile` :
+## Tools
 
-```bash
-make install       # Installer les dépendances
-make check         # Équivalent du job `checks` de la CI (format, lint, types, couverture, build, tests du hook)
-make test          # Lancer les tests
-make test-contract # Tests de contrat contre l'API Camptocamp réelle (npm run test:contract, réseau requis, hors make check)
-make lint          # Lint ESLint
-make typecheck     # Vérification des types
-make test-watch    # Tests en mode watch
-make build         # Compiler TypeScript
-make docker-build  # Construire l'image de production
-make help          # Liste toutes les commandes
-```
+13 read-only tools: one search and one detail tool per kind of Camptocamp document, plus a shortcut for a user's outings. Search results give IDs; the `get_*` tools take an ID. Every tool takes `lang`, the language of titles and texts (`fr` by default; v1.3.0 or later).
 
-Les tests de contrat tournent aussi chaque lundi via le workflow `Contract` (`.github/workflows/contract.yml`, planifié ou lancé à la main, jamais requis sur une PR) :
+| Tool                                                       | What it does                                                                                                     |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [`search_routes`](docs/tools/search_routes.md)             | Search routes by keyword, area, waypoint, activity, rating, elevation gain, route type or configuration; paged.  |
+| [`get_route`](docs/tools/get_route.md)                     | One route by ID: ratings, elevation, practical facts, description, areas, books, waypoints and recent outings.   |
+| [`search_waypoints`](docs/tools/search_waypoints.md)       | Search summits, huts, passes, crags and other waypoints by name and/or area, optionally by type; paged.          |
+| [`get_waypoint`](docs/tools/get_waypoint.md)               | One waypoint by ID: altitude, GPS coordinates, hut details, access, areas, routes, books and outings.            |
+| [`search_outings`](docs/tools/search_outings.md)           | Search trip reports by keyword, area, activity, ratings, conditions, elevation, dates, route, waypoint or user.  |
+| [`search_user_outings`](docs/tools/search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                            |
+| [`get_outing`](docs/tools/get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.                |
+| [`search_areas`](docs/tools/search_areas.md)               | Search ranges, administrative subdivisions and countries by name; the ID is reusable as `area_id`.               |
+| [`get_area`](docs/tools/get_area.md)                       | One area by ID: type, summary and description.                                                                   |
+| [`search_books`](docs/tools/search_books.md)               | Search guidebooks and other books by title, book type and activity; author and ISBN searches are unreliable.     |
+| [`get_book`](docs/tools/get_book.md)                       | One book by ID: author, editor, date, ISBN, languages, and the routes, waypoints and articles it covers.         |
+| [`search_articles`](docs/tools/search_articles.md)         | Search articles (gear, technique, environment, stories) by keyword; by category, type and activity after v1.3.0. |
+| [`get_article`](docs/tools/get_article.md)                 | One article by ID: text, author, type, and the routes, waypoints, articles, outings and books linked to it.      |
 
-- GitHub désactive les workflows planifiés après 60 jours sans activité sur le dépôt : une exécution hebdomadaire absente ne vaut pas succès. GitHub refuse de lancer à la main un workflow désactivé : le réactiver d'abord (`gh workflow enable contract.yml` ou l'onglet Actions), puis le lancer avec `gh workflow run contract.yml`.
-- Les échecs des exécutions planifiées sont notifiés à l'utilisateur qui a modifié la ligne `cron` en dernier (après un squash merge, l'auteur de ce commit sur `main`) ou, si le workflow a été réactivé, à l'utilisateur qui l'a réactivé.
+Each tool page gives its inputs, generated from the registered schema, its output format, a real example and its limits: see the [tool reference](docs/tools/README.md).
 
-## Publication
+## Guides
 
-La publication est automatisée : le tag `vX.Y.Z` déclenche le workflow `publish.yml`, qui publie sur npm, GHCR et le [registre MCP officiel](https://modelcontextprotocol.io/registry). Aucune publication manuelle : le processus (PR de bump, merge, tag) est décrit dans la section [Release de `CONTRIBUTING.md`](CONTRIBUTING.md#release).
+- [Using the tools with an LLM](docs/using-with-llms.md): which tools to chain for a region, a summit altitude, a hut, recent conditions or guidebooks; what each output line means; and a real June ski-tour example.
+- [System prompt](docs/system-prompt.md): a prompt to paste into your agent, so the model quotes Camptocamp, cites it and says when a value is missing.
+- [Documentation index](docs/README.md): every page, by topic.
 
-## Stack technique
+## Development
 
-- **Runtime** : Node.js 22+ (CI sur 22 et 24) + TypeScript
-- **MCP SDK** : `@modelcontextprotocol/sdk`
-- **Transport** : stdio
-- **Tests** : Vitest
-- **Docker** : image multi-stage (`node:22-alpine`), multi-arch (amd64, arm64), exécutée par un utilisateur non-root (`node`)
+Everything runs in Docker, through the `Makefile`: no local Node.js is needed. `make check` runs the same steps as the CI `checks` job: format, lint, type check, tests with enforced coverage thresholds (95 % of lines, functions and statements, 90 % of branches), build and hook tests.
+Every change lands through a reviewed pull request: see [CONTRIBUTING.md](CONTRIBUTING.md) (in French), and [Development](docs/development.md) for the make targets, the live API contract tests, releases and the stack.
 
-## Licence
+## License
 
-MIT
+[MIT](LICENSE)
