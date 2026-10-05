@@ -23,7 +23,7 @@ import {
 import { isMalformed } from "../api/schemas.js";
 import { ROUTE_RATING_SYSTEMS, formatRatingLines } from "./ratings.js";
 import { describeRange, heightDiffUp, rangeFilter, ratingBound, ratingFilter, ratingScales } from "./filters.js";
-import { formatUserTexts, USER_TEXT_NOTE, type TextSection } from "./text.js";
+import { formatUserTexts, USER_TEXT_NOTE, type TextCut, type TextSection } from "./text.js";
 
 // The free-text sections get_outing prints, in print order; a field name the locale lacks fails the typecheck.
 const OUTING_TEXT = [
@@ -153,7 +153,8 @@ function formatAccount(user: NonNullable<NonNullable<OutingDetail["associations"
     : `(user ID: ${user.document_id}, ${MALFORMED_ITEM_NOTE})`;
 }
 
-function formatOutingDetail(outing: OutingDetail, lang?: Lang): string {
+// The block for one outing; `cut` sets where its user-written text is cut (8000 by default).
+function formatOutingDetail(outing: OutingDetail, lang?: Lang, cut?: TextCut): string {
   const locale = pickLocale(outing.locales, lang);
   const lines: string[] = [];
 
@@ -181,7 +182,7 @@ function formatOutingDetail(outing: OutingDetail, lang?: Lang): string {
   if (isPresent(outing.height_diff_up)) lines.push(`**Elevation gain**: ${outing.height_diff_up}m`);
   if (isPresent(outing.height_diff_down)) lines.push(`**Elevation loss**: ${outing.height_diff_down}m`);
 
-  lines.push(...formatUserTexts(locale, OUTING_TEXT));
+  lines.push(...formatUserTexts(locale, OUTING_TEXT, cut));
 
   const routes = outing.associations?.routes;
   if (routes && routes.length > 0) {
