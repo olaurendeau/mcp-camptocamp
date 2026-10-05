@@ -1467,6 +1467,24 @@ describe("searchOutings", () => {
     expect(calledUrl().searchParams.has("date")).toBe(false);
   });
 
+  // Plain -date_end leaves outings ending the same day in arbitrary order between pages; -id makes it strict.
+  it("breaks date ties by descending ID with tiebreak_by_id", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ route_id: 54513, tiebreak_by_id: true, limit: 100 });
+
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API}/outings?r=54513&sort=-date_end%2C-id&limit=100&offset=0&pl=fr`);
+  });
+
+  it.each([false, undefined])("keeps the -date_end sort with tiebreak_by_id %s", async (tiebreak) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ route_id: 54513, tiebreak_by_id: tiebreak });
+
+    expect(calledUrl().searchParams.get("sort")).toBe("-date_end");
+    expect(calledUrl().searchParams.has("tiebreak_by_id")).toBe(false);
+  });
+
   it("sends custom limit and offset and no unset filter", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
 

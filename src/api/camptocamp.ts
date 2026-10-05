@@ -209,6 +209,9 @@ export interface OutingSearchParams {
   limit?: number; // default DEFAULT_LIMIT
   offset?: number; // default 0
   lang?: Lang; // sent as pl, default DEFAULT_LANG
+  // Sort `-date_end,-id` instead of `-date_end`: outings ending the same day otherwise come back in an
+  // arbitrary order, which can differ from one page to the next, so paging could skip or repeat one.
+  tiebreak_by_id?: boolean;
 }
 
 export async function searchOutings(params: OutingSearchParams = {}): Promise<OutingListResponse> {
@@ -237,7 +240,7 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
   if (params.route_id !== undefined) search.set("r", String(params.route_id));
   if (params.waypoint_id !== undefined) search.set("w", String(params.waypoint_id));
   if (params.user_id !== undefined) search.set("u", String(params.user_id));
-  search.set("sort", "-date_end");
+  search.set("sort", params.tiebreak_by_id === true ? "-date_end,-id" : "-date_end");
   search.set("limit", String(params.limit ?? DEFAULT_LIMIT));
   search.set("offset", String(params.offset ?? 0));
   search.set("pl", params.lang ?? DEFAULT_LANG);

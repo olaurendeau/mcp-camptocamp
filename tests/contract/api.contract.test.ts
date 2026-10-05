@@ -16,6 +16,7 @@ import {
   searchOutings,
   searchRoutes,
   searchWaypoints,
+  type OutingListResponse,
 } from "../../src/api/camptocamp.js";
 import { isMalformed, type MalformedItem } from "../../src/api/schemas.js";
 import { pickLocale, type ListOf } from "../../src/tools/format.js";
@@ -85,6 +86,24 @@ function expectMostMatch<T extends { document_id: number }>(
 function once<T>(load: () => Promise<T>): () => Promise<T> {
   let result: Promise<T> | undefined;
   return () => (result ??= load());
+}
+
+// The order of `sort=-date_end,-id`, checked on a page that has at least one same-day tie, so that the ID
+// key is exercised.
+function expectStrictlyByDateEndThenIdDescending(result: OutingListResponse): void {
+  const outings = wellFormed(result.documents).map((outing) => ({
+    date: outing.date_end ?? "",
+    id: outing.document_id,
+  }));
+  expect(
+    outings.some((outing, i) => i > 0 && outing.date === outings[i - 1].date),
+    "no same-day tie",
+  ).toBe(true);
+  for (let i = 1; i < outings.length; i++) {
+    const [previous, current] = [outings[i - 1], outings[i]];
+    const ordered = previous.date > current.date || (previous.date === current.date && previous.id > current.id);
+    expect(ordered, `outing ${current.id} (${current.date}) after ${previous.id} (${previous.date})`).toBe(true);
+  }
 }
 
 const VANOISE = 14409;
@@ -199,6 +218,21 @@ describe("searches (AC8.2, AC8.3)", () => {
 
     expect(january.total).toBeGreaterThan(0);
     expect(january.total).toBeGreaterThanOrEqual(fromSecond.total);
+  });
+
+  // `sort=-date_end,-id` (tiebreak_by_id), which outing counts page through: a strict order, so pages of
+  // 100 neither skip nor repeat an outing. Route 54513 has outings ending the same day (2016-07-08).
+  it("outings of route 54513 with tiebreak_by_id, all on one page of 100, by (date_end, id) descending", async () => {
+    const result = await searchOutings({ route_id: 54513, tiebreak_by_id: true, limit: 100 });
+
+    expect(result.documents).toHaveLength(Math.min(result.total, 100));
+    expectStrictlyByDateEndThenIdDescending(result);
+  });
+
+  // Plain `-date_end` returns same-day ties of route 54513 in descending ID order anyway. The latest 100
+  // outings tell the two sorts apart: without `-id`, 63 of their 94 ties came back ascending (2026-10-05).
+  it("the latest 100 outings with tiebreak_by_id, by (date_end, id) descending", async () => {
+    expectStrictlyByDateEndThenIdDescending(await searchOutings({ tiebreak_by_id: true, limit: 100 }));
   });
 
   it("areas by keyword", async () => {
