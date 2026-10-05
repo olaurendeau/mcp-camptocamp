@@ -210,6 +210,16 @@ describe("searches (AC8.2, AC8.3)", () => {
     }
   });
 
+  // #251, AC0.4: a period starting on 01-01 matched nothing while it was sent as 2020-01-01 (day 365.1 of the
+  // API's 365.2425-day year). Adding 01-01 to 01-02 → 01-31 can only add outings.
+  it("outings in the period 01-01 → 01-31, at least as many as in 01-02 → 01-31", async () => {
+    const january = await searchOutings({ period: { start: "01-01", end: "01-31" }, limit: 1 });
+    const fromSecond = await searchOutings({ period: { start: "01-02", end: "01-31" }, limit: 1 });
+
+    expect(january.total).toBeGreaterThan(0);
+    expect(january.total).toBeGreaterThanOrEqual(fromSecond.total);
+  });
+
   // `sort=-date_end,-id` (tiebreak_by_id), which outing counts page through: a strict order, so pages of
   // 100 neither skip nor repeat an outing. Route 54513 has outings ending the same day (2016-07-08).
   it("outings of route 54513 with tiebreak_by_id, all on one page of 100, by (date_end, id) descending", async () => {

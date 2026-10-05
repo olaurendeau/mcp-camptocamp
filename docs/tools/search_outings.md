@@ -133,29 +133,49 @@ The period matches June of every year: here 2026 and 2025. `get_outing {id: 1912
   | 2021 | 1358       | 1313              | 1357              |
   | 2024 | 1519       | 1456              | 1518              |
 
-  A period ending on `12-31` cannot be widened past it, and widening a period to start on `01-01` runs into the next limit.
+  A period ending on `12-31` cannot be widened past it, and a period starting on `01-01` cannot be widened before it (next item).
 
-- **A period starting on `01-01` returns almost nothing.** Measured on the live API on 2026-10-05, with no other filter:
+- **A period starting on `01-01` returns almost nothing in v1.3.0, and misses 1 January in some years after it.** Camptocamp reduces each bound of a period, and the dates of each outing, to a day of a 365.2425-day year. v1.3.0 sends every bound in 2020, which puts `2020-01-01` after `12-31`. From the release after v1.3.0, a `01-01` start is sent as `1970-01-01` and a `01-01` end as `2021-01-01`, so these periods find the outings of the other days. Measured on the live API on 2026-10-05, with no other filter:
 
-  | Period            | Outings found |
-  | ----------------- | ------------- |
-  | `01-01` → `01-31` | 0             |
-  | `01-02` → `01-31` | 29297         |
-  | `01-01` → `12-31` | 4             |
-  | `12-20` → `12-31` | 10098         |
+  | Period            | v1.3.0 | From the release after v1.3.0 |
+  | ----------------- | ------ | ----------------------------- |
+  | `01-01` → `01-31` | 0      | 30161                         |
+  | `01-01` → `01-01` | 76     | 692                           |
+  | `01-01` → `12-31` | 4      | 346332                        |
+  | `01-02` → `01-31` | 29297  | 29297                         |
+  | `12-20` → `12-31` | 10098  | 10098                         |
 
-  A period ending on `12-31` works normally. For early January, start the period on `01-02` and accept that 1 January is left out, or use `date_from` and `date_to` instead, one year per call. An empty result for a period starting on `01-01` does not mean there are no reports.
+  1 January itself is still missed in some years from the release after v1.3.0. 1 January of a leap year lands after `12-31` on that 365.2425-day year, so no period starting on `01-01` returns an outing dated on 1 January alone, however wide; `01-01` → `12-31` only returns those that span several days. A `01-01` → `01-01` period also misses 1 January of some other years, such as 2025. Measured on the live API on 2026-10-05, the outings of 1 January of one year (`date_from` and `date_to` alone on that day, then with each period, from the release after v1.3.0):
 
-- **An outing spanning the new year matches no period.** Outing 1362640, from 2020-12-17 to 2021-10-28, was returned by no period tested. `date_from` and `date_to` do return it.
+  | Year | Dates only | `01-01` → `01-31` | `01-01` → `01-01` | `01-01` → `12-31` |
+  | ---- | ---------- | ----------------- | ----------------- | ----------------- |
+  | 2019 | 64         | 62                | 62                | 64                |
+  | 2020 | 77         | 0                 | 0                 | 3                 |
+  | 2021 | 54         | 47                | 47                | 54                |
+  | 2022 | 84         | 80                | 80                | 84                |
+  | 2023 | 47         | 40                | 40                | 47                |
+  | 2024 | 42         | 0                 | 0                 | 5                 |
+  | 2025 | 88         | 84                | 0                 | 86                |
+  | 2026 | 57         | 47                | 47                | 57                |
+
+  In v1.3.0, `01-01` → `01-31` returns none of them, in each of these years. From the release after v1.3.0, in the six years other than 2020 and 2024, it returns every outing dated on 1 January alone; the outings it misses span several days. For 1 January, use `date_from` and `date_to`, one year per call, in every version. With v1.3.0, start a January period on `01-02`. An empty result for a period starting on `01-01` does not mean there are no reports.
+
+- **An outing spanning the new year is missed by periods inside its dates.** Camptocamp keeps an outing when its end falls on or after `period_start` and its start on or before `period_end`, all reduced to days of the 365.2425-day year, so a bound can be off by a day. For an outing spanning the new year and lasting less than a year, the end day comes before the start day, so only a period covering the days between them returns it. This does not hold for an outing lasting a year or more, such as 1684833, from 2023-08-15 to 2024-08-16. Outing 1362640, from 2020-12-17 to 2021-10-28 (route 1276279), measured on the live API on 2026-10-05:
+  - returned by `10-27` → `12-17`, `10-01` → `12-20`, `03-01` → `12-20` and `06-01` → `12-31`, in v1.3.0 too;
+  - not returned by `10-28` → `12-17`, `10-27` → `12-16`, `01-01` → `01-31`, `06-01` → `06-30` or `12-01` → `12-31`;
+  - returned by `01-01` → `12-31` from the release after v1.3.0, but not in v1.3.0.
+
+  `date_from` and `date_to` return it.
+
 - **A period cannot wrap around the new year.** `period_end` must be on or after `period_start`. `search_outings {area_id: 14409, activity: "skitouring", period_start: "12-20", period_end: "01-10", limit: 3}`, captured from v1.3.0 on 2026-10-05:
 
   ```text
   Error: period cannot wrap around the new year; make two calls (12-20 → 12-31 and 01-01 → 01-10)
   ```
 
-  The second call this error suggests starts on `01-01`, so it hits the limit above. Make the second call start on `01-02`, or use `date_from` and `date_to` for those January days. For this Vanoise ski-touring search, measured on 2026-10-05:
+  From the release after v1.3.0, both calls this error suggests return outings, but the second one misses 1 January in some years (see above): use `date_from` and `date_to` for that day. In v1.3.0, the second call starts on `01-01` and returns almost nothing: make it start on `01-02`, or use `date_from` and `date_to` for those January days. For this Vanoise ski-touring search, measured on 2026-10-05:
   - `12-20` → `12-31` found 79 outings;
-  - `01-01` → `01-10` found none;
+  - `01-01` → `01-10` found 53 from the release after v1.3.0, and none in v1.3.0;
   - `01-02` → `01-10` found 45;
   - `date_from: "2025-01-01"` with `date_to: "2025-01-10"` and no period found 3, for January 2025 only.
 
