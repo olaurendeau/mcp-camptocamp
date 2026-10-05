@@ -244,12 +244,24 @@ export function checkMcpServers(text: string): string[] {
   );
 }
 
-// "Bearer " then 20 or more characters of a bearer token (RFC 6750 b64token): a real token, not `$VAR`, `${VAR}` or
-// `%s`. Same for any entry of an MCP_AUTH_TOKENS list, set with `=` (env, docker -e), `:` (YAML) or `": "` (JSON).
+// A bearer token (RFC 6750 b64token) of 20 or more characters: a real token, not `$VAR`, `${VAR}` or `%s`.
+const TOKEN = String.raw`[A-Za-z0-9\-._~+/]{20,}`;
+// The entries of a comma-separated list before the token: `alice,`, `$OLD, ` or `${OLD},`.
+const EARLIER_ENTRIES = String.raw`(?:[^,\s"']*[ \t]*,[ \t]*)*`;
 const LITERAL_TOKENS: [RegExp, string][] = [
-  [/\bBearer +[A-Za-z0-9\-._~+/]{20,}/gi, "a literal bearer token"],
+  [new RegExp(String.raw`\bBearer +${TOKEN}`, "gi"), "a literal bearer token"],
+  // On the key's line, after `=` (env, docker -e), `:` (YAML) or `": "` (JSON).
   [
-    /\bMCP_AUTH_TOKENS["']?\s*[=:]\s*["']?(?:[A-Za-z0-9\-._~+/=]*\s*,\s*)*[A-Za-z0-9\-._~+/]{20,}/g,
+    new RegExp(String.raw`\bMCP_AUTH_TOKENS["']?[ \t]*[=:][ \t]*["']?${EARLIER_ENTRIES}${TOKEN}`, "g"),
+    "a literal MCP_AUTH_TOKENS value",
+  ],
+  // Alone on the next, more indented line, after a YAML key with no value or a block scalar indicator (`|`, `>-`…).
+  // A line as indented as the key is the next key: a Compose key without a value is read from the host.
+  [
+    new RegExp(
+      String.raw`^([ \t]*)["']?MCP_AUTH_TOKENS["']?[ \t]*:[ \t]*(?:[|>][+-]?\d?[ \t]*)?\n\1[ \t]+["']?${EARLIER_ENTRIES}${TOKEN}=*["']?[ \t]*$`,
+      "gm",
+    ),
     "a literal MCP_AUTH_TOKENS value",
   ],
 ];

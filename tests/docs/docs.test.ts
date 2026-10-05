@@ -320,14 +320,34 @@ describe("docs checks fail on bad fixtures", () => {
       `MCP_AUTH_TOKENS=alice,${token}`,
       `MCP_AUTH_TOKENS: "bob, ${token}"`,
       "MCP_AUTH_TOKENS: ${MCP_AUTH_TOKENS} and MCP_AUTH_TOKENS=alice,bob and `MCP_AUTH_TOKENS`: a comma-separated list",
-      "MCP_AUTH_TOKENS:",
-      `  ${token}`,
+      `MCP_AUTH_TOKENS=\${OLD},${token} and MCP_AUTH_TOKENS="$OLD, ${token}"`,
     ].join("\n");
     const problems = checkTokenLiterals(text);
 
     expect(problems).toEqual(
-      [1, 2, 3, 4, 6].map((line) => `line ${line}: a literal MCP_AUTH_TOKENS value; use an env var`),
+      [1, 2, 3, 4, 6, 6].map((line) => `line ${line}: a literal MCP_AUTH_TOKENS value; use an env var`),
     );
+    expect(problems.join("\n")).not.toContain(token.slice(0, 8));
+  });
+
+  it("a literal MCP_AUTH_TOKENS value alone on the next, more indented YAML line, but not the next key", () => {
+    const token = "0f".repeat(32);
+    const text = [
+      "    MCP_AUTH_TOKENS:",
+      `      ${token}`,
+      "    MCP_AUTH_TOKENS: >-",
+      `      ${token}`,
+      "    MCP_AUTH_TOKENS: |",
+      `      alice,${token}`,
+      // Compose takes a key without a value from the host; an env file may leave a variable empty.
+      "    MCP_AUTH_TOKENS:",
+      "    MCP_OPERATOR_CONTACT: ops@example.org",
+      "MCP_AUTH_TOKENS=",
+      "MCP_OPERATOR_CONTACT=ops@example.org",
+    ].join("\n");
+    const problems = checkTokenLiterals(text);
+
+    expect(problems).toEqual([1, 3, 5].map((line) => `line ${line}: a literal MCP_AUTH_TOKENS value; use an env var`));
     expect(problems.join("\n")).not.toContain(token.slice(0, 8));
   });
 
