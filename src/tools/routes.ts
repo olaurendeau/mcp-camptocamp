@@ -76,7 +76,8 @@ export const searchRoutesSchema = z.object({
     ROUTE_CONFIGURATIONS,
     `Terrain configurations, matching any of: ${ROUTE_CONFIGURATIONS.join(", ")} (edge = arête/ridge). ` +
       "Tagging is incomplete: routes without a configuration are excluded, and some ridges are tagged pillar or glacier. " +
-      "For ridges, also search query: 'arête', which matches names only",
+      "For ridges, also search query: 'arête', which matches names only and so also lists routes on summits " +
+      "whose name contains 'arête'",
   ),
   offset: searchOffset(),
   lang: langInput(),

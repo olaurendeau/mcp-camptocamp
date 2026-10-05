@@ -1159,6 +1159,8 @@ describe("search_routes tool definition", () => {
     expect(description).toContain("routes without a configuration are excluded");
     expect(description).toContain("some ridges are tagged pillar or glacier");
     expect(description).toContain("query: 'arête'");
+    // 13 of the 23 non-edge 'arête' matches in range 14410 are on summits named "Pointe … de l'arête …" (2026-10-05).
+    expect(description).toContain("also lists routes on summits whose name contains 'arête'");
   });
 });
 
