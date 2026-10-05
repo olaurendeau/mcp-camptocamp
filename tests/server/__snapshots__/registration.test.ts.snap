@@ -156,6 +156,12 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         ],
         "type": "string",
       },
+      "max_section_chars": {
+        "description": "Characters each text section is cut at, 500 to 8000 (default 2000); a higher value lengthens the output",
+        "maximum": 8000,
+        "minimum": 500,
+        "type": "integer",
+      },
     },
     "required": [
       "ids",

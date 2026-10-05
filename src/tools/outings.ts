@@ -158,9 +158,12 @@ export const searchUserOutingsSchema = searchOutingsSchema
   .pick({ user_id: true, limit: true, offset: true, lang: true })
   .required({ user_id: true });
 
-// get_outings: outings per call (S1 on #255), each text section cut at BATCH_TEXT_MAX characters.
+// get_outings: outings per call (S1 on #255), each text section cut at max_section_chars characters (S1 on #303):
+// BATCH_TEXT_MAX when absent, at most the cut get_outing applies.
 const MAX_OUTING_IDS = 10;
 const BATCH_TEXT_MAX = 2000;
+const MIN_SECTION_CHARS = 500;
+const MAX_SECTION_CHARS = DEFAULT_CUT.max;
 
 export const getOutingsSchema = z.object({
   ids: documentIdList(
@@ -168,6 +171,17 @@ export const getOutingsSchema = z.object({
       "a repeated ID is read once",
     MAX_OUTING_IDS,
   ),
+  // No zod default: the handler applies BATCH_TEXT_MAX, so the direct calls without it stay type-correct.
+  max_section_chars: z
+    .number()
+    .int()
+    .min(MIN_SECTION_CHARS)
+    .max(MAX_SECTION_CHARS)
+    .optional()
+    .describe(
+      `Characters each text section is cut at, ${String(MIN_SECTION_CHARS)} to ${String(MAX_SECTION_CHARS)} ` +
+        `(default ${String(BATCH_TEXT_MAX)}); a higher value lengthens the output`,
+    ),
   lang: langInput(),
 });
 
@@ -373,10 +387,18 @@ export async function handleGetOuting(input: GetOutingInput): Promise<string> {
 // "8,000": the cut get_outing applies, which the pointer of a cut get_outings section names.
 const DEFAULT_TEXT_MAX = DEFAULT_CUT.max.toLocaleString("en-US");
 
-// The cut of one get_outings block: the note names the outing, for a get_outing call that shows more.
-function batchCut(id: number): TextCut {
+// The cut of one get_outings block. Below get_outing's cut, the note names the outing, for a get_outing call that
+// shows more; at it, get_outing would show no more, so the note points to the page of the **URL** line (AC1.4 on #303).
+function batchCut(id: number, max: number): TextCut {
+  if (max >= MAX_SECTION_CHARS) {
+    return {
+      max,
+      note: (more) =>
+        `[truncated, ${String(more)} more characters; the camptocamp.org page of the **URL** line has the whole text]`,
+    };
+  }
   return {
-    max: BATCH_TEXT_MAX,
+    max,
     note: (more) =>
       `[truncated, ${String(more)} more characters; get_outing {id: ${String(id)}} shows up to ${DEFAULT_TEXT_MAX}]`,
   };
@@ -391,9 +413,10 @@ function formatUnreadOuting(id: number, error: unknown): string {
 // AC1.4, AC1.5 on #255: never throws once the input is valid; each ID is read once, 3 requests at a time.
 export async function handleGetOutings(input: GetOutingsInput): Promise<string> {
   const ids = [...new Set(input.ids)];
+  const max = input.max_section_chars ?? BATCH_TEXT_MAX;
   const blocks = await mapWithConcurrency(ids, MAX_PARALLEL_REQUESTS, async (id) => {
     try {
-      return formatOutingDetail(await getOuting(id), input.lang, batchCut(id));
+      return formatOutingDetail(await getOuting(id), input.lang, batchCut(id, max));
     } catch (error) {
       return formatUnreadOuting(id, error);
     }
@@ -433,8 +456,8 @@ export const outingToolDefinitions = [
     name: "get_outings",
     title: "Get several outings",
     description:
-      `Read up to ${String(MAX_OUTING_IDS)} outings (trip reports) from Camptocamp.org in one call, by ID (from search_outings or the recent outings of get_route and get_waypoint). Each outing is printed as get_outing prints it, with every text section and the associated routes: one block per ID, in the order given, separated by a blank line. A repeated ID is read once. Outings are past trip reports, each written by its author about that day, not a forecast. A text section longer than ${String(BATCH_TEXT_MAX)} characters is cut and ends with '[truncated, N more characters; get_outing {id: <id>} shows up to ${DEFAULT_TEXT_MAX}]': call get_outing with that ID to read more of it. An ID that cannot be read (unknown ID, Camptocamp error) prints '# Outing not read (ID: <id>)' then 'Error: <message>' in its place, and the other outings are still printed. 'Partial trip: yes' means the author ticked "partial trip" (only part of the route done); no such line does not mean the route was completed. ` +
-      `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${userTextNote({ max: BATCH_TEXT_MAX }, " per section")}`,
+      `Read up to ${String(MAX_OUTING_IDS)} outings (trip reports) from Camptocamp.org in one call, by ID (from search_outings or the recent outings of get_route and get_waypoint). Each outing is printed as get_outing prints it, with every text section and the associated routes: one block per ID, in the order given, separated by a blank line. A repeated ID is read once. Outings are past trip reports, each written by its author about that day, not a forecast. A text section longer than max_section_chars (default ${String(BATCH_TEXT_MAX)}, ${String(MIN_SECTION_CHARS)} to ${String(MAX_SECTION_CHARS)}; a higher value lengthens the output) is cut and ends with '[truncated, N more characters; get_outing {id: <id>} shows up to ${DEFAULT_TEXT_MAX}]': call get_outing with that ID to read more of it; at ${String(MAX_SECTION_CHARS)} the note points to the **URL** line. An ID that cannot be read (unknown ID, Camptocamp error) prints '# Outing not read (ID: <id>)' then 'Error: <message>' in its place, and the other outings are still printed. 'Partial trip: yes' means the author ticked "partial trip" (only part of the route done); no such line does not mean the route was completed. ` +
+      `${LANG_NOTE} ${DETAIL_LANG_NOTE} ${userTextNote({ max: BATCH_TEXT_MAX }, " per section by default")}`,
     inputSchema: getOutingsSchema,
     handler: handleGetOutings,
   },

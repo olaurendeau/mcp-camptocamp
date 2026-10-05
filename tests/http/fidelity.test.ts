@@ -172,6 +172,11 @@ const TOOL_ARGUMENTS: Record<string, Record<string, unknown>> = {
   get_article: { id: 107016 },
 };
 
+// Inputs a tool takes beyond those above, each run through the same API-500 check (S1 of #303).
+const EXTRA_ARGUMENTS: [string, Record<string, unknown>][] = [
+  ["get_outings", { ids: [1630012], max_section_chars: 8000 }],
+];
+
 // get_outings never fails once its input is valid: an unreadable ID prints "Error: <message>" in its block.
 const NEVER_AN_ERROR_RESULT = new Set(["get_outings"]);
 
@@ -257,7 +262,7 @@ describe("HTTP fidelity with the in-memory transport", () => {
     expect(Object.keys(TOOL_ARGUMENTS).sort()).toEqual(tools.map((tool) => tool.name).sort());
   });
 
-  it.each(Object.entries(TOOL_ARGUMENTS))("gives the same %s output for an API 500", async (name, args) => {
+  it.each([...Object.entries(TOOL_ARGUMENTS), ...EXTRA_ARGUMENTS])("gives the same %s output for an API 500", async (name, args) => {
     const fetchMock = stubFetch(serverError);
     const result = await expectSameOutput(name, args);
 
