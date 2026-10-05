@@ -60,7 +60,7 @@ Search trip reports across Camptocamp.org, most recent first, by keyword, area, 
 
 <!-- generated:inputs end -->
 
-**Not in v1.3.0:** `route_ids` comes with the release after v1.3.0. v1.3.0 ignores it without an error and returns every outing on Camptocamp, unfiltered and with no `Filters:` line. On v1.3.0, call `search_outings {route_id}` once per route instead.
+**Not in v1.3.0:** `route_ids` comes with the release after v1.3.0. v1.3.0 ignores it without an error and applies the other filters without the route filter: with `route_ids` alone, it returns every outing on Camptocamp, with no `Filters:` line. On v1.3.0, call `search_outings {route_id}` once per route instead.
 
 ## Output format
 
@@ -128,7 +128,7 @@ Next page: offset=3
 
 The period matches June of every year: here 2026 and 2025. `get_outing {id: 1912989}` gives the full report of the first one: see [its example](get_outing.md#example).
 
-The outings of three routes around the Innominata in one call, `search_outings {route_ids: [54513, 1148298, 54684], limit: 3}`, captured from main at 596f777 with `route_ids` added (#257) on 2026-10-05, with a local build:
+The outings of three routes around the Innominata in one call, which needs the release after v1.3.0, `search_outings {route_ids: [54513, 1148298, 54684], limit: 3}`, captured from main at 596f777 with `route_ids` added (#257) on 2026-10-05, with a local build:
 
 ```text
 Found 86 outing(s), most recent first. Showing 3 from offset 0:
@@ -192,15 +192,15 @@ The result lines do not say which of the routes an outing is linked to: `get_out
 - **Ratings, conditions, max elevation and elevation gain are those the author reported for that day**, not the route's. An outing without a value for a filtered field is left out. One rating system per call: `rating_min` and `rating_max` must come from the scale of `rating_system`, and any other value is refused with the valid list. `rating_system` takes 12 of the 20 systems of [`search_routes`](search_routes.md): Camptocamp ignores the Labande ski rating, the exposures, and the risk, required rock, aid and mixed ratings on outings, so they are not offered.
 - **`query` matches outing titles only**, not the report text.
 - **`user_id` lists the outings a user is listed on as a participant**, including those another user wrote. No tool finds a user by name: the ID is the number in the user's camptocamp.org profile URL, or comes from the `**Participants with a Camptocamp account**` line of [`get_outing`](get_outing.md).
-- **An outing linked to several routes is listed once.** `route_ids` is not in v1.3.0, which ignores it and returns every outing unfiltered: on v1.3.0, use `route_id`, one route per call. `route_ids` lists the outings of any of its routes, without repeats. Measured on the live API on 2026-10-05, routes 54513, 1148298 and 54684 have 61, 1 and 30 outings, and `route_ids: [54513, 1148298, 54684]` finds 86, not 92: 6 outings are linked to both 54513 and 54684. A repeated ID is sent and named once.
-- **An unknown ID in `route_ids` does not empty the result.** It adds no outings, and the other routes' outings are still listed. The `Filters:` line names every ID given, the unknown one included. Measured on the live API on 2026-10-05, `route_ids: [54513, 999999999]` finds 61 outings, as `route_id: 54513` does. When a route seems to have no outings, check its ID alone with `route_id`.
-- **`route_ids` takes 1 to 10 IDs, and not together with `route_id`.** Not in v1.3.0, which ignores `route_ids`, refuses none of these and returns every outing unfiltered (with `route_id` too, it filters on `route_id` alone). From the release after v1.3.0, an empty list, more than 10 IDs, or `route_id` with `route_ids` is refused before any request. `search_outings {route_id: 54513, route_ids: [54684], limit: 3}`, captured from main at 596f777 with `route_ids` added (#257) on 2026-10-05, with a local build:
+- **An outing linked to several routes is listed once.** `route_ids` is not in v1.3.0, which ignores it and searches without the route filter: on v1.3.0, use `route_id`, one route per call. `route_ids` lists the outings of any of its routes, without repeats. Measured on the live API on 2026-10-05, routes 54513, 1148298 and 54684 have 61, 1 and 30 outings, and `route_ids: [54513, 1148298, 54684]` finds 86, not 92: 6 outings are linked to both 54513 and 54684. A repeated ID is sent and named once.
+- **An unknown ID in `route_ids` does not empty the result.** Not in v1.3.0, which ignores `route_ids` and searches without the route filter. From the release after v1.3.0, an unknown ID adds no outings, and the other routes' outings are still listed. The `Filters:` line names every ID given, the unknown one included. Measured on the live API on 2026-10-05, `route_ids: [54513, 999999999]` finds 61 outings, as `route_id: 54513` does. When a route seems to have no outings, check its ID alone with `route_id`.
+- **`route_ids` takes 1 to 10 IDs, and not together with `route_id`.** Not in v1.3.0, which ignores `route_ids`, refuses none of these and searches without the route filter (with `route_id` too, it filters on `route_id` alone). From the release after v1.3.0, an empty list, more than 10 IDs, or `route_id` with `route_ids` is refused before any request. `search_outings {route_id: 54513, route_ids: [54684], limit: 3}`, captured from main at 596f777 with `route_ids` added (#257) on 2026-10-05, with a local build:
 
   ```text
   Error: give route_id or route_ids, not both; put every route ID in route_ids (up to 10).
   ```
 
-- **An unknown ID used as a filter returns no results, not an error.** An empty result after an `area_id`, `route_id`, `waypoint_id` or `user_id` filter can mean a wrong ID; for `route_ids`, see above. See [Unknown IDs](../using-with-llms.md#unknown-ids).
+- **An unknown ID used as a filter returns no results, not an error.** An empty result after an `area_id`, `route_id`, `waypoint_id` or `user_id` filter can mean a wrong ID; for `route_ids` (not in v1.3.0), see above. See [Unknown IDs](../using-with-llms.md#unknown-ids).
 - **Paging stops at 10,000 results.** A call where `offset + limit` exceeds 10,000 is refused before any request: narrow the filters instead.
 - **Outings are past reports, not a forecast.** Give each outing's date with what it says. The server has no weather forecast and no avalanche bulletin.
 
