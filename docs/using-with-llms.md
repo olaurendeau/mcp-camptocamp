@@ -4,7 +4,7 @@ This guide is for the model that calls the tools, and for whoever writes its pro
 
 Every output on this page is real: it was captured from the server on 2026-10-05, with the version stated above each block, and copied verbatim. The only cuts are user-written text bodies and long lists, each replaced by a line `… (N lines omitted in this documentation)`, and the spaces at the end of a line, which this repository's formatter removes. Camptocamp changes every day, so the same call made later can return other counts and other recent outings.
 
-Everything here works with v1.3.0 or later, except three things that come with the release after v1.3.0: the `**Text in other languages**` line (see [Language](#language)), the escaping of invisible and bidirectional characters in repeated input (see [Paging](#paging)), and periods starting on `01-01` (see the [June example](#2-june-reports-in-good-conditions-search_outings)).
+Everything here works with v1.3.0 or later, except three things that come with the release after v1.3.0: the `**Text in other languages**` line (see [Language](#language)), the escaping of invisible and bidirectional characters in repeated input (see [Paging](#paging)), and periods starting on `01-01` that return outings, though not those of 1 January in every year (see the [June example](#2-june-reports-in-good-conditions-search_outings)).
 
 ## Tool chains
 
@@ -207,7 +207,7 @@ Note: Camptocamp's period filter can miss outings on the first or last day of th
 Next page: offset=3
 ```
 
-- **The period** matches the same days in every year: these are the Junes of 2026, 2025 and earlier. To keep only some years, add `date_from` and `date_to`. A period cannot wrap around the new year: for 12-20 → 01-10, make two calls, `12-20` → `12-31` and `01-01` → `01-10`. The second call works from the release after v1.3.0. In v1.3.0, a period starting on `01-01` returns almost nothing (see the [`search_outings` limits](tools/search_outings.md#limits)), so start it on `01-02`, and use `date_from` and `date_to` for 1 January, one year per call.
+- **The period** matches the same days in every year: these are the Junes of 2026, 2025 and earlier. To keep only some years, add `date_from` and `date_to`. A period cannot wrap around the new year: for 12-20 → 01-10, make two calls, `12-20` → `12-31` and `01-01` → `01-10`. From the release after v1.3.0, the second call returns outings, but it misses 1 January in leap years such as 2020 and 2024 (see the [`search_outings` limits](tools/search_outings.md#limits)). In v1.3.0, a period starting on `01-01` returns almost nothing, so start it on `01-02`. In every version, use `date_from` and `date_to` for 1 January, one year per call.
 - **The edge days.** The `Note:` line is printed with every period search: Camptocamp's period filter can miss outings on the first or last day of the range. When those days matter, widen the period by a day on each side (`period_start: "05-31"`, `period_end: "07-01"`) and leave out the outings dated outside June.
 - **`condition_at_least: "good"`** keeps the outings whose authors rated the conditions `good` or `excellent`. The scale is `excellent`, `good`, `average`, `poor`, `awful`; outings without a condition rating are left out. Without this filter, the same search found 251 outings on 2026-10-05.
 - **The ratings** in each line are the ones the author reported for that day, labelled with their grading system.
