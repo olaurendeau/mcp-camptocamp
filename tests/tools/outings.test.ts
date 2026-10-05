@@ -496,11 +496,21 @@ describe("get_outing Text in other languages", () => {
   });
 });
 
-// S3 of #255: the "Parcours partiel" checkbox, printed only when ticked; false is the form default, null the old outings'.
+// S3 of #255: the "Parcours partiel" checkbox, printed only when ticked; false is the form default, null is unset.
 describe("get_outing partial trip", () => {
-  // Derived from GET /outings/219347, /outings/1924138 and /outings/669600 (2026-10-05): the fields get_outing
-  // prints, each text cut after its first sentence or line, nulls kept as sent; associations left out.
-  // partial_trip is as sent: true, false and null.
+  // Derived from GET /outings/219347, /outings/1924138 and /outings/669600 (2026-10-05): every field get_outing
+  // prints, nulls kept as sent. Edited: each text cut after its first sentence or line; each route keeps only its
+  // fr locale and its ratings, the fields get_outing prints for it. partial_trip is as sent: true, false and null.
+  const innominata = {
+    document_id: 54513,
+    locales: [{ lang: "fr", title: "Arête de l'Innominata", title_prefix: "Mont Blanc" }],
+    global_rating: "D+",
+    engagement_rating: "IV",
+    ice_rating: "2",
+    mixed_rating: "M2",
+    rock_free_rating: "5b",
+    rock_required_rating: "4b",
+  };
   const tentative = {
     document_id: 219347,
     locales: [
@@ -523,9 +533,11 @@ describe("get_outing partial trip", () => {
     height_diff_up: 3220,
     height_diff_down: null,
     global_rating: "D+",
+    engagement_rating: "IV",
     condition_rating: "awful",
     partial_trip: true,
     participant_count: null,
+    associations: { users: [{ document_id: 11310, name: "Herve Sergeraert" }], routes: [innominata] },
   };
   const innominata2026 = {
     document_id: 1924138,
@@ -549,9 +561,25 @@ describe("get_outing partial trip", () => {
     height_diff_up: 3220,
     height_diff_down: 3445,
     global_rating: "D+",
+    engagement_rating: "IV",
     condition_rating: "average",
     partial_trip: false,
     participant_count: null,
+    associations: {
+      users: [{ document_id: 1625915, name: "Anthony Davoine" }],
+      routes: [
+        innominata,
+        {
+          document_id: 54684,
+          locales: [{ lang: "fr", title: "Arête SE", title_prefix: "Punta Innominata" }],
+          global_rating: "AD",
+          engagement_rating: "III",
+          equipment_rating: "P4",
+          rock_free_rating: "4a",
+          rock_required_rating: "4a",
+        },
+      ],
+    },
   };
   // 669600 without its partial_trip key, as an outing that lacks it would come.
   const innominata2015WithoutFlag = {
@@ -576,24 +604,34 @@ describe("get_outing partial trip", () => {
     height_diff_up: 3220,
     height_diff_down: null,
     global_rating: "D+",
+    engagement_rating: "IV",
     condition_rating: "good",
     participant_count: null,
+    associations: { users: [{ document_id: 305991, name: "herge81" }], routes: [innominata] },
   };
   const innominata2015 = { ...innominata2015WithoutFlag, partial_trip: null };
+
+  // The fact and route lines of each outing, as get_outing prints them from the live API (2026-10-05).
+  const INNOMINATA_LINE =
+    "- [54513] Mont Blanc : Arête de l'Innominata | Global rating: D+ | Engagement: IV | Rock free rating: 5b | " +
+    "Rock required rating: 4b | Ice rating: 2 | Mixed rating: M2";
+  const factLines = (result: string) => result.split("\n").filter((line) => /^(\*\*|- \[)/.test(line));
 
   it("prints Partial trip: yes right after the Conditions line when the author ticked it (219347)", async () => {
     mockGetOuting.mockResolvedValueOnce(tentative);
 
-    const lines = (await handleGetOuting({ id: 219347 })).split("\n");
-
-    expect(lines.slice(3, 10)).toEqual([
+    expect(factLines(await handleGetOuting({ id: 219347 }))).toEqual([
+      "**URL**: https://www.camptocamp.org/outings/219347",
       "**Activities**: snow_ice_mixed",
       "**Date**: 1994-07-19",
+      "**Participants with a Camptocamp account**: Herve Sergeraert (user ID: 11310)",
       "**Global rating**: D+",
+      "**Engagement**: IV",
       "**Conditions**: awful",
       "**Partial trip**: yes",
       "**Max elevation**: 4810m",
       "**Elevation gain**: 3220m",
+      INNOMINATA_LINE,
     ]);
   });
 
@@ -602,19 +640,51 @@ describe("get_outing partial trip", () => {
 
     const result = await handleGetOuting({ id: 219347 });
 
-    expect(result).toContain("**Global rating**: D+\n**Partial trip**: yes\n**Max elevation**: 4810m");
+    expect(result).toContain("**Engagement**: IV\n**Partial trip**: yes\n**Max elevation**: 4810m");
   });
 
+  const facts2015 = [
+    "**URL**: https://www.camptocamp.org/outings/669600",
+    "**Activities**: snow_ice_mixed",
+    "**Date**: 2015-08-27",
+    "**Participants with a Camptocamp account**: herge81 (user ID: 305991)",
+    "**Global rating**: D+",
+    "**Engagement**: IV",
+    "**Conditions**: good",
+    "**Max elevation**: 4810m",
+    "**Elevation gain**: 3220m",
+    INNOMINATA_LINE,
+  ];
+
   it.each([
-    ["false (1924138)", innominata2026],
-    ["null (669600)", innominata2015],
-    ["a missing key", innominata2015WithoutFlag],
-  ])("prints no Partial trip line for %s", async (_case, outing) => {
+    [
+      "false (1924138)",
+      innominata2026,
+      [
+        "**URL**: https://www.camptocamp.org/outings/1924138",
+        "**Activities**: mountain_climbing",
+        "**Date**: 2026-07-03 → 2026-07-05",
+        "**Participants with a Camptocamp account**: Anthony Davoine (user ID: 1625915)",
+        "**Global rating**: D+",
+        "**Engagement**: IV",
+        "**Conditions**: average",
+        "**Max elevation**: 4810m",
+        "**Min elevation**: 1590m",
+        "**Elevation gain**: 3220m",
+        "**Elevation loss**: 3445m",
+        INNOMINATA_LINE,
+        "- [54684] Punta Innominata : Arête SE | Global rating: AD | Engagement: III | Equipment: P4 | " +
+          "Rock free rating: 4a | Rock required rating: 4a",
+      ],
+    ],
+    ["null (669600)", innominata2015, facts2015],
+    ["a missing key", innominata2015WithoutFlag, facts2015],
+  ])("prints no Partial trip line for %s", async (_case, outing, facts) => {
     mockGetOuting.mockResolvedValueOnce(outing);
 
     const result = await handleGetOuting({ id: outing.document_id });
 
-    expect(result).toContain(`**Conditions**: ${outing.condition_rating}\n**Max elevation**: 4810m`);
+    expect(factLines(result)).toEqual(facts);
     expect(result).not.toMatch(/partial trip/i);
   });
 
