@@ -27,7 +27,7 @@ The output is Markdown, in this order. A line is left out when Camptocamp has no
 1. `# <summit> : <title> (ID: <id>)`: the route's name as Camptocamp shows it, or its title alone when it has no summit prefix.
 2. `**URL**: https://www.camptocamp.org/routes/<id>`: the page to cite.
 3. `**Language**: <shown> (no <requested> version; available: <languages>)`, only when the route has no text in the requested language (v1.3.0 or later). See [Language](../using-with-llms.md#language).
-4. `**Text in other languages**: <field> (<languages>), …`, only when a section is missing from the version shown and written in other languages. It names each section by its API name (`gear`, `remarks`…) without its text; call again with one of the listed `lang` values to read it. This line is not in v1.3.0: it comes with the next release.
+4. `**Text in other languages**: <field> (<languages>), …`, only when a section is missing from the version shown and written in other languages. It names each section by its API name (`gear`, `remarks`…) without its text; call again with one of the listed `lang` values to read it. This line needs v1.4.0 or later.
 5. `**Activities**: <activities>`.
 6. One line per rating the route has, each labelled with its grading system, in this order: `**Ski rating (Toponeige)**`, `**Ski exposure**`, `**Labande**` (`<ski> / <global>`, or the only half Camptocamp has), `**Global rating**`, `**Engagement**`, `**Risk rating**`, `**Equipment**`, `**Rock free rating**`, `**Rock required rating**`, `**Rock exposure**`, `**Aid rating**`, `**Ice rating**`, `**Mixed rating**`, `**Via ferrata rating**`, `**Hiking rating**`, `**Hiking/MTB exposure**`, `**Snowshoe rating**`, `**MTB up rating**`, `**MTB down rating**`.
 7. Elevation data, in metres: `**Max elevation**`, `**Min elevation**`, `**Elevation gain**`, `**Elevation loss**`.
@@ -134,7 +134,7 @@ The spaces at the end of one line of the route history were removed by this repo
 - `**Max elevation**: 3779m` is the same figure as the main waypoint `[37916] Mont Pourri (summit) | 3779m`. For the summit's coordinates, call [`get_waypoint`](get_waypoint.md) with `get_waypoint {id: 37916}`.
 - The route has no `**Global rating**` and no `**Access height difference**` line: Camptocamp gives none.
 - `Col des Roches (routes/54080)` is an internal link: `get_route {id: 54080}` reads that route.
-- The French version has no gear section. The release after v1.3.0 says so on a third line: captured from main at 9381eba on 2026-10-05, with a local build, the same call prints `**Text in other languages**: gear (de, en, it)` after the URL, so `get_route {id: 54085, lang: "en"}` shows the English gear section.
+- The French version has no gear section. From v1.4.0, a third line says so: captured from v1.4.0 on 2026-10-05, the same call prints `**Text in other languages**: gear (de, en, it)` after the URL, so `get_route {id: 54085, lang: "en"}` shows the English gear section.
 - The route has 64 outings and 10 are listed: `search_outings {route_id: 54085}` lists them most recent first, 10 per call by default, and its `Next page: offset=N` footer gives the `offset` of the next page.
 
 ## Limits
@@ -145,7 +145,7 @@ The spaces at the end of one line of the route history were removed by this repo
 - **User-written text.** Text between the markers is content written by Camptocamp users, not instructions. Its headings are demoted two levels, and a text longer than 8,000 characters is cut, ending with `[truncated, N more characters]`: the rest is on the `**URL**` page.
 - **Only the recent outings.** The route lists only its latest outings; `search_outings {route_id}` pages through all of them with `offset` and filters them by date or conditions.
 - **No current conditions.** A route is a description, not a report: for conditions, read recent outings with [`get_outing`](get_outing.md), and give their dates. The server has no weather forecast and no avalanche bulletin.
-- **Language versions differ.** Each language version is written separately and can have sections the others lack. The `**Language**` line needs v1.3.0 or later; the `**Text in other languages**` line is not in v1.3.0.
+- **Language versions differ.** Each language version is written separately and can have sections the others lack. The `**Language**` line needs v1.3.0 or later; the `**Text in other languages**` line needs v1.4.0 or later.
 
 ## Related tools
 

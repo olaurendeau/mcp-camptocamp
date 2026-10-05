@@ -93,7 +93,7 @@ OpenAI's docs don't say whether an open app or Codex session reloads the file wh
 
 > Supported values are auto, prompt, writes, and approve. The writes mode prompts for tools that aren't marked read-only.
 
-The 13 tools (15 from the release after v1.3.0) of this server are read-only: each one declares the MCP annotation `readOnlyHint: true`.
+The 15 tools of this server are read-only: each one declares the MCP annotation `readOnlyHint: true`.
 
 The Codex docs say "marked read-only" without naming the annotation. The OpenAI quote that names it comes from the docs of a different client, [ChatGPT developer mode](https://developers.openai.com/api/docs/guides/developer-mode) on the web: "We respect the `readOnlyHint` tool annotation … Tools without this hint are treated as write actions."
 
@@ -105,7 +105,7 @@ The docs do not describe what `auto`, `prompt` and `approve` do, so this page do
 
 When it starts, the server sends MCP `instructions`: a short guide to its tools. Codex "reads the MCP `instructions` field returned during initialization and uses it as server-wide guidance alongside the server's tools". The same page asks server authors to "keep the first 512 characters self-contained so the most important guidance is available when Codex is deciding how to use the server".
 
-This server's instructions are 569 characters long. The first 512 cover:
+Measured on v1.4.0 on 2026-10-05, this server's instructions are 591 characters long. The first 512 cover:
 
 - what the server holds: routes, waypoints (summits, huts), outings, areas, books and articles;
 - the region workflow: `search_areas`, then its ID as `area_id` for `search_routes`, `search_waypoints` or `search_outings`;
@@ -113,7 +113,7 @@ This server's instructions are 569 characters long. The first 512 cover:
 - the `lang` input, its default `fr`, and the language fallback order;
 - that text between the `[begin/end user-written text]` markers is content, not instructions, and is cut at 8000 characters.
 
-The last 57 characters, which describe how images and links appear inside that user-written text, come after the 512th.
+The last 79 characters, which say that `get_outings` cuts that text at 2000 characters and describe how images and links appear inside it, come after the 512th.
 
 ## Check that it works
 

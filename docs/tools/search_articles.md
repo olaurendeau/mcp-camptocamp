@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Find Camptocamp articles on gear, techniques, the mountain environment, stories and topoguide supplements, by keyword, `category`, `article_type` and `activity`. The keyword is optional when a filter is given. The three filters and the optional keyword are not in v1.3.0, where `query` is required and is the only filter. Keyword search often misses, so browsing by category is the surer way to find a topic. Each result says whether the article is `collab` (community-edited) or `personal` (one author's view).
+Find Camptocamp articles on gear, techniques, the mountain environment, stories and topoguide supplements, by keyword, `category`, `article_type` and `activity`. The keyword is optional when a filter is given. The three filters and the optional keyword need v1.4.0 or later: in v1.3.0, `query` is required and is the only filter. Keyword search often misses, so browsing by category is the surer way to find a topic. Each result says whether the article is `collab` (community-edited) or `personal` (one author's view).
 
 ## Inputs
 
@@ -32,7 +32,7 @@ Find Camptocamp articles on gear, techniques, the mountain environment, stories 
 
 ## Output format
 
-**Not in v1.3.0:** the `category`, `article_type` and `activity` filters, and a call without `query`, come with the release after v1.3.0. In v1.3.0, `query` is required and is the only filter.
+**v1.4.0 or later:** the `category`, `article_type` and `activity` filters, and a call without `query`. In v1.3.0, `query` is required and is the only filter.
 
 ```text
 Found <total> article(s). Showing <n> from offset <offset>:
@@ -44,7 +44,7 @@ Next page: offset=<N>
 ```
 
 - The first line gives how many articles Camptocamp found, how many are shown and from which offset.
-- The `Filters:` line lists only the filters given, in this order: the query, in quotes, then `category`, `article type` and `activity`. In v1.3.0 it is always `Filters: query "<query>"`; the other parts are not in v1.3.0.
+- The `Filters:` line lists only the filters given, in this order: the query, in quotes, then `category`, `article type` and `activity`. In v1.3.0 it is always `Filters: query "<query>"`; the other parts need v1.4.0 or later.
 - Each result is one line: the article ID in brackets, its title in the language picked by `lang`, then its type, categories and activities. A part is left out when Camptocamp has no value for it. The type is `collab` (community-edited reference) or `personal` (one author's view, not community consensus); categories and activities are codes, copied verbatim.
 - An article Camptocamp sent in an unexpected format is replaced by `- [<id>] (not shown: Camptocamp sent this item in an unexpected format)`, or by `- (not shown: Camptocamp sent an item in an unexpected format)` when its ID is unreadable. See [Missing data](../using-with-llms.md#missing-data).
 - The last line is `Next page: offset=N` when more results follow, `Next page: offset=N (limit at most M)` near the end of the 10,000-result window, or `More results exist beyond Camptocamp's 10,000-result window; narrow the filters.` See [Paging](../using-with-llms.md#paging).
@@ -65,7 +65,7 @@ Filters: query "crampons"
 
 The first two articles are community-edited; the third is one author's own method. Open one with [`get_article`](get_article.md): `get_article {id: 226838}`.
 
-Browsing by filter, without a query, `search_articles {category: "gear", article_type: "collab", limit: 3}`, captured from main at 9381eba on 2026-10-05, with a local build:
+Browsing by filter, without a query, `search_articles {category: "gear", article_type: "collab", limit: 3}`, captured from v1.4.0 on 2026-10-05:
 
 ```text
 Found 138 article(s). Showing 3 from offset 0:
@@ -78,17 +78,17 @@ Filters: category gear, article type collab
 Next page: offset=3
 ```
 
-The filters combine with AND, and an article is listed when any of its categories is the one given: the first result is also in `technical`. This call is refused by v1.3.0, which requires `query`.
+The filters combine with AND, and an article is listed when any of its categories is the one given: the first result is also in `technical`. This call needs v1.4.0 or later: v1.3.0 requires `query` and refuses it.
 
 ## Limits
 
-- **A query or a filter is required.** A call with neither, or with a blank query and no filter, is refused before any request. `search_articles {limit: 3}`, captured from main at 9381eba on 2026-10-05, with a local build:
+- **A query or a filter is required.** A call with neither, or with a blank query and no filter, is refused before any request. `search_articles {limit: 3}`, captured from v1.4.0 on 2026-10-05:
 
   ```text
   Error: search_articles needs a query or at least one filter: category, article_type, activity.
   ```
 
-  This message is not in v1.3.0, where `query` is required: the same call is refused with `MCP error -32602: Input validation error: Invalid arguments for tool search_articles: Required at query`.
+  This message needs v1.4.0 or later. In v1.3.0, where `query` is required, the same call is refused with `MCP error -32602: Input validation error: Invalid arguments for tool search_articles: Required at query`.
 
 - **Keyword search often misses.** `search_articles {query: "noeud", limit: 3}`, captured from v1.3.0 on 2026-10-05:
 
@@ -96,10 +96,10 @@ The filters combine with AND, and an article is listed when any of its categorie
   No articles found matching query "noeud".
   ```
 
-  `search_articles {query: "nœud", limit: 3}` finds nothing either, captured from v1.3.0 on 2026-10-05. Browsing by `category` is the surer way to find a topic; it needs the release after v1.3.0.
+  `search_articles {query: "nœud", limit: 3}` finds nothing either, captured from v1.3.0 on 2026-10-05. Browsing by `category` is the surer way to find a topic; it needs v1.4.0 or later.
 
 - **Matches can be approximate.** `search_articles {query: "rappel", limit: 3}`, captured from v1.3.0 on 2026-10-05, also returned `[193302] Du lointain nous nous rappellons`, a story. Check the titles and categories before opening an article.
-- **`category`, `article_type` and `activity` take only the listed codes**, and any other value is refused with the valid list. These filters are not in v1.3.0. The categories, as Camptocamp names them: `mountain_environment`, `gear`, `technical`, `topoguide_supplements`, `soft_mobility` (car-free and bike travel), `expeditions`, `stories`, `c2c_meetings` (community meetups), `tags`, `site_info` (help pages about Camptocamp.org) and `association` (news of the Camptocamp association).
+- **`category`, `article_type` and `activity` take only the listed codes**, and any other value is refused with the valid list. These filters need v1.4.0 or later. The categories, as Camptocamp names them: `mountain_environment`, `gear`, `technical`, `topoguide_supplements`, `soft_mobility` (car-free and bike travel), `expeditions`, `stories`, `c2c_meetings` (community meetups), `tags`, `site_info` (help pages about Camptocamp.org) and `association` (news of the Camptocamp association).
 - **A `personal` article is one author's view**, not a community consensus: say so when you quote it.
 - **Paging stops at 10,000 results**: a call where `offset + limit` exceeds 10,000 is refused before any request.
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Search trip reports across Camptocamp.org, most recent first, by keyword, area, activity, the ratings and conditions their authors reported, elevation, dates, a period of the year, route, waypoint or user. Use it for recent conditions on a route (`search_outings {route_id}`), on up to 10 routes at once (`route_ids`, not in v1.3.0) or in an area, or for past reports at a time of year (`period_start` and `period_end`). All filters are optional and combine with AND. Outings are past reports, not a forecast.
+Search trip reports across Camptocamp.org, most recent first, by keyword, area, activity, the ratings and conditions their authors reported, elevation, dates, a period of the year, route, waypoint or user. Use it for recent conditions on a route (`search_outings {route_id}`), on up to 10 routes at once (`route_ids`, v1.4.0 or later) or in an area, or for past reports at a time of year (`period_start` and `period_end`). All filters are optional and combine with AND. Outings are past reports, not a forecast.
 
 ## Inputs
 
@@ -60,7 +60,7 @@ Search trip reports across Camptocamp.org, most recent first, by keyword, area, 
 
 <!-- generated:inputs end -->
 
-**Not in v1.3.0:** `route_ids` comes with the release after v1.3.0. v1.3.0 ignores it without an error and applies the other filters without the route filter: with `route_ids` alone, it returns every outing on Camptocamp, with no `Filters:` line. On v1.3.0, call `search_outings {route_id}` once per route instead.
+**v1.4.0 or later:** v1.3.0 ignores `route_ids` without an error and applies the other filters without the route filter: with `route_ids` alone, it returns every outing on Camptocamp, with no `Filters:` line. On v1.3.0, call `search_outings {route_id}` once per route instead.
 
 ## Output format
 
@@ -90,7 +90,7 @@ Next page: offset=<N>
   | `date_from`, `date_to`                      | `dates 2026-01-01 → 2026-06-30`, `dates from 2026-01-01` or `dates until 2026-06-30`       |
   | `period_start`, `period_end`                | `period 06-01 → 06-30 of every year`                                                       |
   | `route_id`                                  | `route 46954`                                                                              |
-  | `route_ids`                                 | `routes 54513 or 1148298`, or `route 54513` for a single ID (not in v1.3.0)                |
+  | `route_ids`                                 | `routes 54513 or 1148298`, or `route 54513` for a single ID (v1.4.0 or later)              |
   | `waypoint_id`                               | `waypoint 38516`                                                                           |
 
   With no filter at all, there is no `Filters:` line.
@@ -128,7 +128,7 @@ Next page: offset=3
 
 The period matches June of every year: here 2026 and 2025. `get_outing {id: 1912989}` gives the full report of the first one: see [its example](get_outing.md#example).
 
-The outings of three routes around the Innominata in one call, which needs the release after v1.3.0, `search_outings {route_ids: [54513, 1148298, 54684], limit: 3}`, captured from main at 596f777 with `route_ids` added (#257) on 2026-10-05, with a local build:
+The outings of three routes around the Innominata in one call, which needs v1.4.0 or later, `search_outings {route_ids: [54513, 1148298, 54684], limit: 3}`, captured from v1.4.0 on 2026-10-05:
 
 ```text
 Found 86 outing(s), most recent first. Showing 3 from offset 0:
@@ -155,17 +155,17 @@ The result lines do not say which of the routes an outing is linked to: `get_out
 
   A period ending on `12-31` cannot be widened past it, and a period starting on `01-01` cannot be widened before it (next item).
 
-- **A period starting on `01-01` returns almost nothing in v1.3.0, and misses 1 January in some years after it.** Camptocamp reduces each bound of a period, and the dates of each outing, to a day of a 365.2425-day year. v1.3.0 sends every bound in 2020, which puts `2020-01-01` after `12-31`. From the release after v1.3.0, a `01-01` start is sent as `1970-01-01` and a `01-01` end as `2021-01-01`, so these periods find the outings of the other days. Measured on the live API on 2026-10-05, with no other filter:
+- **A period starting on `01-01` returns almost nothing in v1.3.0, and misses 1 January in some years from v1.4.0.** Camptocamp reduces each bound of a period, and the dates of each outing, to a day of a 365.2425-day year. v1.3.0 sends every bound in 2020, which puts `2020-01-01` after `12-31`. From v1.4.0, a `01-01` start is sent as `1970-01-01` and a `01-01` end as `2021-01-01`, so these periods find the outings of the other days. Measured on the live API on 2026-10-05, with no other filter:
 
-  | Period            | v1.3.0 | From the release after v1.3.0 |
-  | ----------------- | ------ | ----------------------------- |
-  | `01-01` → `01-31` | 0      | 30161                         |
-  | `01-01` → `01-01` | 76     | 692                           |
-  | `01-01` → `12-31` | 4      | 346332                        |
-  | `01-02` → `01-31` | 29297  | 29297                         |
-  | `12-20` → `12-31` | 10098  | 10098                         |
+  | Period            | v1.3.0 | v1.4.0 or later |
+  | ----------------- | ------ | --------------- |
+  | `01-01` → `01-31` | 0      | 30161           |
+  | `01-01` → `01-01` | 76     | 692             |
+  | `01-01` → `12-31` | 4      | 346347          |
+  | `01-02` → `01-31` | 29297  | 29297           |
+  | `12-20` → `12-31` | 10098  | 10098           |
 
-  1 January itself is still missed in some years from the release after v1.3.0. 1 January of a leap year lands after `12-31` on that 365.2425-day year, so no period starting on `01-01` returns an outing dated on 1 January alone, however wide; `01-01` → `12-31` only returns those that span several days. A `01-01` → `01-01` period also misses 1 January of some other years, such as 2025. Measured on the live API on 2026-10-05, the outings of 1 January of one year (`date_from` and `date_to` alone on that day, then with each period, from the release after v1.3.0):
+  1 January itself is still missed in some years from v1.4.0. 1 January of a leap year lands after `12-31` on that 365.2425-day year, so no period starting on `01-01` returns an outing dated on 1 January alone, however wide; `01-01` → `12-31` only returns those that span several days. A `01-01` → `01-01` period also misses 1 January of some other years, such as 2025. Measured on the live API on 2026-10-05, the outings of 1 January of one year (`date_from` and `date_to` alone on that day, then with each period, on v1.4.0):
 
   | Year | Dates only | `01-01` → `01-31` | `01-01` → `01-01` | `01-01` → `12-31` |
   | ---- | ---------- | ----------------- | ----------------- | ----------------- |
@@ -178,12 +178,12 @@ The result lines do not say which of the routes an outing is linked to: `get_out
   | 2025 | 88         | 84                | 0                 | 86                |
   | 2026 | 57         | 47                | 47                | 57                |
 
-  In v1.3.0, `01-01` → `01-31` returns none of them, in each of these years. From the release after v1.3.0, in the six years other than 2020 and 2024, it returns every outing dated on 1 January alone; the outings it misses span several days. For 1 January, use `date_from` and `date_to`, one year per call, in every version. With v1.3.0, start a January period on `01-02`. An empty result for a period starting on `01-01` does not mean there are no reports.
+  In v1.3.0, `01-01` → `01-31` returns none of them, in each of these years. From v1.4.0, in the six years other than 2020 and 2024, it returns every outing dated on 1 January alone; the outings it misses span several days. For 1 January, use `date_from` and `date_to`, one year per call, in every version. With v1.3.0, start a January period on `01-02`. An empty result for a period starting on `01-01` does not mean there are no reports.
 
 - **An outing spanning the new year is missed by periods inside its dates.** Camptocamp keeps an outing when its end falls on or after `period_start` and its start on or before `period_end`, all reduced to days of the 365.2425-day year, so a bound can be off by a day. For an outing spanning the new year and lasting less than a year, the end day comes before the start day, so only a period covering the days between them returns it. This does not hold for an outing lasting a year or more, such as 1684833, from 2023-08-15 to 2024-08-16. Outing 1362640, from 2020-12-17 to 2021-10-28 (route 1276279), measured on the live API on 2026-10-05:
   - returned by `10-27` → `12-17`, `10-01` → `12-20`, `03-01` → `12-20` and `06-01` → `12-31`, in v1.3.0 too;
   - not returned by `10-28` → `12-17`, `10-27` → `12-16`, `01-01` → `01-31`, `06-01` → `06-30` or `12-01` → `12-31`;
-  - returned by `01-01` → `12-31` from the release after v1.3.0, but not in v1.3.0.
+  - returned by `01-01` → `12-31` from v1.4.0, but not in v1.3.0.
 
   `date_from` and `date_to` return it.
 
@@ -193,9 +193,9 @@ The result lines do not say which of the routes an outing is linked to: `get_out
   Error: period cannot wrap around the new year; make two calls (12-20 → 12-31 and 01-01 → 01-10)
   ```
 
-  From the release after v1.3.0, both calls this error suggests return outings, but the second one misses 1 January in some years (see above): use `date_from` and `date_to` for that day. In v1.3.0, the second call starts on `01-01` and returns almost nothing: make it start on `01-02`, or use `date_from` and `date_to` for those January days. For this Vanoise ski-touring search, measured on 2026-10-05:
+  From v1.4.0, both calls this error suggests return outings, but the second one misses 1 January in some years (see above): use `date_from` and `date_to` for that day. In v1.3.0, the second call starts on `01-01` and returns almost nothing: make it start on `01-02`, or use `date_from` and `date_to` for those January days. For this Vanoise ski-touring search, measured on 2026-10-05:
   - `12-20` → `12-31` found 79 outings;
-  - `01-01` → `01-10` found 53 from the release after v1.3.0, and none in v1.3.0;
+  - `01-01` → `01-10` found 53 from v1.4.0, and none in v1.3.0;
   - `01-02` → `01-10` found 45;
   - `date_from: "2025-01-01"` with `date_to: "2025-01-10"` and no period found 3, for January 2025 only.
 
@@ -212,15 +212,15 @@ The result lines do not say which of the routes an outing is linked to: `get_out
 - **Ratings, conditions, max elevation and elevation gain are those the author reported for that day**, not the route's. An outing without a value for a filtered field is left out. One rating system per call: `rating_min` and `rating_max` must come from the scale of `rating_system`, and any other value is refused with the valid list. `rating_system` takes 12 of the 20 systems of [`search_routes`](search_routes.md): Camptocamp ignores the Labande ski rating, the exposures, and the risk, required rock, aid and mixed ratings on outings, so they are not offered.
 - **`query` matches outing titles only**, not the report text.
 - **`user_id` lists the outings a user is listed on as a participant**, including those another user wrote. No tool finds a user by name: the ID is the number in the user's camptocamp.org profile URL, or comes from the `**Participants with a Camptocamp account**` line of [`get_outing`](get_outing.md).
-- **An outing linked to several routes is listed once.** `route_ids` is not in v1.3.0, which ignores it and searches without the route filter: on v1.3.0, use `route_id`, one route per call. `route_ids` lists the outings of any of its routes, without repeats. Measured on the live API on 2026-10-05, routes 54513, 1148298 and 54684 have 61, 1 and 30 outings, and `route_ids: [54513, 1148298, 54684]` finds 86, not 92: 6 outings are linked to both 54513 and 54684. A repeated ID is sent and named once.
-- **An unknown ID in `route_ids` does not empty the result.** Not in v1.3.0, which ignores `route_ids` and searches without the route filter. From the release after v1.3.0, an unknown ID adds no outings, and the other routes' outings are still listed. The `Filters:` line names every ID given, the unknown one included. Measured on the live API on 2026-10-05, `route_ids: [54513, 999999999]` finds 61 outings, as `route_id: 54513` does. When a route seems to have no outings, check its ID alone with `route_id`.
-- **`route_ids` takes 1 to 10 IDs, and not together with `route_id`.** Not in v1.3.0, which ignores `route_ids`, refuses none of these and searches without the route filter (with `route_id` too, it filters on `route_id` alone). From the release after v1.3.0, an empty list, more than 10 IDs, or `route_id` with `route_ids` is refused before any request. `search_outings {route_id: 54513, route_ids: [54684], limit: 3}`, captured from main at 596f777 with `route_ids` added (#257) on 2026-10-05, with a local build:
+- **An outing linked to several routes is listed once.** `route_ids` needs v1.4.0 or later: v1.3.0 ignores it and searches without the route filter, so on v1.3.0, use `route_id`, one route per call. `route_ids` lists the outings of any of its routes, without repeats. Measured on the live API on 2026-10-05, routes 54513, 1148298 and 54684 have 61, 1 and 30 outings, and `route_ids: [54513, 1148298, 54684]` finds 86, not 92: 6 outings are linked to both 54513 and 54684. A repeated ID is sent and named once.
+- **An unknown ID in `route_ids` does not empty the result.** v1.4.0 or later; v1.3.0 ignores `route_ids` and searches without the route filter. From v1.4.0, an unknown ID adds no outings, and the other routes' outings are still listed. The `Filters:` line names every ID given, the unknown one included. Measured on the live API on 2026-10-05, `route_ids: [54513, 999999999]` finds 61 outings, as `route_id: 54513` does. When a route seems to have no outings, check its ID alone with `route_id`.
+- **`route_ids` takes 1 to 10 IDs, and not together with `route_id`.** v1.4.0 or later; v1.3.0 ignores `route_ids`, refuses none of these and searches without the route filter (with `route_id` too, it filters on `route_id` alone). From v1.4.0, an empty list, more than 10 IDs, or `route_id` with `route_ids` is refused before any request. `search_outings {route_id: 54513, route_ids: [54684], limit: 3}`, captured from v1.4.0 on 2026-10-05:
 
   ```text
   Error: give route_id or route_ids, not both; put every route ID in route_ids (up to 10).
   ```
 
-- **An unknown ID used as a filter returns no results, not an error.** An empty result after an `area_id`, `route_id`, `waypoint_id` or `user_id` filter can mean a wrong ID; for `route_ids` (not in v1.3.0), see above. See [Unknown IDs](../using-with-llms.md#unknown-ids).
+- **An unknown ID used as a filter returns no results, not an error.** An empty result after an `area_id`, `route_id`, `waypoint_id` or `user_id` filter can mean a wrong ID; for `route_ids` (v1.4.0 or later), see above. See [Unknown IDs](../using-with-llms.md#unknown-ids).
 - **Paging stops at 10,000 results.** A call where `offset + limit` exceeds 10,000 is refused before any request: narrow the filters instead.
 - **Outings are past reports, not a forecast.** Give each outing's date with what it says. The server has no weather forecast and no avalanche bulletin.
 
@@ -230,6 +230,6 @@ The result lines do not say which of the routes an outing is linked to: `get_out
 - [`search_routes`](search_routes.md): find the `route_id` of a route.
 - [`search_waypoints`](search_waypoints.md): find the `waypoint_id` of a summit or hut.
 - [`get_outing`](get_outing.md): read the full report from an ID in the results.
-- [`get_outings`](get_outings.md): read up to 10 reports from the results in one call (not in v1.3.0).
-- [`outing_stats`](outing_stats.md): count the outings of the same filters by start month, start year or condition (not in v1.3.0).
+- [`get_outings`](get_outings.md): read up to 10 reports from the results in one call (v1.4.0 or later).
+- [`outing_stats`](outing_stats.md): count the outings of the same filters by start month, start year or condition (v1.4.0 or later).
 - [`search_user_outings`](search_user_outings.md): list a user's outings with only `user_id`.

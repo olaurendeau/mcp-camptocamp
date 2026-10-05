@@ -43,7 +43,7 @@ Read one area from its ID: its title, type, summary and description. It gives no
 
 - The title is in the language picked by `lang`, or the first available in the fallback order. The `**URL**` line is the area's page on camptocamp.org, to cite as the source.
 - `**Language**` is printed only when the area has no version in the requested language: it says which language is shown and which exist. This line needs v1.3.0 or later. See [Language](../using-with-llms.md#language).
-- `**Text in other languages**` is printed only when the shown version has no summary or no description and another language has one. It names each such section by its API name, `summary` or `description`, without its text, followed by its languages; when both are missing, both are listed, separated by a comma. Call again with one of the listed `lang` values to read it. **This line is not in v1.3.0**: it comes with the release after v1.3.0.
+- `**Text in other languages**` is printed only when the shown version has no summary or no description and another language has one. It names each such section by its API name, `summary` or `description`, without its text, followed by its languages; when both are missing, both are listed, separated by a comma. Call again with one of the listed `lang` values to read it. **This line needs v1.4.0 or later.**
 - `**Type**` is the code `range`, `admin_limits` or `country`, copied verbatim.
 - `## Summary` and `## Description` are printed only when the text exists. The text is written by Camptocamp users and printed between markers, as described in [User-written text](../using-with-llms.md#user-written-text): headings demoted two levels, internal links shown as `<label> (<type>/<id>)`, and a cut after 8,000 characters.
 
@@ -85,7 +85,7 @@ Site avec l'[état d'ouverture des routes](https://sitonline.vs.ch/transports_co
 
 The area has no summary, so there is no `## Summary` section. The internal links of the description end with `(areas/<id>)`: each ID can be passed to `get_area`, or as `area_id` to the search tools. The `####Info transport` heading was `##Info transport` on Camptocamp.
 
-The same area in English, `get_area {id: 14384, lang: "en"}`, captured from main at 9381eba on 2026-10-05, with a local build:
+The same area in English, `get_area {id: 14384, lang: "en"}`, captured from v1.4.0 on 2026-10-05:
 
 ```text
 # Valais (ID: 14384)
@@ -95,7 +95,7 @@ The same area in English, `get_area {id: 14384, lang: "en"}`, captured from main
 **Type**: admin_limits
 ```
 
-The English version has a title but no text, and the French one has a description: `lang: "fr"` shows it. v1.3.0 prints the same output without the `**Text in other languages**` line.
+The English version has a title but no text, and the French one has a description: `lang: "fr"` shows it. The `**Text in other languages**` line needs v1.4.0 or later.
 
 ## Limits
 

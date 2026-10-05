@@ -2,7 +2,7 @@
 
 A system prompt to paste into an agent that uses this server, so that the model takes altitudes, ratings and route facts from Camptocamp instead of guessing them, and says so when Camptocamp has no value.
 
-The server already sends short usage instructions to MCP clients when they connect, but an SDK does not necessarily pass them on to the model: the OpenAI Agents SDK docs, for example, don't say that it does. This prompt repeats what matters and adds rules on citing and missing data. The rule on `lang` and the Language line needs v1.3.0 or later of the server. The Text in other languages line is not in v1.3.0: it is on `main` and comes with the next release, and until then the rule about it has nothing to act on.
+The server already sends short usage instructions to MCP clients when they connect, but an SDK does not necessarily pass them on to the model: the OpenAI Agents SDK docs, for example, don't say that it does. This prompt repeats what matters and adds rules on citing and missing data. The rule on `lang` and the Language line needs v1.3.0 or later of the server, and the Text in other languages line v1.4.0 or later: with v1.3.0, the rule about it has nothing to act on.
 
 ## The prompt
 

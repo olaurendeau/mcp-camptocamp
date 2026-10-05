@@ -1,6 +1,6 @@
 # outing_stats
 
-**Not in v1.3.0**: this tool comes with the release after v1.3.0. On v1.3.0, page through [`search_outings`](search_outings.md) and count the result lines.
+**v1.4.0 or later**: this tool is not in v1.3.0. On v1.3.0, page through [`search_outings`](search_outings.md) and count the result lines.
 
 ## Purpose
 
@@ -87,7 +87,7 @@ Counts of trip reports published on Camptocamp, not of ascents; a month with no 
 
 ## Example
 
-The Innominata (route 54513), `outing_stats {route_id: 54513, group_by: "month"}`, captured from main at ee1aa85 with `outing_stats` added (#264) on 2026-10-05, with a local build:
+The Innominata (route 54513), `outing_stats {route_id: 54513, group_by: "month"}`, captured from v1.4.0 on 2026-10-05:
 
 ```text
 61 outing(s) counted (all matches), by start month
@@ -108,7 +108,7 @@ Counts of trip reports published on Camptocamp, not of ascents; a month with no 
 12: 0
 ```
 
-Captured the same way, the same route by year and by condition (the same first three lines, then):
+Captured the same way, the same route by year and by condition (the same three header lines, with `by start year` or `by condition` in the first, then):
 
 ```text
 1994: 1
@@ -147,7 +147,7 @@ The year lines run from 1994 to 2026, zeros included, and add up to 61; the 19 l
   Error: 123,415 outings match these filters, more than the 2,000 that can be counted in one call: narrow the filters (dates, area, activity, routes…) and call again.
   ```
 
-- **One request per 100 outings.** The server reads the first page, then the others 3 at a time. Measured on 2026-10-05 with the build above, `outing_stats {area_id: 14410, activity: "mountain_climbing", date_from: "2023-01-01", group_by: "year"}` counts 1,948 outings in 20 requests and about 3 seconds. If Camptocamp stops responding, 2,000 outings can take 8 rounds of 15 s, 120 s: that is twice the MCP TypeScript SDK's default client timeout of 60 s, so a client may give up first.
+- **One request per 100 outings.** The server reads the first page, then the others 3 at a time. Measured on v1.4.0 on 2026-10-05, `outing_stats {area_id: 14410, activity: "mountain_climbing", date_from: "2023-01-01", group_by: "year"}` counts 1,948 outings in 20 requests and about 1 second. If Camptocamp stops responding, 2,000 outings can take 8 rounds of 15 s, 120 s: that is twice the MCP TypeScript SDK's default client timeout of 60 s, so a client may give up first.
 - **The counts reflect one state of Camptocamp.** When an outing is published, edited or deleted between two pages, the call fails with `Camptocamp's results changed while counting; call again.` Two changes that cancel out between pages (one outing deleted, another published) keep the total and are not detected: the counts may then mix the data before and after them.
 - **Counts are of published reports, not of ascents.** Many ascents have no report, older reports may have no condition, and one report can cover several days. A month with no report is not evidence the route is out of condition.
 - **Filters behave as in `search_outings`.** The period edge days, the overlap of `date_from` and `date_to`, the titles-only `query` and the unknown IDs that match nothing are explained in the [`search_outings` Limits](search_outings.md#limits). `route_id` with `route_ids`, a wrapping period or dates out of order are refused before any request.
@@ -158,4 +158,4 @@ The year lines run from 1994 to 2026, zeros included, and add up to 61; the 19 l
 - [`search_routes`](search_routes.md): find the `route_id` of a route.
 - [`search_areas`](search_areas.md): find the `area_id` of a region.
 - [`search_outings`](search_outings.md): list the outings behind the counts, with the same filters, most recent first.
-- [`get_outings`](get_outings.md): read up to 10 of those reports in one call (not in v1.3.0).
+- [`get_outings`](get_outings.md): read up to 10 of those reports in one call (v1.4.0 or later).
