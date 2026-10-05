@@ -180,6 +180,24 @@ describe("searches (AC8.2, AC8.3)", () => {
     }
   });
 
+  // `sort=-date_end,-id` (tiebreak_by_id), which outing counts page through: a strict order, so pages of
+  // 100 neither skip nor repeat an outing. Route 54513 has outings ending the same day (2016-07-08).
+  it("outings of route 54513 with tiebreak_by_id, all on one page of 100, by (date_end, id) descending", async () => {
+    const result = await searchOutings({ route_id: 54513, tiebreak_by_id: true, limit: 100 });
+    const outings = wellFormed(result.documents).map((outing) => ({
+      date: outing.date_end ?? "",
+      id: outing.document_id,
+    }));
+
+    expect(result.documents).toHaveLength(Math.min(result.total, 100));
+    expect(outings.some((outing, i) => i > 0 && outing.date === outings[i - 1].date)).toBe(true);
+    for (let i = 1; i < outings.length; i++) {
+      const [previous, current] = [outings[i - 1], outings[i]];
+      const ordered = previous.date > current.date || (previous.date === current.date && previous.id > current.id);
+      expect(ordered, `outing ${current.id} (${current.date}) after ${previous.id} (${previous.date})`).toBe(true);
+    }
+  });
+
   it("areas by keyword", async () => {
     expectNonEmptySearch(await searchAreas({ query: "Ecrins" }));
   });
