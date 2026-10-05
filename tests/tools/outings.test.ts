@@ -806,6 +806,67 @@ describe("handleGetOutings", () => {
     participant_count: 2,
     associations: { users: [{ document_id: 1265850, name: "arnaud_nico_" }], routes: [innominata] },
   };
+  // The description of GET /outings/1917601 (2026-10-05), whole: 2,251 characters, cut at 2,000 by default.
+  const DESCRIPTION_1917601 =
+    "Ma première grande course d'alpinisme sur ce magnifique versant italien du Mont-Blanc et pas déçu du voyage.\nUne montée efficace le premier jour pour aller au bivouac.\nUne autre cordée de 2 est présente avec nous, belle rencontre de Dorsan et Anthony ! \nOn passe le temps à grignoter et faire la sieste, plutôt agréable ! \nRéveil 00h15, ça pique... \nMontée au col Eccles rapide et efficace avec la trace et le bon regel. Puis c'est parti pour 800m d'arêtes et couloirs de neige. \nLe premier bastion passe facilement malgré la nuit noire, l'itinéraire est plutôt évident. On enchaine en faisant des grandes longueurs en corde tendue. On avance plus vite que ce qu'on pensait. On rejoint l'arête permettant de rejoindre l'arête du brouillard avant le lever du soleil (4400m). Tout va bien, ça déroule, puis je perds un crampon dans un passage rocheux, je passe directement en mode critique, quel con... Je m'en veux, que faire maintenant !? \nOn désescalade une trentaine de mètres, on voit rien... Tant pis on essaiera de continuer comme ça tout en restant \"prudent\". Je contacte des connaissances qui vont au Mont-Blanc ce jour pour descendre en parapente, on espère arriver dans le bon timing pour que je puisse récupérer un crampon pour la descente.\nÇa se passe bien jusqu'à la sortie sur l'arête du brouillard, puis c'est bleu glace sur l'arête... On tire des longueurs avec nos 4 broches, frustrant car avec 2 crampons ça serait rando ! \nSommet du Mont-Blanc à 8h20, mon collègue qui peut me donner un crampon arrive 10' plus tard, timing quasi parfait, un grand merci à lui !! \nPause de 45' là-haut pour profiter, et aider un parapentiste à décoller puis on enchaine sur la descente par la voie du Pape, ça s'annonce long... \nGrosse chaleur sur le glacier du Dôme, pause coca à Gonella pour recharger les batteries avant l'interminable glacier du Miage ! \nRetour voiture 13h30 après notre départ du bivouac, fatigués mais heureux ! \n\nMatériels :\nCorde 50m\nFriends du 0.3 au 2\nDégaines rallongeables et sangles\nCoinceurs\n4 broches à glace (elles ont servis dans la rampe pour rejoindre l'arête qui mène à l'arête du brouillard)\n2 piolets \n\nUN CRAMPON BLUE ICE HARFANG HYBRIDE PERDU (si jamais quelqu'un le trouve sur l'itinéraire faîte moi signe 🙏)";
+  const outing1917601Whole = {
+    ...outing1917601,
+    locales: [{ ...outing1917601.locales[0], description: DESCRIPTION_1917601 }],
+  };
+  // Derived from GET /outings/1947529 (2026-10-05): every field get_outing prints, nulls kept as sent. Edited: the
+  // timing cut after its first line; the route keeps only its fr locale and its ratings. The description is whole:
+  // 11,390 characters, without image tags, links or headings, so more than 8,000 are printed as they are sent.
+  const DESCRIPTION_1947529 =
+    "12 juillet – L’approche du refuge des Conscrits\n\nLe réveil sonne tôt ce matin. J’embarque Hugues et, une fois sur la route, nous appelons Albane, qui transporte Berthelin de son côté.\n\n— Rendez-vous au parking de Bionnassay !\n\nQuelques heures plus tard, nous voilà réunis à la fraîche, prêts à affronter notre défi. C’est assez drôle de nous retrouver ici, car tout s’est décidé en seulement trois jours.\n\nDix jours auparavant, les conditions annoncées nous inquiétaient sérieusement. Notre plan initial prévoyait une descente par la voie des Trois Monts, mais une publication de La Chamoniarde au sujet de la crevasse du mont Maudit nous avait rapidement convaincus d’y renoncer. Nous avions donc annulé nos réservations et commencé à chercher un projet de secours pour occuper notre séjour.\n\nPuis, un retour récent sur les conditions du couloir du Goûter nous a laissé entrevoir une nouvelle possibilité : concrétiser ce projet que nous avions presque laissé de côté.\n\n« Mais pourquoi n’y avons-nous pas pensé plus tôt ? », me suis-je demandé.\n\nEn moins de deux heures, Berthelin et moi avons rappelé les refuges, vérifié les disponibilités et proposé cette nouvelle aventure à Albane et Hugues. Le plan était lancé. Plus vraiment le temps de réfléchir : il ne restait qu’à marcher.\n\nJe suis donc particulièrement heureux de commencer cette aventure. La première étape débute à la fraîche, dans le calme du sous-bois. Une pause au refuge de Tré-la-Tête nous permet de reprendre notre souffle et de contempler le panorama sur les aiguilles Rouges. Pour l’instant, tout va bien : les jambes sont fraîches, les sacs encore supportables et personne ne regrette ses choix de vie.\n\nSur le chemin, nous dépassons plusieurs groupes : certains progressent en autonomie, d’autres sont accompagnés par des guides. La passerelle himalayenne, puis la portion de via ferrata, marquent notre véritable entrée dans le domaine de la haute montagne.\n\nLe bruit sourd des roches qui dévalent sur le glacier de Tré-la-Tête nous rappelle brutalement les conséquences des fortes chaleurs de cet été. L’ambiance devient plus sérieuse. La montagne est magnifique, mais elle tient à nous rappeler qu’ici, c’est elle qui décide.\n\nEnfin, le refuge des Conscrits apparaît. Cette vision annonce surtout une excellente nouvelle : l’heure de l’apéritif bien mérité a sonné.\n\n13 juillet – Traversée des dômes de Miage et refuge Durier\n\nJe pense que le petit-déjeuner du refuge des Conscrits restera l’un des meilleurs de toute notre aventure. Qu’est-ce qui lui vaut une telle appréciation ? La vue ? L’altitude ? La perspective de la journée qui nous attend ?\n\nNon.\n\nLe Nocciolata étalé généreusement sur notre pain.\n\nNous partons à 5 h 30, aux premières lueurs du jour. L’itinéraire est relativement facile à suivre grâce à une succession de sentiers, de cairns et de traces dans les névés. Pour une fois, l’orientation ressemble presque à un jeu d’enfant.\n\nUne belle bavante plus tard, nous atteignons l’aiguille de la Bérangère. De là, nous observons le panorama ainsi que les différents dômes qu’il nous faudra franchir. Au loin, plusieurs groupes progressent vers le col des Dômes après avoir traversé le glacier de Tré-la-Tête.\n\nDe notre côté, ce glacier ne nous donne pas particulièrement envie d’aller lui rendre visite. Entre les crevasses et les blocs de pierre qui le recouvrent, il ressemble davantage à un immense piège qu’à une paisible étendue glacée.\n\nLe col des Dômes n’est pas évident à rejoindre. Un long zigzag permet d’éviter de s’enfoncer vers le cœur du glacier. Puis, comme si nous n’avions pas encore suffisamment monté, une nouvelle pente nous attend pour atteindre le sommet du quatrième dôme.\n\nEnfin, refuge en vue !\n\nEnfin… « en vue » ne signifie pas nécessairement « proche ». La montagne aime entretenir ce genre de malentendu.\n\nL’arrivée au cinquième dôme nous donne un avant-goût du terrain qu’il faudra traverser pour rejoindre notre palace du soir. Devant nous s’étend un décor lunaire composé de chaos rocheux et de pierriers instables. Tout semble avoir été soigneusement disposé pour provoquer quelques glissades.\n\nEt tout cela se déroule sous le regard de la Grande Dame blanche, qui observe silencieusement notre progression.\n\nÉvidemment, je finis par glisser.\n\nAvec Berthelin, nous nous interrogeons ensuite sur une indication du topo : « Suivre la flèche rose indiquant le relais. »\n\nTrès bien.\n\nMais où est cette fameuse flèche rose ?\n\nNous avançons prudemment près de la rupture de pente. Je me retourne vers Berthelin pour lui demander ce que nous faisons… et je l’aperçois enfin.\n\nLa flèche rose !\n\nJe la lui indique, et un grand souffle de soulagement évacue la tension qui commençait à monter. Nous installons le rappel et poursuivons notre progression. Albane et Hugues nous suivent et atteignent à leur tour le relais.\n\nCette fois, la journée touche réellement à sa fin.\n\nÀ notre arrivée au refuge Durier, Manon nous accueille et nous demande si tout s’est bien passé. La réponse courte serait « oui ». La réponse complète nécessiterait probablement l’apéritif.\n\n14 juillet – Du refuge Durier au mont Blanc, puis au Nid d’Aigle\n\nC’est le grand jour.\n\nIl est 2 h 30 lorsque nous rejoignons la salle du petit-déjeuner. L’avantage du refuge Durier, c’est qu’il suffit pratiquement de descendre de son lit pour se retrouver à table. Nous prenons la place du groupe précédent et savourons notre repas avant la longue journée qui nous attend.\n\nDans la cuisine, j’aperçois Manon en train de préparer son pain à la lumière de sa frontale.\n\nQuel courage.\n\nÀ cette heure-là, réussir à mettre ses chaussures dans le bon sens constitue déjà une performance. Alors faire du pain…\n\nNous nous équipons à l’extérieur et prenons rapidement la route. Nous le savons : aujourd’hui, nous devons être efficaces. La veille, nous avons défini plusieurs barrières horaires à ne pas dépasser.\n\nLa première partie ressemble encore à de la randonnée. Il n’y a pratiquement plus de neige. Comme nous avons repéré les lieux la veille en cherchant de l’eau, nous ne faisons aucune erreur d’itinéraire. Les cordées qui progressent devant nous nous servent également de repères.\n\nNous nous équipons au pied de l’arête rocheuse. Le premier passage nous met immédiatement dans l’ambiance : un Friend permet de protéger environ cinq mètres de progression. Les traces laissées par les crampons sur la roche blanchie nous indiquent la direction à suivre.\n\nNous remontons une succession d’écailles enchevêtrées. Un passage sous une dalle couchée, coince le sac d'Hugues. Visiblement, la montagne souhaite vérifier si nous savons également ramper.\n\nUne traversée neigeuse presque horizontale nous indique que nous avons déjà parcouru une bonne partie de l’arête. Je remonte ensuite un dièdre en direction d’un relais.\n\nNous voilà enfin au bout de la partie rocheuse.\n\nNous attendons Berthelin et Albane afin de poursuivre ensemble. Le jour commence à se lever. Face à nous se dresse le piton des Italiens, que nous devons rejoindre par une fine arête de glace.\n\nLa trace fait à peine la largeur d’un pas. Ici, la chute n’est clairement pas une option. Heureusement, le vent reste faible pendant notre traversée et ne vient pas ajouter un exercice d’équilibre à un passage qui se suffit déjà largement à lui-même.\n\nNous atteignons finalement le pied du piton des Italiens et décidons de faire une courte pause. Une cordée arrivant de la voie italienne nous rejoint. Nous en profitons pour faire un point général sur notre état.\n\nLes visages sont marqués par la fatigue. Albane et Hugues souhaitent que nous prenions une décision définitive au col du Dôme. Le temps passe et notre barrière horaire se rapproche dangereusement.\n\nLa pause est donc brève, et nous repartons.\n\nSur le chemin du col du Dôme, nous rattrapons une cordée de trois personnes. Ils présentent manifestement des signes de mauvaise acclimatation. Le dernier s’effondre sur les genoux tous les trois pas.\n\nJ’indique à Hugues que nous devons les dépasser : leur rythme est trop lent et nous ne pouvons pas nous permettre d’attendre.\n\nQuelques instants plus tard, nous atteignons le col du Dôme, véritable carrefour avec la voie normale. À cette altitude, il y a étonnamment du monde, et le soleil nous brûle.\n\nC’est l’heure de la décision.\n\n— Alors ?\n\nAlbane souffre du genou.\n\nJe me tourne vers Berthelin :\n\n— Et toi, Berthel ?\n\n— Moi, ça peut le faire.\n\nLa décision est prise. Hugues et Albane commencent la descente, tandis que Berthelin et moi poursuivons vers le sommet.\n\nNous savons qu’un long effort nous attend encore. Pour le rendre plus supportable, je décompose mentalement la partie finale : d’abord l’abri Vallot, puis les grandes bosses, les petites bosses et, enfin, le sommet.\n\nNous reprenons notre marche à un rythme régulier. Nous croisons les alpinistes qui redescendent après leur ascension.\n\nL’abri Vallot.\n\nPlus que 450 mètres de dénivelé.\n\n« Plus que » est une expression très optimiste lorsqu’on se trouve à plus de 4 300 mètres d’altitude.\n\nUn nouveau mur se dresse devant nous. L’effort commence sérieusement à se faire sentir. Je n’ose même plus lever la tête pour regarder ce qu’il reste à gravir. Dans la petite bosse, nous croisons une cordée partie elle aussi du refuge Durier. Ils nous adressent quelques encouragements fraternels qui nous donnent l’énergie nécessaire pour continuer.\n\nLa longue arête sommitale apparaît enfin devant nous.\n\nJe m’arrête et demande à Berthelin :\n\n— On y est ?\n\n— Je pense que c’est encore un peu plus loin.\n\nPuis, quelques pas plus tard, ça y est.\n\nNous foulons le point culminant de l’Europe occidentale.\n\nNous avons une chance incroyable : pendant quelques instants, le sommet est à nous. Nous pouvons savourer pleinement la récompense de tous ces efforts.\n\nL’émotion est étrange. Un mélange de stupeur, de joie et d’une forme de tristesse. Peut-être parce qu’un rêve vient de se réaliser. Peut-être aussi parce que nous savons que l’aventure touche déjà à sa fin.\n\nAvec Berthelin, nous nous prenons dans les bras et nous nous félicitons. Nous avons réussi.\n\nAprès quelques minutes passées sur le toit de l’Europe occidentale, nous entamons la descente. Les personnes que je croise ne peuvent pas le voir, mais derrière mon buff, je souris comme un enfant.\n\nEn redescendant, nous nous accordons même le luxe d’utiliser les toilettes de l’abri Vallot.\n\nFaire ses besoins à 4 350 mètres : c’est fait. Voilà une ligne de plus à ajouter au palmarès.\n\nAlbane et Hugues nous attendent à Tête Rousse. Avant de les retrouver, nous passons devant le refuge du Goûter, puis devant l’ancien refuge en cours de démontage.\n\nUne échelle plus tard, nous entrons dans le fameux couloir du Goûter.\n\nLe décor est effectivement chaotique. D’énormes blocs jonchent le passage et certains pitons ont été arrachés. La pseudo-via ferrata n’a rien de rassurant, surtout après plus de douze heures d’effort.\n\nPar chance, aucune pierre ne dégringole pendant notre traversée.\n\nUne fois de l’autre côté, nous soufflons profondément pour évacuer la tension. Je me retourne vers le refuge du Goûter et contemple l’immense muraille que nous venons de descendre.\n\nÀ cet instant, je me fais une promesse solennelle : ne plus jamais repasser par ici.\n\nEnfin, nous reprenons notre marche vers nos compagnons. Au loin, des mains se lèvent vers le ciel.\n\nL’aventure est terminée.\n\nOver the Top : mission accomplie !";
+  const outing1947529 = {
+    document_id: 1947529,
+    locales: [
+      {
+        lang: "fr",
+        title: "Mont Blanc : Traversée Dômes de Miage → Aiguille de Bionnassay → Mont Blanc (voie royale)",
+        description: DESCRIPTION_1947529,
+        route_description: null,
+        conditions: null,
+        weather: "grand beau",
+        timing: "J1",
+        participants: "Hugues, Albane, Berthelin",
+      },
+    ],
+    activities: ["mountain_climbing", "snow_ice_mixed"],
+    date_start: "2026-07-12",
+    date_end: "2026-07-14",
+    participant_count: 4,
+    global_rating: "AD",
+    engagement_rating: "IV",
+    condition_rating: "good",
+    partial_trip: false,
+    elevation_max: 4810,
+    elevation_min: 1175,
+    height_diff_up: 4188,
+    height_diff_down: null,
+    associations: {
+      users: [{ document_id: 1562512, name: "tintin38" }],
+      routes: [
+        {
+          document_id: 54092,
+          locales: [
+            {
+              lang: "fr",
+              title: "Traversée Dômes de Miage → Aiguille de Bionnassay → Mont Blanc (voie royale)",
+              title_prefix: "Mont Blanc",
+            },
+          ],
+          global_rating: "AD",
+          engagement_rating: "IV",
+          mixed_rating: "M2",
+          rock_free_rating: "3c",
+          rock_required_rating: "3c",
+          risk_rating: "X3",
+          equipment_rating: "P3",
+        },
+      ],
+    },
+  };
   // The message getJson gives for GET /outings/999999999 (404, 2026-10-05).
   const NOT_FOUND = "Camptocamp API error: 404 Not Found (outing 999999999): document not found";
 
@@ -867,6 +928,84 @@ describe("handleGetOutings", () => {
     // The other sections are short enough to be printed whole, and get_outing prints the conditions whole.
     expect(result.match(/\[truncated/g)).toHaveLength(1);
     expect(sectionText(await handleGetOuting({ id: 1545314 }), "conditions")).toBe(CONDITIONS_1545314);
+  });
+
+  // S1 of #303: max_section_chars sets the cut, 2000 when absent; at 8000 the note points to the **URL** line.
+  describe("max_section_chars", () => {
+    // The first `max` code points of a text.
+    const head = (text: string, max: number) => Array.from(text).slice(0, max).join("");
+    const urlNote = (more: number) =>
+      `[truncated, ${String(more)} more characters; the camptocamp.org page of the **URL** line has the whole text]`;
+
+    it("prints the 3,272-character conditions of 1545314 whole at 8000 (AC1.1)", async () => {
+      serve(outing1545314);
+
+      const result = await handleGetOutings({ ids: [1545314], max_section_chars: 8000 });
+
+      expect(sectionText(result, "conditions")).toBe(CONDITIONS_1545314);
+      expect(result).not.toContain("[truncated");
+    });
+
+    it("cuts at 2000 without it, as v1.4.0 does: the 1917601 description ends with the 251-character note (AC1.2)", async () => {
+      serve(outing1917601Whole);
+
+      const result = await handleGetOutings({ ids: [1917601] });
+
+      expect(sectionText(result, "description")).toBe(
+        `${head(DESCRIPTION_1917601, 2000)}\n` +
+          "[truncated, 251 more characters; get_outing {id: 1917601} shows up to 8,000]",
+      );
+      expect(await handleGetOutings({ ids: [1917601], max_section_chars: 2000 })).toBe(result);
+    });
+
+    it("cuts the conditions of 1545314 at 3000 and still points to get_outing (AC1.3)", async () => {
+      serve(outing1545314);
+
+      const result = await handleGetOutings({ ids: [1545314], max_section_chars: 3000 });
+
+      expect(sectionText(result, "conditions")).toBe(
+        `${head(CONDITIONS_1545314, 3000)}\n` +
+          "[truncated, 272 more characters; get_outing {id: 1545314} shows up to 8,000]",
+      );
+      expect(result.match(/\[truncated/g)).toHaveLength(1);
+    });
+
+    it("points to the **URL** line, not get_outing, for a section cut at 8000 (AC1.4, 1947529)", async () => {
+      serve(outing1947529);
+
+      const result = await handleGetOutings({ ids: [1947529], max_section_chars: 8000 });
+
+      expect(sectionText(result, "description")).toBe(`${head(DESCRIPTION_1947529, 8000)}\n${urlNote(3390)}`);
+      expect(result).toContain("\n**URL**: https://www.camptocamp.org/outings/1947529\n");
+      expect(result).not.toContain("get_outing {id:");
+      expect(result.match(/\[truncated/g)).toHaveLength(1);
+      // get_outing cuts at the same place, so it would show no more of the description.
+      expect(sectionText(await handleGetOuting({ id: 1947529 }), "description")).toBe(
+        `${head(DESCRIPTION_1947529, 8000)}\n[truncated, 3390 more characters]`,
+      );
+    });
+
+    it("still points to get_outing just below 8000", async () => {
+      serve(outing1947529);
+
+      const text = sectionText(await handleGetOutings({ ids: [1947529], max_section_chars: 7999 }), "description");
+
+      expect(text).toBe(
+        `${head(DESCRIPTION_1947529, 7999)}\n` +
+          "[truncated, 3391 more characters; get_outing {id: 1947529} shows up to 8,000]",
+      );
+    });
+
+    it("applies the cut to every outing of the call", async () => {
+      serve(outing1545314, outing1917601Whole);
+
+      const result = await handleGetOutings({ ids: [1917601, 1545314], max_section_chars: 8000 });
+
+      const second = result.indexOf(`\n\n# ${title} (ID: 1545314)\n`);
+      expect(sectionText(result.slice(0, second), "description")).toBe(DESCRIPTION_1917601);
+      expect(sectionText(result.slice(second), "conditions")).toBe(CONDITIONS_1545314);
+      expect(result).not.toContain("[truncated");
+    });
   });
 
   it("prints every text section, with no input to choose them (AC1.2)", async () => {
@@ -953,6 +1092,16 @@ describe("handleGetOutings", () => {
       }
     });
 
+    // S1 of #303 (AC1.6): the default, the range, the cost of a higher value and the note at 8000.
+    it("gives max_section_chars's default and range, says a higher value lengthens the output", () => {
+      for (const phrase of [
+        "longer than max_section_chars (default 2000, 500 to 8000; a higher value lengthens the output)",
+        "at 8000 the note points to the **URL** line",
+      ]) {
+        expect(description).toContain(phrase);
+      }
+    });
+
     it("says outings are past reports, not a forecast, and what Partial trip means", () => {
       expect(description).toContain("past trip reports");
       expect(description).toContain("not a forecast");
@@ -966,7 +1115,7 @@ describe("handleGetOutings", () => {
       const text = sectionText(await handleGetOutings({ ids: [1545314] }), "conditions");
       const shown = Array.from(text.slice(0, text.lastIndexOf("\n[truncated"))).length;
 
-      expect(description).toContain(userTextNote({ max: shown }, " per section"));
+      expect(description).toContain(userTextNote({ max: shown }, " per section by default"));
       expect(description).toContain(LANG_NOTE);
       expect(description).toContain(DETAIL_LANG_NOTE);
       expect(description.length).toBeLessThan(2048);

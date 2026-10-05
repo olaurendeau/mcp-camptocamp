@@ -168,4 +168,4 @@ Descente 2 : 11h55 >> 12h45
 - [`search_outings`](search_outings.md): find outings by area, activity, dates, route or waypoint.
 - [`search_user_outings`](search_user_outings.md): list the outings of a Camptocamp user.
 - [`get_route`](get_route.md): read a route the outing followed.
-- [`get_outings`](get_outings.md): read up to 10 outings in one call, each section cut at 2,000 characters (v1.4.0 or later).
+- [`get_outings`](get_outings.md): read up to 10 outings in one call (v1.4.0 or later), each section cut at 2,000 characters, or up to 8,000 with `max_section_chars` (not in v1.4.0).

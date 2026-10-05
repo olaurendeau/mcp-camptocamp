@@ -325,6 +325,34 @@ describe("get_outings ids", () => {
   });
 });
 
+// AC1.5 on #303: max_section_chars is an integer from 500 to 8000, checked before any request.
+describe("get_outings max_section_chars", () => {
+  it.each<[string, unknown, string]>([
+    ["499", 499, "Number must be greater than or equal to 500 at max_section_chars"],
+    ["8001", 8001, "Number must be less than or equal to 8000 at max_section_chars"],
+    ["2000.5", 2000.5, "Expected integer, received float at max_section_chars"],
+    ['"3000"', "3000", "Expected number, received string at max_section_chars"],
+  ])("rejects %s naming the field without calling Camptocamp", async (_label, max_section_chars, issue) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_outings", arguments: { ids: [1924138], max_section_chars } });
+
+    expect(validationIssues(result, "get_outings")).toEqual([issue]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([500, 8000])("accepts %d and sends one request", async (max_section_chars) => {
+    const fetchMock = stubFetch(jsonResponse(OUTING));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_outings", arguments: { ids: [ACCEPTED_ID], max_section_chars } });
+
+    expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 // S4 on #255: outing_stats requires group_by, and checks the search_outings filters before any request.
 describe("outing_stats inputs", () => {
   it.each<[string, Record<string, unknown>, string]>([
