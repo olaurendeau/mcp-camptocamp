@@ -1534,6 +1534,24 @@ describe("searchOutings", () => {
     expect(calledUrl().searchParams.get("period")).toBe("2020-02-01,2020-02-29");
   });
 
+  // #251: the API reduces each bound to its time modulo a 365.2425-day year, so 2020-01-01 lands at day 365.1,
+  // after every other day. A 01-01 start goes in 1970 (day 0), a 01-01 end in 2021 (day 0.6, before every 01-02).
+  it.each([
+    ["01-01", "01-31", "1970-01-01,2020-01-31"],
+    ["01-01", "01-01", "1970-01-01,2021-01-01"],
+    ["01-01", "02-29", "1970-01-01,2020-02-29"],
+    ["01-01", "12-31", "1970-01-01,2020-12-31"],
+    ["02-29", "02-29", "2020-02-29,2020-02-29"],
+    ["06-01", "06-30", "2020-06-01,2020-06-30"],
+    ["12-20", "12-31", "2020-12-20,2020-12-31"],
+  ])("sends the period %s → %s as %s", async (start, end, expected) => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));
+
+    await searchOutings({ period: { start, end } });
+
+    expect(calledUrl().searchParams.get("period")).toBe(expected);
+  });
+
   // AC5.3: the period and the date range are two independent filters.
   it("sends both period and date when both are given", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({ documents: [], total: 0 }));

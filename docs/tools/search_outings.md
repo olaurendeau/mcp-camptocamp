@@ -133,29 +133,30 @@ The period matches June of every year: here 2026 and 2025. `get_outing {id: 1912
   | 2021 | 1358       | 1313              | 1357              |
   | 2024 | 1519       | 1456              | 1518              |
 
-  A period ending on `12-31` cannot be widened past it, and widening a period to start on `01-01` runs into the next limit.
+  A period ending on `12-31` cannot be widened past it.
 
-- **A period starting on `01-01` returns almost nothing.** Measured on the live API on 2026-10-05, with no other filter:
+- **In v1.3.0, a period starting on `01-01` returns almost nothing.** Camptocamp places each bound of a period on a 365.2425-day year, and v1.3.0 sends every bound in 2020, which puts `2020-01-01` after `12-31`. From the release after v1.3.0, a `01-01` start is sent as `1970-01-01` and a `01-01` end as `2021-01-01`, so periods starting on `01-01` work. Measured on the live API on 2026-10-05, with no other filter:
 
-  | Period            | Outings found |
-  | ----------------- | ------------- |
-  | `01-01` → `01-31` | 0             |
-  | `01-02` → `01-31` | 29297         |
-  | `01-01` → `12-31` | 4             |
-  | `12-20` → `12-31` | 10098         |
+  | Period            | v1.3.0 | From the release after v1.3.0 |
+  | ----------------- | ------ | ----------------------------- |
+  | `01-01` → `01-31` | 0      | 30161                         |
+  | `01-01` → `01-01` | 76     | 692                           |
+  | `01-01` → `12-31` | 4      | 346332                        |
+  | `01-02` → `01-31` | 29297  | 29297                         |
+  | `12-20` → `12-31` | 10098  | 10098                         |
 
-  A period ending on `12-31` works normally. For early January, start the period on `01-02` and accept that 1 January is left out, or use `date_from` and `date_to` instead, one year per call. An empty result for a period starting on `01-01` does not mean there are no reports.
+  1 January is an edge day like the others. Of the 47 outings that `date_from: "2023-01-01"` with `date_to: "2023-01-01"` found, adding the period `01-01` → `01-31` keeps none in v1.3.0 and 40 from the release after v1.3.0; the other 7 started in 2022 and span the new year (next item). With v1.3.0, start the period on `01-02` and accept that 1 January is left out, or use `date_from` and `date_to` instead, one year per call: an empty result for a period starting on `01-01` does not mean there are no reports.
 
-- **An outing spanning the new year matches no period.** Outing 1362640, from 2020-12-17 to 2021-10-28, was returned by no period tested. `date_from` and `date_to` do return it.
+- **An outing spanning the new year matches no period but the whole year.** Outing 1362640, from 2020-12-17 to 2021-10-28, was returned by none of `01-01` → `01-31`, `06-01` → `06-30` and `12-01` → `12-31`, measured on 2026-10-05. From the release after v1.3.0, `01-01` → `12-31` returns it. `date_from` and `date_to` do return it.
 - **A period cannot wrap around the new year.** `period_end` must be on or after `period_start`. `search_outings {area_id: 14409, activity: "skitouring", period_start: "12-20", period_end: "01-10", limit: 3}`, captured from v1.3.0 on 2026-10-05:
 
   ```text
   Error: period cannot wrap around the new year; make two calls (12-20 → 12-31 and 01-01 → 01-10)
   ```
 
-  The second call this error suggests starts on `01-01`, so it hits the limit above. Make the second call start on `01-02`, or use `date_from` and `date_to` for those January days. For this Vanoise ski-touring search, measured on 2026-10-05:
+  From the release after v1.3.0, both calls this error suggests work. In v1.3.0, the second one starts on `01-01` and hits the limit above: make it start on `01-02`, or use `date_from` and `date_to` for those January days. For this Vanoise ski-touring search, measured on 2026-10-05:
   - `12-20` → `12-31` found 79 outings;
-  - `01-01` → `01-10` found none;
+  - `01-01` → `01-10` found 53 from the release after v1.3.0, and none in v1.3.0;
   - `01-02` → `01-10` found 45;
   - `date_from: "2025-01-01"` with `date_to: "2025-01-10"` and no period found 3, for January 2025 only.
 

@@ -180,9 +180,15 @@ export async function getArea(id: number): Promise<AreaDetail> {
 const DATE_MIN = "0001-01-01";
 const DATE_MAX = "9999-12-31";
 
-// `period` matches month and day in every year, given as dates of one year: 2020, a leap year, so
-// that 02-29 exists. A range wrapping around the new year (12-20 → 01-10) matches nothing.
-const PERIOD_YEAR = "2020";
+// `period` matches month and day in every year. The API reduces each bound to its time modulo a 365.2425-day
+// year, so the year of a bound decides where it lands. Bounds go in 2020, a leap year, so that 02-29 exists,
+// except 01-01: 2020-01-01 lands at day 365.1, after every other day, and January periods matched nothing.
+// A 01-01 start goes in 1970 (day 0), a 01-01 end in 2021 (day 0.6, before every 01-02 since 1990).
+// A range wrapping around the new year (12-20 → 01-10) matches nothing.
+function periodBound(day: string, side: "start" | "end"): string {
+  if (day === "01-01") return side === "start" ? "1970-01-01" : "2021-01-01";
+  return `2020-${day}`;
+}
 
 export interface OutingSearchParams {
   query?: string;
@@ -224,7 +230,7 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
     search.set("date", `${params.date_from ?? DATE_MIN},${params.date_to ?? DATE_MAX}`);
   }
   if (params.period !== undefined) {
-    search.set("period", `${PERIOD_YEAR}-${params.period.start},${PERIOD_YEAR}-${params.period.end}`);
+    search.set("period", `${periodBound(params.period.start, "start")},${periodBound(params.period.end, "end")}`);
   }
   if (params.route_id !== undefined) search.set("r", String(params.route_id));
   if (params.waypoint_id !== undefined) search.set("w", String(params.waypoint_id));
