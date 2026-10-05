@@ -36,7 +36,7 @@ The contract tests call the live Camptocamp API to catch changes in its response
 
 ## Releases
 
-Publishing is automated: pushing a `vX.Y.Z` tag starts the `publish.yml` workflow, which publishes to npm, GHCR and the [official MCP registry](https://modelcontextprotocol.io/registry). Nothing is published by hand. The process (version bump pull request, merge, tag) is in the [Release section of CONTRIBUTING.md](../CONTRIBUTING.md#release).
+Publishing is automated: pushing a `vX.Y.Z` tag starts the `publish.yml` workflow, which publishes to npm, GHCR and the [official MCP registry](https://modelcontextprotocol.io/registry). Nothing is published by hand. The process (version bump pull request, merge, tag, then a docs pull request that re-checks the client pages and updates the version-dependent notes and examples) is in the [Release section of CONTRIBUTING.md](../CONTRIBUTING.md#release).
 
 ## Stack
 
