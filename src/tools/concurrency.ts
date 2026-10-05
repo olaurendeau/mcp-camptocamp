@@ -1,5 +1,6 @@
 // Parallel API calls for the tools that read several documents in one call (get_outings, S1 of #255).
-// Each call still goes through getJson, with its User-Agent, 15 s timeout and 10 MiB cap.
+// Each call still goes through getJson, with its User-Agent, 15 s timeout and 10 MiB cap, and in HTTP mode
+// also waits for a slot under the process-wide upstream cap (src/api/upstream.ts), shared by every client.
 
 // The most requests one tool call sends to Camptocamp at a time.
 export const MAX_PARALLEL_REQUESTS = 3;
