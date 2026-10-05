@@ -1,6 +1,6 @@
 # get_outings
 
-**Not in v1.3.0**: this tool comes with the release after v1.3.0. On v1.3.0, call [`get_outing`](get_outing.md) once per outing.
+**v1.4.0 or later**: this tool is not in v1.3.0. On v1.3.0, call [`get_outing`](get_outing.md) once per outing.
 
 ## Purpose
 
@@ -49,7 +49,7 @@ Error: <message>
 
 ## Example
 
-An Innominata report from the [`search_outings` example](search_outings.md#example) and an unknown ID, `get_outings {ids: [1924138, 999999999]}`, captured from main at 19b241e with `get_outings` added (#261) on 2026-10-05, with a local build. The report text has zero-width spaces at the start of some lines, kept as captured; the spaces at the end of two lines were removed by this repository's formatter:
+An Innominata report from the [`search_outings` example](search_outings.md#example) and an unknown ID, `get_outings {ids: [1924138, 999999999]}`, captured from v1.4.0 on 2026-10-05. The report text has zero-width spaces at the start of some lines, kept as captured; the spaces at the end of two lines were removed by this repository's formatter:
 
 ```text
 # Mont Blanc : Arête de l'Innominata (ID: 1924138)
@@ -105,14 +105,14 @@ Error: Camptocamp API error: 404 Not Found (outing 999999999): document not foun
 
 ## Limits
 
-- **At most 10 IDs per call.** An empty list or more than 10 IDs is refused before any request. `get_outings {ids: []}`, captured from main at 19b241e with `get_outings` added (#261) on 2026-10-05, with a local build:
+- **At most 10 IDs per call.** An empty list or more than 10 IDs is refused before any request. `get_outings {ids: []}`, captured from v1.4.0 on 2026-10-05:
 
   ```text
   MCP error -32602: Input validation error: Invalid arguments for tool get_outings: must list at least 1 ID at ids
   ```
 
 - **Sections are cut at 2,000 characters**, against 8,000 in `get_outing`. Call `get_outing` with the ID named in the `[truncated, …]` line to read more, or the camptocamp.org page of the `**URL**` line for the whole text.
-- **Ten long reports can exceed Claude Code's 25,000-token output cap.** Each outing prints up to six sections of 2,000 characters, so ten outings can carry 120,000 characters of text. Measured on 2026-10-05 with the build above, the 10 most recent Innominata outings (`search_outings {route_id: 54513}`) print 28,870 characters, with 4 sections cut. Above the cap, Claude Code saves the result to a file; ask for fewer IDs per call, or see [Tool output](../clients/claude-code.md#tool-output-warning-at-10000-tokens-cap-at-25000) in the Claude Code page.
+- **Ten long reports can exceed Claude Code's 25,000-token output cap.** Each outing prints up to six sections of 2,000 characters, so ten outings can carry 120,000 characters of text. Measured on v1.4.0 on 2026-10-05, the 10 most recent Innominata outings (`search_outings {route_id: 54513}`) print 28,870 characters, with 4 sections cut. Above the cap, or above 50,000 characters, Claude Code saves the result to a file; ask for fewer IDs per call, or see [Tool output](../clients/claude-code.md#tool-output-warning-at-10000-tokens-cap-at-25000) in the Claude Code page.
 - **A Camptocamp outage can outlast the client's timeout.** Each request gives up after 15 s, and 10 IDs go out in 4 rounds of 3, so if Camptocamp stops responding the call takes 60 s before its `# Outing not read` blocks arrive. That equals the MCP TypeScript SDK's default client timeout of 60 s, so a client may give up first and show a timeout instead.
 - **An unknown ID is not an error of the call.** It gets its own `# Outing not read` block; check each block before quoting it.
 - **The limits of `get_outing` apply**: no author, routes only, a missing line means Camptocamp has no value, no line says the route was completed, and ratings and conditions are those of one day, as the author reported them. See [`get_outing` Limits](get_outing.md#limits).

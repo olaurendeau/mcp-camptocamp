@@ -95,7 +95,7 @@ The [support matrix](docs/README.md#support-matrix) lists the clients covered by
 
 ## Tools
 
-13 read-only tools in v1.3.0: one search and one detail tool per kind of Camptocamp document, plus a shortcut for a user's outings. The release after v1.3.0 adds two: `get_outings`, to read several outings in one call, and `outing_stats`, to count outings by month, year or condition. Search results give IDs; the `get_*` tools take an ID. Every tool takes `lang`, the language of titles and texts (`fr` by default; v1.3.0 or later).
+15 read-only tools: one search and one detail tool per kind of Camptocamp document, a shortcut for a user's outings, `get_outings`, to read several outings in one call, and `outing_stats`, to count outings by month, year or condition (these two from v1.4.0). Search results give IDs; the `get_*` tools take an ID. Every tool takes `lang`, the language of titles and texts (`fr` by default; v1.3.0 or later).
 
 | Tool                                                       | What it does                                                                                                     |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -106,13 +106,13 @@ The [support matrix](docs/README.md#support-matrix) lists the clients covered by
 | [`search_outings`](docs/tools/search_outings.md)           | Search trip reports by keyword, area, activity, ratings, conditions, elevation, dates, routes, waypoint or user. |
 | [`search_user_outings`](docs/tools/search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                            |
 | [`get_outing`](docs/tools/get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.                |
-| [`get_outings`](docs/tools/get_outings.md)                 | Up to 10 outings by ID in one call, in `get_outing` format, each section cut at 2,000 characters; not in v1.3.0. |
-| [`outing_stats`](docs/tools/outing_stats.md)               | Count the outings matching `search_outings` filters by start month, start year or condition; not in v1.3.0.      |
+| [`get_outings`](docs/tools/get_outings.md)                 | Up to 10 outings by ID in one call, in `get_outing` format, each section cut at 2,000 characters; from v1.4.0.   |
+| [`outing_stats`](docs/tools/outing_stats.md)               | Count the outings matching `search_outings` filters by start month, start year or condition; from v1.4.0.        |
 | [`search_areas`](docs/tools/search_areas.md)               | Search ranges, administrative subdivisions and countries by name; the ID is reusable as `area_id`.               |
 | [`get_area`](docs/tools/get_area.md)                       | One area by ID: type, summary and description.                                                                   |
 | [`search_books`](docs/tools/search_books.md)               | Search guidebooks and other books by title, book type and activity; author and ISBN searches are unreliable.     |
 | [`get_book`](docs/tools/get_book.md)                       | One book by ID: author, editor, date, ISBN, languages, and the routes, waypoints and articles it covers.         |
-| [`search_articles`](docs/tools/search_articles.md)         | Search articles (gear, technique, environment, stories) by keyword; by category, type and activity after v1.3.0. |
+| [`search_articles`](docs/tools/search_articles.md)         | Search articles (gear, technique, environment, stories) by keyword; by category, type and activity from v1.4.0.  |
 | [`get_article`](docs/tools/get_article.md)                 | One article by ID: text, author, type, and the routes, waypoints, articles, outings and books linked to it.      |
 
 Each tool page gives its inputs, generated from the registered schema, its output format, a real example and its limits: see the [tool reference](docs/tools/README.md).

@@ -44,7 +44,7 @@ Find routes by keyword, area, waypoint, activity, rating, elevation gain, route 
 
 <!-- generated:inputs end -->
 
-**Not in v1.3.0:** the `query` and `configuration` descriptions above, which state that `query` matches route names only and that configuration tagging is incomplete (see [Limits](#limits)), come with the release after v1.3.0. v1.3.0 has the same behaviour, but describes `query` only as "Search query for routes (e.g. 'Mont Blanc voie normale')" and `configuration` without the last two sentences.
+**v1.4.0 or later:** the `query` and `configuration` descriptions above, which state that `query` matches route names only and that configuration tagging is incomplete (see [Limits](#limits)). v1.3.0 has the same behaviour, but describes `query` only as "Search query for routes (e.g. 'Mont Blanc voie normale')" and `configuration` without the last two sentences.
 
 ## Output format
 
