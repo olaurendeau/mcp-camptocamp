@@ -66,7 +66,7 @@ const isoDate = () =>
     .regex(DATE_FORMAT, DATE_MESSAGE)
     .refine((s) => !DATE_FORMAT.test(s) || isRealDate(s), DATE_MESSAGE);
 
-// A day of the year for `period`, checked in 2020 (a leap year) like the API layer sends it.
+// A day of the year for `period`, checked in 2020 (a leap year), the year the API layer sends it in (01-01 aside).
 const PERIOD_DAY_MESSAGE = "must be a real day in MM-DD format (e.g. 06-01; 02-29 allowed)";
 const PERIOD_DAY_FORMAT = /^\d{2}-\d{2}$/;
 const periodDay = () =>
@@ -274,7 +274,8 @@ function periodFilter(start: string | undefined, end: string | undefined): Outin
   }
   if (start === undefined || end === undefined) return undefined;
   if (start > end) {
-    // Camptocamp returns no outing at all for a wrapping period.
+    // Camptocamp returns no outing at all for a wrapping period. The second call, starting on 01-01, works since
+    // #251: the API layer sends a 01-01 start in a non-leap year.
     throw new Error(`period cannot wrap around the new year; make two calls (${start} → 12-31 and 01-01 → ${end})`);
   }
   return { start, end };

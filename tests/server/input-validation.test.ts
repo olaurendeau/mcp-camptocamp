@@ -438,6 +438,17 @@ describe("cross-field rules", () => {
     expect(params.get("u")).toBe("430052");
   });
 
+  // #251: the second call the wrap-around error suggests starts on 01-01, sent in a non-leap year.
+  it("search_outings sends a period starting on 01-01 through MCP with a 1970 start", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    await client.callTool({ name: "search_outings", arguments: { period_start: "01-01", period_end: "01-10" } });
+
+    const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
+    expect(params.get("period")).toBe("1970-01-01,2020-01-10");
+  });
+
   // AC2.1 on #255
   it("search_outings sends route_ids as one r through MCP", async () => {
     const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
