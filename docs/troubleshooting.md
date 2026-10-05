@@ -48,6 +48,23 @@ Or raise the client's startup timeout:
 
 **Fix:** check the version with `node --version`, and install [Node.js](https://nodejs.org/en/download) 22 or later. Or use the [Docker variant](getting-started.md#quick-start-docker): the image includes its own Node.js.
 
+## The smoke test prints 13 tools instead of 15
+
+**Symptom:** the [smoke test](getting-started.md#smoke-test) prints `13` and a version below 1.4.0. `get_outings` and `outing_stats` are missing: they came with v1.4.0. Measured on 2026-10-06, v1.2.0 and v1.3.0 both list 13 tools.
+
+**Cause:** the client runs an older copy of the server:
+
+- Docker: `docker run` pulls only an image that is missing, so a local `ghcr.io/olaurendeau/mcp-camptocamp:latest` pulled before v1.4.0 stays on v1.3.0 or older.
+- npx: a copy installed globally (`npm install -g`) or in the current project runs instead of the latest release. Tried on 2026-10-06 with npm 10.9.9: with v1.3.0 installed globally, `npx -y @olaurendeau/mcp-camptocamp` ran v1.3.0. The npx cache is not the cause: with v1.3.0 in that cache, the next npx run installed and ran v1.4.0.
+- Node.js older than 22: npx runs v1.2.0, see [above](#the-server-is-older-than-expected-or-lang-is-ignored).
+
+**Fix:** update the copy, then restart the client and run the smoke test again: it should print 1.4.0 or later and `15`.
+
+- Docker: `docker pull ghcr.io/olaurendeau/mcp-camptocamp:latest`.
+- npx with a global copy: `npm install -g @olaurendeau/mcp-camptocamp`, which installs the latest release, or remove it with `npm uninstall -g @olaurendeau/mcp-camptocamp`.
+- npx with a copy in the project: in that project, `npm update @olaurendeau/mcp-camptocamp` moves it to the newest release its range in `package.json` allows, so `^1.3.0` gets v1.4.0 but an exact `1.3.0` stays. Or remove it with `npm uninstall @olaurendeau/mcp-camptocamp`: npx then runs the latest release. Tried on 2026-10-06 with npm 10.9.9.
+- Node.js older than 22: install [Node.js](https://nodejs.org/en/download) 22 or later. npx then runs the latest release: tried on 2026-10-06, npx ran v1.2.0 under an older Node.js, then v1.4.0 under Node.js 22 with the same npm cache.
+
 ## Docker: the server stops right after it starts
 
 **Symptom:** with the Docker variant, the client reports that the server closed or failed to connect, and running the command in a terminal returns at once without output.
@@ -117,9 +134,9 @@ Then start Claude Desktop again. If npx still fails, check that npm is installed
 
 **Symptom:** Claude Code warns about the size of a tool's output, or replaces the output in the conversation with a message that names a file.
 
-**Cause:** Claude Code warns when an MCP tool's output exceeds 10,000 tokens, and limits output to 25,000 tokens by default. When a text result exceeds the limit, Claude Code saves it to a file and puts a message naming the file in the conversation instead; Claude reads the file when it needs the content ([Claude Code docs](https://code.claude.com/docs/en/mcp#mcp-output-limits-and-warnings)).
+**Cause:** Claude Code warns when an MCP tool's output exceeds 10,000 tokens, and limits output to 25,000 tokens by default. When a successful text result exceeds the limit, Claude Code saves it to a file and puts a message naming the file in the conversation instead; Claude reads the file when it needs the content. It does the same with a successful text result longer than 50,000 characters, even under the token cap and whatever `MAX_MCP_OUTPUT_TOKENS` says ([Claude Code docs](https://code.claude.com/docs/en/mcp#mcp-output-limits-and-warnings)). A `get_outings` call on 10 long reports can pass 50,000 characters: by default each outing prints up to six text sections of 2,000 characters, so ten outings carry up to 120,000 characters of text.
 
-**Fix:** ask for fewer results per call (the search tools take a `limit`), or raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable, for example `MAX_MCP_OUTPUT_TOKENS=50000 claude`. The warning threshold cannot be changed. See [Claude Code's limits](clients/claude-code.md#limits).
+**Fix:** ask for fewer results per call: the search tools take a `limit`, and `get_outings` takes fewer `ids` or a lower `max_section_chars` (not in v1.4.0). For a result over the token cap but under 50,000 characters, you can also raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable, for example `MAX_MCP_OUTPUT_TOKENS=50000 claude`; it does not help a result over 50,000 characters. The warning threshold cannot be changed. See [Claude Code's limits](clients/claude-code.md#limits).
 
 ## Check that a client sees the server
 
@@ -142,5 +159,6 @@ Then start Claude Desktop again. If npx still fails, check that npm is installed
 - Mistral Vibe Code: https://docs.mistral.ai/vibe/code/cli/mcp-servers and https://github.com/mistralai/mistral-vibe
 - Gemini CLI: https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md and, for folder trust, https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/trusted-folders.md
 - docker run: https://docs.docker.com/reference/cli/docker/container/run/
+- npx (npm 10, bundled with Node.js 22): https://docs.npmjs.com/cli/v10/commands/npx
 
-Last verified: 2026-10-05 against official docs
+Last verified: 2026-10-06 against official docs
