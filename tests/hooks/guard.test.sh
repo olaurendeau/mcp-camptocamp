@@ -363,6 +363,8 @@ MOVE_FORMS=(
   "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { clientMutationId } }' # refs/heads/feat/x"
   # A mutation set by another command may name a tag: the call's own refs/heads/ does not exempt it
   "Q='mutation { updateRefs(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }'; gh api graphql -f query=\"\$Q\" -f branch=refs/heads/feat/x"
+  # Same over REST: curl sends the DELETE to every URL, a branch one included
+  "U=https://api.github.com/repos/o/r/git/refs/tags/v1.0.4; curl -X DELETE https://api.github.com/repos/o/r/git/refs/heads/feat/x \"\$U\""
 )
 CREATE_FORMS=(
   "${BRANCH_THEN}gh api repos/o/r/git/refs --input ref.json"
@@ -372,6 +374,10 @@ CREATE_FORMS=(
   'gh api repos/o/r/git/refs --input - < ref.json # refs/heads/'
   "$(lines 'cat > /tmp/b.json <<EOF' "$REST_BRANCH_BODY" 'EOF' 'gh api repos/o/r/git/refs --input - < /tmp/b.json')"
   "Q='mutation { createRef(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { clientMutationId } }'; gh api graphql -f query=\"\$Q\" -f branch=refs/heads/feat/x"
+  # A tag in a variable, a branch in another field of the call: refs/tags anywhere in the line voids the exemption
+  "R=refs/tags/v1.0.5; gh api repos/o/r/git/refs -f ref=\"\$R\" -f sha=abc -f note=refs/heads/feat/x"
+  "$(lines 'R=refs/tags/v1.0.5' 'gh api repos/o/r/git/refs -f ref="$R" -f sha=abc -f note=refs/heads/feat/x')"
+  "B='{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}'; gh api repos/o/r/git/refs --input - <<<\"\$B\" -f note=refs/heads/x"
 )
 for role in coordinator developer pr-reviewer ""; do
   for cmd in "${MOVE_FORMS[@]}"; do

@@ -186,11 +186,10 @@ sends() {
   [ -n "$n" ] && printf '%s\n%s\n' "$1" "${heredocs[$n]:-}"
 }
 # The API call names only branches, in a field, the path or its own stdin body; another command's refs/heads/ does not count.
-branch_only() { local text; text=$(sends "$1") || return 1; has "$text" 'refs/heads/' && ! has "$text" 'refs/tags'; }
+# A tag named anywhere in the line voids the exemption: a variable set by another command may carry it.
+branch_only() { local text; text=$(sends "$1") || return 1; has "$text" 'refs/heads/' && ! has "$raw" 'refs/tags'; }
 # PATCH/DELETE on a …/git/refs/heads/… path targets that branch, whatever the body says.
-branch_path() { has "$1" "${method}(PATCH|PUT|DELETE)" && has "$1" 'git/refs/heads/' && ! has "$1" 'git/refs/tags'; }
-# A GraphQL mutation is looked up in the whole line, so a tag it names anywhere in the line counts too.
-graphql_branch_only() { branch_only "$1" && ! has "$raw" 'refs/tags'; }
+branch_path() { has "$1" "${method}(PATCH|PUT|DELETE)" && has "$1" 'git/refs/heads/' && ! has "$raw" 'refs/tags'; }
 
 while IFS= read -r seg; do
   case $seg in $'\x01'*) continue ;; esac
@@ -211,10 +210,10 @@ while IFS= read -r seg; do
   # GraphQL: updateRef/updateRefs/deleteRef move or delete a ref, createRef creates one, like PATCH/DELETE and POST.
   # The mutation may sit in a variable set by another command or in a heredoc, so look for it in the raw command.
   if has "$seg" 'graphql'; then
-    if has "$raw" "$move_ref_by_id" || { has "$raw" "$move_refs" && ! graphql_branch_only "$seg"; }; then
+    if has "$raw" "$move_ref_by_id" || { has "$raw" "$move_refs" && ! branch_only "$seg"; }; then
       deny "No agent moves or deletes a tag through the API (GraphQL updateRef/deleteRef, or updateRefs outside refs/heads/): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
     fi
-    if [ "$agent" != "coordinator" ] && has "$raw" "$create_ref" && ! graphql_branch_only "$seg"; then
+    if [ "$agent" != "coordinator" ] && has "$raw" "$create_ref" && ! branch_only "$seg"; then
       deny "Only the coordinator creates version tags (GraphQL createRef outside refs/heads/), on main, once the bump PR is merged and the human asked for the release. Report to the coordinator instead."
     fi
   fi
