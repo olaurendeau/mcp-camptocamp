@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { connect, jsonResponse } from "../server/helpers.js";
 import { VERSION } from "../../src/version.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { startHttpServer } from "../../src/http/server.js";
 import { ConfigError } from "../../src/http/config.js";
 import {
@@ -203,6 +204,19 @@ describe("HTTP server", () => {
   });
 
   describe("stateless MCP", () => {
+    // The SDK copies every request header into requestInfo.headers, which every tool handler receives.
+    it("hands the SDK the request without its Authorization and Cookie headers", async () => {
+      const handleRequest = vi.spyOn(WebStandardStreamableHTTPServerTransport.prototype, "handleRequest");
+      const { port } = await startTestServer();
+      const result = await postMcp(port, rpc("tools/list"), { cookie: "session=secret" });
+      const { headers } = handleRequest.mock.calls[0][0];
+      handleRequest.mockRestore();
+      expect(result.status).toBe(200);
+      expect(headers.get("authorization")).toBeNull();
+      expect(headers.get("cookie")).toBeNull();
+      expect(headers.get("accept")).toBe(MCP_HEADERS.accept);
+    });
+
     it("sends no Mcp-Session-Id, and ignores one sent by the client", async () => {
       const { port } = await startTestServer();
       const init = await postMcp(port, INITIALIZE);

@@ -134,7 +134,7 @@ export function startHttpServer(config: HttpConfig, log: (line: string) => void)
     const server = createServer();
     try {
       await server.connect(transport);
-      const aborted = once(abort, "abort").then(() => undefined);
+      const aborted = abort.aborted ? Promise.resolve(undefined) : once(abort, "abort").then(() => undefined);
       return await Promise.race([transport.handleRequest(request, { parsedBody }), aborted]);
     } finally {
       await server.close();

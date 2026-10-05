@@ -117,7 +117,7 @@ describe("runHttp", () => {
     expect(proc.exits).toEqual([1]);
   });
 
-  it.each(["SIGTERM", "SIGINT"])("drains on %s and exits 0; a second signal exits at once", async (signal) => {
+  it.each(["SIGTERM", "SIGINT"])("drains on %s and exits 0; a second signal exits 1 at once", async (signal) => {
     const port = await freePort();
     const proc = new FakeProcess({ ...HTTP_ENV, MCP_HTTP_PORT: String(port) });
     const server = await runHttp(proc.process);
@@ -126,9 +126,9 @@ describe("runHttp", () => {
 
     proc.signal(signal);
     proc.signal(signal);
-    expect(proc.exits).toEqual([0]);
+    expect(proc.exits).toEqual([1]);
     await vi.waitFor(() => {
-      expect(proc.exits).toEqual([0, 0]);
+      expect(proc.exits).toEqual([1, 0]);
     });
   });
 });

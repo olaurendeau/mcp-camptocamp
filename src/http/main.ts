@@ -11,7 +11,7 @@ export interface HttpProcess {
 
 // Starts the HTTP mode: one startup line on stderr, or a configuration or listen error and exit 1.
 // Node runs as PID 1 in the Docker image, where a signal without a handler does nothing: SIGTERM and SIGINT
-// drain the server (at most 8 s) and exit 0, and a second signal exits at once.
+// drain the server (at most 8 s) and exit 0; a second signal exits 1 at once, cutting in-flight requests.
 export async function runHttp(proc: HttpProcess = process): Promise<RunningHttpServer | undefined> {
   let running: RunningHttpServer;
   try {
@@ -25,7 +25,7 @@ export async function runHttp(proc: HttpProcess = process): Promise<RunningHttpS
   let stopping = false;
   const stop = (): void => {
     if (stopping) {
-      proc.exit(0);
+      proc.exit(1);
       return;
     }
     stopping = true;
