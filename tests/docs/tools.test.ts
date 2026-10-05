@@ -12,6 +12,8 @@ const DOCS = join(ROOT, "docs");
 const TOOLS_DIR = join(DOCS, "tools");
 const INDEX = join(TOOLS_DIR, "README.md");
 const RUN = "run npm run docs:tools";
+/** The path a fixture is checked as: a doc that justifies no NOT_OUR_TOOLS entry. */
+const FIXTURE = "docs/fixture.md";
 
 const tools = await listRegisteredTools();
 const names = tools.map((tool) => tool.name);
@@ -60,7 +62,12 @@ function checkIndex(text: string, registered: string[]): string[] {
   ];
 }
 
-/** Problems with a tool page: anything renderToolPage() would change, which is the Inputs block or the formatting. */
+/** The part of `page` from its Inputs start marker to its end marker. */
+function inputsBlock(page: string): string {
+  return page.slice(page.indexOf(INPUTS_START), page.indexOf(INPUTS_END));
+}
+
+/** Problems with a tool page: anything renderToolPage() would change, in the Inputs block or in the formatting. */
 async function checkPage(tool: Tool, text: string, file: string): Promise<string[]> {
   const where = relative(ROOT, file);
   let rendered: string;
@@ -69,19 +76,23 @@ async function checkPage(tool: Tool, text: string, file: string): Promise<string
   } catch (error) {
     return [`${where}: ${(error as Error).message}`];
   }
-  return rendered === text
-    ? []
+  if (rendered === text) {
+    return [];
+  }
+  return inputsBlock(rendered) === inputsBlock(text)
+    ? [`${where}: Prettier would reformat the page outside the Inputs block: ${RUN}`]
     : [`${where}: the Inputs block differs from the registered schema of ${tool.name}: ${RUN}`];
 }
 
 const TOOL_LIKE = /^(?:search|get)_[a-z][a-z_]*$/;
 
 /**
- * Names shaped like our tools that the docs mention on purpose and that are not MCP tools.
- * Each entry says where it comes from; add one only for a name that is not, and never was, one of our tools.
+ * Names shaped like our tools that a doc mentions on purpose and that are not MCP tools, each with the one file (from
+ * the repo root) that justifies it: the name stays flagged anywhere else. Add an entry only for a name that is not,
+ * and never was, one of our tools.
  */
-const NOT_OUR_TOOLS = new Set([
-  "get_location", // docs/agent-sdks.md: the local function of the upstream Mistral weather example, removed from ours
+const NOT_OUR_TOOLS = new Map([
+  ["get_location", "docs/agent-sdks.md"], // the local function of the upstream Mistral weather example, removed from ours
 ]);
 const STRING = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g;
 
@@ -115,19 +126,20 @@ function argumentKeys(object: string): string[] {
  * Problems with the tools and parameters `text` names (AC14):
  * - an inline `<tool> {key: …}` must name a registered tool and only its parameters;
  * - an inline `search_*` or `get_*` identifier must be a registered tool;
- * - a prefixed name, `camptocamp_<search|get>_…` (Mistral Vibe) or `mcp__camptocamp__<x>` (Claude Code), anywhere in
- *   the text, fenced blocks included, must name a registered tool. Other `camptocamp_` identifiers, such as the
- *   `camptocamp_agent` variable of an SDK example, are not tool names.
- * Names in NOT_OUR_TOOLS are skipped.
+ * - a prefixed name, `camptocamp_<search|get>_…` (Mistral Vibe), `mcp__camptocamp__<x>` (Claude Code) or
+ *   `mcp_camptocamp_<x>` (Gemini CLI), anywhere in the text, fenced blocks included, must name a registered tool.
+ *   Other `camptocamp_` identifiers, such as the `camptocamp_agent` variable of an SDK example, are not tool names.
+ * The NOT_OUR_TOOLS names whose entry is `file` (the path of `text` from the repo root) are skipped.
  */
-function checkToolMentions(text: string, registered: Tool[]): string[] {
+function checkToolMentions(text: string, registered: Tool[], file: string): string[] {
   const parameters = new Map(
     registered.map((tool) => [tool.name, new Set(Object.keys(tool.inputSchema.properties ?? {}))]),
   );
+  const allowed = (name: string): boolean => NOT_OUR_TOOLS.get(name) === file;
   const problems: string[] = [];
   for (const span of inlineCodeSpans(text)) {
     const call = /^([a-z][a-z0-9_]*)\s*(\{[\s\S]*\})$/.exec(span);
-    if (call && !NOT_OUR_TOOLS.has(call[1]) && (parameters.has(call[1]) || TOOL_LIKE.test(call[1]))) {
+    if (call && !allowed(call[1]) && (parameters.has(call[1]) || TOOL_LIKE.test(call[1]))) {
       const known = parameters.get(call[1]);
       if (known === undefined) {
         problems.push(`\`${span}\`: ${call[1]} is not a registered tool`);
@@ -138,14 +150,16 @@ function checkToolMentions(text: string, registered: Tool[]): string[] {
       }
     }
     for (const [name] of span.matchAll(/(?<![\w./-])(?:search|get)_[a-z][a-z_]*/g)) {
-      if (!parameters.has(name) && !NOT_OUR_TOOLS.has(name)) {
+      if (!parameters.has(name) && !allowed(name)) {
         problems.push(`\`${span}\`: ${name} is not a registered tool`);
       }
     }
   }
-  // Claude Code's mcp__camptocamp__ prefix is ours alone; Vibe's camptocamp_ prefix is only read before a tool name.
+  // The mcp__camptocamp__ (Claude Code) and mcp_camptocamp_ (Gemini CLI) prefixes are ours alone; Vibe's camptocamp_
+  // prefix is only read before a tool name.
   for (const prefixed of [
     /(?<![\w-])mcp__camptocamp__([a-z][a-z_]*)/g,
+    /(?<![\w-])mcp_camptocamp_([a-z][a-z_]*)/g,
     /(?<![\w-])camptocamp_((?:search|get)_[a-z_]*)/g,
   ]) {
     for (const [mention, name] of text.matchAll(prefixed)) {
@@ -212,6 +226,17 @@ describe("tool reference checks fail on bad fixtures", () => {
     ]);
   });
 
+  it("a page Prettier would reformat outside its Inputs block", async () => {
+    const file = pageOf("search_routes");
+    const page = read(file);
+    const tool = tools.find((t) => t.name === "search_routes") as Tool;
+
+    expect(page).toContain("# search_routes\n\n");
+    expect(await checkPage(tool, page.replace("# search_routes\n\n", "# search_routes\n\n\n\n"), file)).toEqual([
+      `docs/tools/search_routes.md: Prettier would reformat the page outside the Inputs block: ${RUN}`,
+    ]);
+  });
+
   it("a schema changed without running npm run docs:tools (AC18)", async () => {
     const file = pageOf("search_routes");
     const tool = tools.find((t) => t.name === "search_routes") as Tool;
@@ -236,16 +261,16 @@ describe("tool reference checks fail on bad fixtures", () => {
   });
 
   it("a call with a parameter the tool does not have, or a tool that does not exist", () => {
-    expect(checkToolMentions("Try `search_routes {foo: 1}`.", tools)).toEqual([
+    expect(checkToolMentions("Try `search_routes {foo: 1}`.", tools, FIXTURE)).toEqual([
       "`search_routes {foo: 1}`: search_routes has no parameter foo",
     ]);
-    expect(checkToolMentions('Try `search_huts {query: "x"}`.', tools)).toEqual([
+    expect(checkToolMentions('Try `search_huts {query: "x"}`.', tools, FIXTURE)).toEqual([
       '`search_huts {query: "x"}`: search_huts is not a registered tool',
     ]);
-    expect(checkToolMentions('`get_outing {"id": 1, "user": 2}`', tools)).toEqual([
+    expect(checkToolMentions('`get_outing {"id": 1, "user": 2}`', tools, FIXTURE)).toEqual([
       '`get_outing {"id": 1, "user": 2}`: get_outing has no parameter user',
     ]);
-    expect(checkToolMentions("`search_outings {route_id, date}`", tools)).toEqual([
+    expect(checkToolMentions("`search_outings {route_id, date}`", tools, FIXTURE)).toEqual([
       "`search_outings {route_id, date}`: search_outings has no parameter date",
     ]);
   });
@@ -253,16 +278,17 @@ describe("tool reference checks fail on bad fixtures", () => {
   it("an unknown search_* or get_* identifier, or an unknown prefixed tool name", () => {
     const text = [
       "Call `get_routes`, then `More: search_hut with waypoint_id=<id>`.",
-      "Allow `mcp__camptocamp__get_summit` and:",
+      "Allow `mcp__camptocamp__get_summit`, see mcp_camptocamp_search_huts and:",
       "```toml",
       "[tools.camptocamp_search_huts]",
       "```",
     ].join("\n");
 
-    expect(checkToolMentions(text, tools)).toEqual([
+    expect(checkToolMentions(text, tools, FIXTURE)).toEqual([
       "`get_routes`: get_routes is not a registered tool",
       "`More: search_hut with waypoint_id=<id>`: search_hut is not a registered tool",
       "mcp__camptocamp__get_summit: get_summit is not a registered tool",
+      "mcp_camptocamp_search_huts: search_huts is not a registered tool",
       "camptocamp_search_huts: search_huts is not a registered tool",
     ]);
   });
@@ -273,9 +299,10 @@ describe("tool reference checks fail on bad fixtures", () => {
       '`search_routes {query: "a: b, c", lang: "de"}`, `search_outings {route_id}`, `get_route {"id": 675555}`',
       "and `search_waypoints {query: …}`, then `get_*`, `More: search_routes with waypoint_id=<id>`.",
       "`mcp__camptocamp__search_routes`, `mcp__camptocamp__*`, `camptocamp_get_route`, `camptocamp`.",
+      "Gemini CLI names them `mcp_camptocamp_search_routes`, `mcp_camptocamp_get_route`, and so on.",
     ].join("\n");
 
-    expect(checkToolMentions(text, tools)).toEqual([]);
+    expect(checkToolMentions(text, tools, FIXTURE)).toEqual([]);
   });
 
   it("accepts a camptocamp_ identifier that is not shaped like a tool, such as an SDK example's variable", () => {
@@ -288,14 +315,20 @@ describe("tool reference checks fail on bad fixtures", () => {
       "Keep `camptocamp_agent` and `camptocamp_server` around.",
     ].join("\n");
 
-    expect(checkToolMentions(text, tools)).toEqual([]);
+    expect(checkToolMentions(text, tools, FIXTURE)).toEqual([]);
   });
 
-  it("accepts a name of the explicit allow-list, such as the upstream example's get_location function", () => {
-    expect(checkToolMentions("The source also registers a local `get_location` function.", tools)).toEqual([]);
-    expect(checkToolMentions("`get_location {city: 1}`", tools)).toEqual([]);
-    expect(checkToolMentions("`get_locations`", tools)).toEqual([
+  it("accepts a name of the explicit allow-list in the file it is listed for, and only there", () => {
+    const sdks = "docs/agent-sdks.md";
+
+    expect(checkToolMentions("The source also registers a local `get_location` function.", tools, sdks)).toEqual([]);
+    expect(checkToolMentions("`get_location {city: 1}`", tools, sdks)).toEqual([]);
+    expect(checkToolMentions("`get_locations`", tools, sdks)).toEqual([
       "`get_locations`: get_locations is not a registered tool",
+    ]);
+    expect(checkToolMentions("Call `get_location {city: 1}` or `get_location`.", tools, FIXTURE)).toEqual([
+      "`get_location {city: 1}`: get_location is not a registered tool",
+      "`get_location`: get_location is not a registered tool",
     ]);
   });
 });
@@ -339,7 +372,9 @@ describe("docs/ and README.md", () => {
   it("name only registered tools, and only their parameters (AC14)", () => {
     const files = [...listMarkdownFiles(DOCS), join(ROOT, "README.md")];
     const problems = files.flatMap((file) =>
-      checkToolMentions(read(file), tools).map((problem) => `${relative(ROOT, file)}: ${problem}`),
+      checkToolMentions(read(file), tools, relative(ROOT, file)).map(
+        (problem) => `${relative(ROOT, file)}: ${problem}`,
+      ),
     );
 
     expect(problems).toEqual([]);
