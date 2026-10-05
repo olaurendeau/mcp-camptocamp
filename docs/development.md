@@ -32,7 +32,7 @@ The contract tests call the live Camptocamp API to catch changes in its response
 
 ## Local image
 
-`docker compose build mcp` builds the production image locally, under the `image` name that `docker-compose.yml` gives the `mcp` service. Use that name in your client's configuration in place of `ghcr.io/olaurendeau/mcp-camptocamp:latest`.
+`docker compose build mcp` builds the production image locally as `mcp-camptocamp-mcp`, the `image` name that `docker-compose.yml` gives the `mcp` service. Use `mcp-camptocamp-mcp` in your client's configuration in place of `ghcr.io/olaurendeau/mcp-camptocamp:latest`.
 
 ## Releases
 

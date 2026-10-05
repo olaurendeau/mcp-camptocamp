@@ -4,7 +4,7 @@ This guide is for the model that calls the tools, and for whoever writes its pro
 
 Every output on this page is real: it was captured from the server on 2026-10-05, with the version stated above each block, and copied verbatim. The only cuts are user-written text bodies and long lists, each replaced by a line `… (N lines omitted in this documentation)`, and the spaces at the end of a line, which this repository's formatter removes. Camptocamp changes every day, so the same call made later can return other counts and other recent outings.
 
-Everything here works with v1.3.0 or later, except the `**Text in other languages**` line, which comes with the release after v1.3.0 (see [Language](#language)).
+Everything here works with v1.3.0 or later, except two things that come with the release after v1.3.0: the `**Text in other languages**` line (see [Language](#language)) and the escaping of invisible and bidirectional characters in repeated input (see [Paging](#paging)).
 
 ## Tool chains
 
@@ -501,7 +501,7 @@ Rather than paging far, add filters: an area, an activity, a rating range, dates
 
 When nothing matches, the whole output is one line: `No <kind>s found matching <filters>.`, or `No <kind>s found.` without filters.
 
-Text you typed and that the output repeats, the `query "…"` of the `Filters:` line and the `rating_min "…"` or `rating_max "…"` of an error, always stays on one line between double quotes. In it, `"`, `\`, line feed, carriage return and tab are printed as `\"`, `\\`, `\n`, `\r` and `\t`. Other control characters, U+2028, U+2029 and the invisible or bidirectional characters U+061C, U+200B to U+200F, U+202A to U+202E, U+2066 to U+2069 and U+FEFF are printed as `\uxxxx`. Every other character, accents included, is printed unchanged (`query "Écrins"`). This only changes what is printed: the query is sent to Camptocamp as you typed it.
+Text you typed and that the output repeats, the `query "…"` of the `Filters:` line and the `rating_min "…"` or `rating_max "…"` of an error, always stays on one line between double quotes. In it, `"`, `\`, line feed, carriage return and tab are printed as `\"`, `\\`, `\n`, `\r` and `\t`. Other control characters, U+2028 and U+2029 are printed as `\uxxxx`. From the release after v1.3.0, so are the invisible or bidirectional characters U+061C, U+200B to U+200F, U+202A to U+202E, U+2066 to U+2069 and U+FEFF; v1.3.0 prints them unchanged. Every other character, accents included, is printed unchanged (`query "Écrins"`). This only changes what is printed: the query is sent to Camptocamp as you typed it.
 
 The lists inside a `get_*` output are not paged. A heading such as `## Recent outings (10 of 29)` gives how many are shown and how many exist, and a line such as `More: search_outings with route_id=46954` or `More: search_routes with waypoint_id=1947492` gives the search that lists them all.
 

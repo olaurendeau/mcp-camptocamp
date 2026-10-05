@@ -70,27 +70,27 @@ The server is listed in the [official MCP registry](https://registry.modelcontex
 | Cursor and other clients that start a local command                    | Yes                                                     | [Getting started](docs/getting-started.md#other-mcp-clients)               |
 | Claude.ai custom connectors, ChatGPT on the web, Vibe Work, Gemini API | No: remote servers only                                 | [Remote-only clients](docs/clients/remote-only.md)                         |
 
-The [support matrix](docs/README.md#support-matrix) lists every client with the date its page was last checked against the vendor's docs.
+The [support matrix](docs/README.md#support-matrix) lists the clients covered by the client pages and the agent SDK guide, with the date each page was last checked against the vendor's docs.
 
 ## Tools
 
 13 read-only tools: one search and one detail tool per kind of Camptocamp document, plus a shortcut for a user's outings. Search results give IDs; the `get_*` tools take an ID. Every tool takes `lang`, the language of titles and texts (`fr` by default; v1.3.0 or later).
 
-| Tool                                                       | What it does                                                                                                    |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [`search_routes`](docs/tools/search_routes.md)             | Search routes by keyword, area, waypoint, activity, rating, elevation gain, route type or configuration; paged. |
-| [`get_route`](docs/tools/get_route.md)                     | One route by ID: ratings, elevation, practical facts, description, areas, books, waypoints and recent outings.  |
-| [`search_waypoints`](docs/tools/search_waypoints.md)       | Search summits, huts, passes, crags and other waypoints by name and/or area, optionally by type; paged.         |
-| [`get_waypoint`](docs/tools/get_waypoint.md)               | One waypoint by ID: altitude, GPS coordinates, hut details, access, areas, routes, books and outings.           |
-| [`search_outings`](docs/tools/search_outings.md)           | Search trip reports by keyword, area, activity, ratings, conditions, elevation, dates, route, waypoint or user. |
-| [`search_user_outings`](docs/tools/search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                           |
-| [`get_outing`](docs/tools/get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.               |
-| [`search_areas`](docs/tools/search_areas.md)               | Search ranges, administrative subdivisions and countries by name; the ID is reusable as `area_id`.              |
-| [`get_area`](docs/tools/get_area.md)                       | One area by ID: type, summary and description.                                                                  |
-| [`search_books`](docs/tools/search_books.md)               | Search guidebooks and other books by title, book type and activity; author and ISBN searches are unreliable.    |
-| [`get_book`](docs/tools/get_book.md)                       | One book by ID: author, editor, date, ISBN, languages, and the routes, waypoints and articles it covers.        |
-| [`search_articles`](docs/tools/search_articles.md)         | Search articles (gear, technique, environment, stories) by keyword, category, type and activity.                |
-| [`get_article`](docs/tools/get_article.md)                 | One article by ID: text, author, type, and the routes, waypoints, articles, outings and books linked to it.     |
+| Tool                                                       | What it does                                                                                                     |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [`search_routes`](docs/tools/search_routes.md)             | Search routes by keyword, area, waypoint, activity, rating, elevation gain, route type or configuration; paged.  |
+| [`get_route`](docs/tools/get_route.md)                     | One route by ID: ratings, elevation, practical facts, description, areas, books, waypoints and recent outings.   |
+| [`search_waypoints`](docs/tools/search_waypoints.md)       | Search summits, huts, passes, crags and other waypoints by name and/or area, optionally by type; paged.          |
+| [`get_waypoint`](docs/tools/get_waypoint.md)               | One waypoint by ID: altitude, GPS coordinates, hut details, access, areas, routes, books and outings.            |
+| [`search_outings`](docs/tools/search_outings.md)           | Search trip reports by keyword, area, activity, ratings, conditions, elevation, dates, route, waypoint or user.  |
+| [`search_user_outings`](docs/tools/search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                            |
+| [`get_outing`](docs/tools/get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.                |
+| [`search_areas`](docs/tools/search_areas.md)               | Search ranges, administrative subdivisions and countries by name; the ID is reusable as `area_id`.               |
+| [`get_area`](docs/tools/get_area.md)                       | One area by ID: type, summary and description.                                                                   |
+| [`search_books`](docs/tools/search_books.md)               | Search guidebooks and other books by title, book type and activity; author and ISBN searches are unreliable.     |
+| [`get_book`](docs/tools/get_book.md)                       | One book by ID: author, editor, date, ISBN, languages, and the routes, waypoints and articles it covers.         |
+| [`search_articles`](docs/tools/search_articles.md)         | Search articles (gear, technique, environment, stories) by keyword; by category, type and activity after v1.3.0. |
+| [`get_article`](docs/tools/get_article.md)                 | One article by ID: text, author, type, and the routes, waypoints, articles, outings and books linked to it.      |
 
 Each tool page gives its inputs, generated from the registered schema, its output format, a real example and its limits: see the [tool reference](docs/tools/README.md).
 
