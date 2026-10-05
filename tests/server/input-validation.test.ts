@@ -41,6 +41,12 @@ const ID_FIELDS: IdField[] = [
   { tool: "search_waypoints", field: "area_id", args: (area_id) => ({ area_id }), response: EMPTY_SEARCH },
   { tool: "search_outings", field: "area_id", args: (area_id) => ({ area_id }), response: EMPTY_SEARCH },
   { tool: "search_outings", field: "route_id", args: (route_id) => ({ route_id }), response: EMPTY_SEARCH },
+  {
+    tool: "search_outings",
+    field: "route_ids[0]",
+    args: (route_id) => ({ route_ids: [route_id] }),
+    response: EMPTY_SEARCH,
+  },
   { tool: "search_outings", field: "waypoint_id", args: (waypoint_id) => ({ waypoint_id }), response: EMPTY_SEARCH },
   { tool: "search_outings", field: "user_id", args: (user_id) => ({ user_id }), response: EMPTY_SEARCH },
 ];
@@ -257,6 +263,14 @@ describe("search_outings field inputs", () => {
     ["a negative route_id", { route_id: -1 }, "Number must be greater than 0 at route_id"],
     ["a non-integer area_id", { area_id: 1.5 }, "Expected integer, received float at area_id"],
     ["a negative user_id", { user_id: -1 }, "Number must be greater than 0 at user_id"],
+    ["an empty route_ids", { route_ids: [] }, "must list at least 1 ID at route_ids"],
+    [
+      "11 route_ids",
+      { route_ids: Array.from({ length: 11 }, (_, i) => 54513 + i) },
+      "must list at most 10 IDs at route_ids",
+    ],
+    ["a negative ID in route_ids", { route_ids: [54513, -1] }, "Number must be greater than 0 at route_ids[1]"],
+    ["a route_ids that is not a list", { route_ids: 54513 }, "Expected array, received number at route_ids"],
   ])("rejects %s naming the field without calling Camptocamp", async (_label, args, issue) => {
     const fetchMock = stubFetch();
     const client = await connect();
@@ -307,6 +321,12 @@ describe("cross-field rules", () => {
       "a period wrapping around the new year",
       { period_start: "12-20", period_end: "01-10" },
       "Error: period cannot wrap around the new year; make two calls (12-20 → 12-31 and 01-01 → 01-10)",
+    ],
+    [
+      "search_outings",
+      "route_id together with route_ids",
+      { route_id: 54513, route_ids: [1148298] },
+      "Error: give route_id or route_ids, not both; put every route ID in route_ids (up to 10).",
     ],
     [
       "search_routes",
@@ -416,6 +436,18 @@ describe("cross-field rules", () => {
     const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
     expect(params.get("period")).toBe("2020-06-01,2020-06-30");
     expect(params.get("u")).toBe("430052");
+  });
+
+  // AC2.1 on #255
+  it("search_outings sends route_ids as one r through MCP", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "search_outings", arguments: { route_ids: [54513, 1148298] } });
+
+    expect(resultText(result)).toBe("No outings found matching routes 54513 or 1148298.");
+    const params = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
+    expect(params.getAll("r")).toEqual(["54513,1148298"]);
   });
 });
 

@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { DETAIL_LANG_NOTE, LANG_NOTE, documentId, langInput, searchOffset, searchQuery } from "./inputs.js";
+import {
+  DETAIL_LANG_NOTE,
+  LANG_NOTE,
+  documentId,
+  documentIdList,
+  langInput,
+  searchOffset,
+  searchQuery,
+} from "./inputs.js";
 import { assertResultWindow, formatSearchPage, quote } from "./paging.js";
 import { ACTIVITIES, enumValue } from "./enums.js";
 import type { Lang } from "./enums.js";
@@ -83,6 +91,9 @@ const PERIOD_LIMITS_NOTE =
   "A period cannot wrap around the new year, so make two calls for 12-20 → 01-10; " +
   "Camptocamp's period filter can miss outings on the first or last day of the range.";
 
+// route_ids: routes per call, sent as one `r=a,b` (S2 on #255).
+const MAX_ROUTE_IDS = 10;
+
 export const searchOutingsSchema = z.object({
   query: searchQuery("Keyword matched against outing titles (e.g. 'cosmiques')", { allowBlank: true }).optional(),
   area_id: documentId("Camptocamp area ID from search_areas (e.g. 14409 for Vanoise)").optional(),
@@ -126,6 +137,11 @@ export const searchOutingsSchema = z.object({
       `Last day (MM-DD) of a period matched in every year, on or after period_start (e.g. 06-30). ${PERIOD_LIMITS_NOTE}`,
     ),
   route_id: documentId("Camptocamp route ID from search_routes").optional(),
+  route_ids: documentIdList(
+    `Up to ${String(MAX_ROUTE_IDS)} Camptocamp route IDs from search_routes (e.g. [54513, 1148298]): outings of any ` +
+      "of these routes, an outing linked to several of them listed once; not with route_id",
+    MAX_ROUTE_IDS,
+  ).optional(),
   waypoint_id: documentId("Camptocamp waypoint ID from search_waypoints").optional(),
   user_id: documentId(
     "Camptocamp user ID (the number in their profile URL): outings this user is listed on as a participant, not only those they wrote",
@@ -218,6 +234,10 @@ function describeFilters(params: OutingSearchParams): string[] {
     filters.push(`period ${params.period.start} → ${params.period.end} of every year`);
   }
   if (params.route_id !== undefined) filters.push(`route ${params.route_id}`);
+  if (params.route_ids !== undefined) {
+    const [first, ...others] = params.route_ids;
+    filters.push(others.length === 0 ? `route ${first}` : `routes ${params.route_ids.join(" or ")}`);
+  }
   if (params.waypoint_id !== undefined) filters.push(`waypoint ${params.waypoint_id}`);
   return filters;
 }
@@ -269,8 +289,14 @@ function outingSearchParams(input: SearchOutingsInput): OutingSearchParams {
     height_diff_up_max,
     period_start,
     period_end,
+    route_ids,
     ...rest
   } = input;
+  if (rest.route_id !== undefined && route_ids !== undefined) {
+    throw new Error(
+      `give route_id or route_ids, not both; put every route ID in route_ids (up to ${String(MAX_ROUTE_IDS)}).`,
+    );
+  }
   if (rest.date_from !== undefined && rest.date_to !== undefined && rest.date_from > rest.date_to) {
     throw new Error(`date_from (${rest.date_from}) must be on or before date_to (${rest.date_to}).`);
   }
@@ -291,6 +317,8 @@ function outingSearchParams(input: SearchOutingsInput): OutingSearchParams {
     ...(elevationMax !== undefined && { elevation_max: elevationMax }),
     ...(heightDiffUp !== undefined && { height_diff_up: heightDiffUp }),
     ...(period !== undefined && { period }),
+    // A repeated ID would change nothing in the results: it is sent and named once, in first-seen order.
+    ...(route_ids !== undefined && { route_ids: [...new Set(route_ids)] }),
   };
 }
 
@@ -334,7 +362,7 @@ export const outingToolDefinitions = [
     name: "search_outings",
     title: "Search outings",
     description:
-      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, rating_system with rating_min and/or rating_max (one of 12 grading systems per call, inclusive bounds checked against its scale), condition_at_least (that value or better), max_elevation_min / max_elevation_max and height_diff_up_min / height_diff_up_max (metres, inclusive) — the ratings and conditions the outing's author reported for that day, with the max elevation and elevation gain they reported; outings without a value for a chosen filter are excluded —, date_from / date_to (YYYY-MM-DD), period_start / period_end (MM-DD, both together; the same days in every year, e.g. 06-01 → 06-30 for all Junes; combine with date_from / date_to to limit the years), route_id (from search_routes), waypoint_id (from search_waypoints), user_id (outings this user is listed on as a participant, not only those they wrote). Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow — or 'Next page: offset=N (limit at most M)' near the window's end, where limit must be lowered to M — or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint/user ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text. " +
+      "Search outings (trip reports) across all of Camptocamp.org, most recent first (by end date, keyword searches included). All filters are optional and combine with AND: query (keyword), area_id (from search_areas), activity, rating_system with rating_min and/or rating_max (one of 12 grading systems per call, inclusive bounds checked against its scale), condition_at_least (that value or better), max_elevation_min / max_elevation_max and height_diff_up_min / height_diff_up_max (metres, inclusive) — the ratings and conditions the outing's author reported for that day, with the max elevation and elevation gain they reported; outings without a value for a chosen filter are excluded —, date_from / date_to (YYYY-MM-DD), period_start / period_end (MM-DD, both together; the same days in every year, e.g. 06-01 → 06-30 for all Junes; combine with date_from / date_to to limit the years), route_id (from search_routes) or route_ids (up to 10 routes, matching any; an outing linked to several is listed once), waypoint_id (from search_waypoints), user_id (outings this user is listed on as a participant, not only those they wrote). Each result shows ID, title, activities, dates, condition rating, max elevation, elevation gain, difficulty ratings labelled by grading system (e.g. 'Ski rating (Toponeige): 4.1 | Labande: AD | Global rating: F'), mountain ranges and author. Use offset to page (offset + limit ≤ 10,000): the output ends with 'Next page: offset=N' when more outings follow — or 'Next page: offset=N (limit at most M)' near the window's end, where limit must be lowered to M — or says when they lie beyond Camptocamp's 10,000-result window. An unknown area/route/waypoint/user ID yields no results, not an error. Call get_outing with an ID for the full conditions, weather and report text. " +
       LANG_NOTE,
     inputSchema: searchOutingsSchema,
     handler: handleSearchOutings,

@@ -191,6 +191,7 @@ export interface OutingSearchParams {
   date_from?: string;
   date_to?: string;
   route_id?: number;
+  route_ids?: number[]; // outings of any of these routes; search_outings refuses it with route_id
   waypoint_id?: number;
   user_id?: number;
   period?: { start: string; end: string }; // MM-DD, start on or before end
@@ -226,7 +227,9 @@ export async function searchOutings(params: OutingSearchParams = {}): Promise<Ou
   if (params.period !== undefined) {
     search.set("period", `${PERIOD_YEAR}-${params.period.start},${PERIOD_YEAR}-${params.period.end}`);
   }
+  // `r=a,b` matches the outings of any of the routes, each outing once.
   if (params.route_id !== undefined) search.set("r", String(params.route_id));
+  else if (params.route_ids !== undefined) search.set("r", params.route_ids.join(","));
   if (params.waypoint_id !== undefined) search.set("w", String(params.waypoint_id));
   if (params.user_id !== undefined) search.set("u", String(params.user_id));
   search.set("sort", "-date_end");

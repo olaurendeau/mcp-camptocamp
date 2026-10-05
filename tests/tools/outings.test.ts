@@ -1402,6 +1402,171 @@ describe("search_outings reported rating, conditions and elevation filters", () 
   });
 });
 
+// S2 on #255: the outings of several routes in one call.
+describe("search_outings route_ids", () => {
+  // Trimmed from GET /outings?r=54513,1148298&sort=-date_end&limit=2&offset=0&pl=fr (2026-10-05, total 62):
+  // two Innominata outings. The list items name no route.
+  const innominata: OutingListItem[] = [
+    {
+      document_id: 1924138,
+      locales: [{ lang: "fr", title: "Mont Blanc : Arête de l'Innominata" }],
+      activities: ["mountain_climbing"],
+      condition_rating: "average",
+      date_end: "2026-07-05",
+      date_start: "2026-07-03",
+      elevation_max: 4810,
+      height_diff_up: 3220,
+      global_rating: "D+",
+      engagement_rating: "IV",
+      areas: [
+        { document_id: 14270, area_type: "country", locales: [{ lang: "fr", title: "Italie" }] },
+        { document_id: 14410, area_type: "range", locales: [{ lang: "fr", title: "Mont-Blanc" }] },
+        { document_id: 280072, area_type: "admin_limits", locales: [{ lang: "fr", title: "Vallée d'Aoste" }] },
+      ],
+      author: { name: "Anthony Davoine", user_id: 1625915 },
+    },
+    {
+      document_id: 1917601,
+      locales: [{ lang: "fr", title: "Mont Blanc : Arête de l'Innominata" }],
+      activities: ["mountain_climbing", "snow_ice_mixed"],
+      condition_rating: "good",
+      date_end: "2026-06-17",
+      date_start: "2026-06-17",
+      elevation_max: 4810,
+      height_diff_up: 3400,
+      global_rating: "D+",
+      engagement_rating: "IV",
+      areas: [{ document_id: 14410, area_type: "range", locales: [{ lang: "fr", title: "Mont-Blanc" }] }],
+      author: { name: "lucasd43", user_id: 1724768 },
+    },
+  ];
+
+  const INNOMINATA_LINES = [
+    "- [1924138] Mont Blanc : Arête de l'Innominata (mountain_climbing) | 2026-07-03 → 2026-07-05 | Conditions: average | Max elevation: 4810m | Elevation gain: 3220m | Global rating: D+ | Engagement: IV | Areas: Mont-Blanc [14410] | Author: Anthony Davoine",
+    "- [1917601] Mont Blanc : Arête de l'Innominata (mountain_climbing, snow_ice_mixed) | 2026-06-17 | Conditions: good | Max elevation: 4810m | Elevation gain: 3400m | Global rating: D+ | Engagement: IV | Areas: Mont-Blanc [14410] | Author: lucasd43",
+  ];
+
+  // AC2.1
+  it("sends the route IDs and names them joined by 'or' in the Filters line", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse(innominata, 62));
+
+    const result = await search({ route_ids: [54513, 1148298], limit: 2 });
+
+    expect(mockSearchOutings).toHaveBeenCalledWith({ route_ids: [54513, 1148298], limit: 2, offset: 0 });
+    expect(result.split("\n")).toEqual([
+      "Found 62 outing(s), most recent first. Showing 2 from offset 0:",
+      "Filters: routes 54513 or 1148298",
+      "",
+      ...INNOMINATA_LINES,
+      "",
+      "Next page: offset=2",
+    ]);
+  });
+
+  // AC2.2: 61 + 1 + 30 outings, 86 once each.
+  it("names three routes in input order, among the other filters", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse(innominata, 86));
+
+    const result = await search({
+      route_ids: [54513, 1148298, 54684],
+      waypoint_id: 37233,
+      activity: "mountain_climbing",
+    });
+
+    expect(result.split("\n").slice(0, 2)).toEqual([
+      "Found 86 outing(s), most recent first. Showing 2 from offset 0:",
+      "Filters: activity mountain_climbing, routes 54513 or 1148298 or 54684, waypoint 37233",
+    ]);
+  });
+
+  it("names a single route as route_id does", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([], 0));
+
+    const result = await search({ route_ids: [54513], date_from: "2027-01-01" });
+
+    expect(result).toBe("No outings found matching dates from 2027-01-01, route 54513.");
+  });
+
+  it("sends each route ID once, in first-seen order", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse(innominata, 62));
+
+    const result = await search({ route_ids: [1148298, 54513, 1148298, 54513] });
+
+    expect(mockSearchOutings).toHaveBeenCalledWith({ route_ids: [1148298, 54513], limit: 10, offset: 0 });
+    expect(result.split("\n")[1]).toBe("Filters: routes 1148298 or 54513");
+  });
+
+  it("names a route once when route_ids repeats a single ID", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse(innominata, 61));
+
+    const result = await search({ route_ids: [54513, 54513] });
+
+    expect(mockSearchOutings).toHaveBeenCalledWith({ route_ids: [54513], limit: 10, offset: 0 });
+    expect(result.split("\n")[1]).toBe("Filters: route 54513");
+  });
+
+  // AC2.3
+  it("refuses route_id together with route_ids without calling the API", async () => {
+    await expect(search({ route_id: 54513, route_ids: [1148298] })).rejects.toThrow(
+      "give route_id or route_ids, not both",
+    );
+    expect(mockSearchOutings).not.toHaveBeenCalled();
+  });
+
+  // The SDK runs the schema before the handler: tests/server/input-validation.test.ts checks it through MCP.
+  it.each([
+    ["an empty list", [], "must list at least 1 ID"],
+    ["11 IDs", Array.from({ length: 11 }, (_, i) => 54513 + i), "must list at most 10 IDs"],
+  ])("refuses %s in the schema", (_label, route_ids, message) => {
+    const result = searchOutingsSchema.safeParse({ route_ids });
+
+    expect(result.error?.issues.map((issue) => [issue.path, issue.message])).toEqual([[["route_ids"], message]]);
+  });
+
+  it("accepts 10 IDs", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([]));
+    const route_ids = Array.from({ length: 10 }, (_, i) => 54513 + i);
+
+    await search({ route_ids });
+
+    expect(mockSearchOutings).toHaveBeenCalledWith({ route_ids, limit: 10, offset: 0 });
+  });
+
+  // AC2.3: the output of {route_id: 54513} is the one before route_ids existed.
+  it("leaves the route_id output unchanged", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse(innominata, 61));
+
+    const result = await search({ route_id: 54513, limit: 2 });
+
+    expect(mockSearchOutings).toHaveBeenCalledWith({ route_id: 54513, limit: 2, offset: 0 });
+    expect(result).toBe(
+      [
+        "Found 61 outing(s), most recent first. Showing 2 from offset 0:",
+        "Filters: route 54513",
+        "",
+        ...INNOMINATA_LINES,
+        "",
+        "Next page: offset=2",
+      ].join("\n"),
+    );
+  });
+
+  it("is not an input of search_user_outings", () => {
+    expect(searchUserOutingsSchema.shape).not.toHaveProperty("route_ids");
+  });
+
+  // AC2.2
+  it("says in the tool and field descriptions that an outing linked to several routes is listed once", () => {
+    const description = outingToolDefinitions.find((t) => t.name === "search_outings")?.description ?? "";
+
+    expect(description).toContain("route_ids");
+    expect(description).toContain("listed once");
+    expect(description.length).toBeLessThan(2048);
+    expect(searchOutingsSchema.shape.route_ids.description).toContain("listed once");
+    expect(searchOutingsSchema.shape.route_ids.description).toContain("not with route_id");
+  });
+});
+
 // AC5.6: search_user_outings is a thin alias of search_outings restricted to user_id, limit and offset.
 describe("handleSearchUserOutings", () => {
   // Trimmed from GET /outings?u=430052&sort=-date_end&limit=2&offset=480&pl=fr (2026-10-04, total 494).

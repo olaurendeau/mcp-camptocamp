@@ -360,6 +360,21 @@ describe("search filters narrow live results", () => {
     it("r: route 53884", async () => {
       expectNarrows(await searchOutings({ route_id: 53884 }), await allOutings());
     });
+
+    // S2 on #255: `r=a,b` is an OR that lists an outing linked to both routes once (54513 and 54684 share some).
+    it("r: routes 54513 or 54684, at least each route's total and at most their sum", async () => {
+      const [either, first, second] = await Promise.all([
+        searchOutings({ route_ids: [54513, 54684] }),
+        searchOutings({ route_id: 54513 }),
+        searchOutings({ route_id: 54684 }),
+      ]);
+
+      expectNonEmptySearch(first);
+      expectNonEmptySearch(second);
+      expect(either.total).toBeGreaterThanOrEqual(Math.max(first.total, second.total));
+      expect(either.total).toBeLessThanOrEqual(first.total + second.total);
+      expectNarrows(either, await allOutings());
+    });
   });
 
   describe(`skitouring outings in Vanoise (area ${VANOISE})`, () => {

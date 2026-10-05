@@ -161,7 +161,7 @@ The user-facing reference of each tool (purpose, generated inputs, output format
 | `get_waypoint`        | Waypoint by ID (altitude, GPS, areas, hut details, access period, routes, books, recent outings)                 |
 | `search_user_outings` | Alias of `search_outings` by `user_id`: outings the user is listed on, written or not; newest first, paged       |
 | `get_outing`          | Outing by ID (ratings, conditions, weather, participants, linked accounts, routes; no author: see search lines)  |
-| `search_outings`      | Outings by keyword, area, activity, reported rating/conditions/elevation, dates, period, route, waypoint, user   |
+| `search_outings`      | Outings by keyword, area, activity, reported rating/conditions/elevation, dates, period, routes, waypoint, user  |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                               |
 | `search_books`        | Search books by title only (author/ISBN unreliable), by `book_type` and `activity`; paged with `offset`          |
@@ -208,7 +208,8 @@ Locale: every search function takes `lang?` and sends `pl={lang}` (default `fr`)
   - `associations`: `all_routes {documents, total}` (shaped like `/routes` search results; there is no `routes` key, hut 104151), `books`, and `recent_outings {documents, total}`; `waypoints`, `waypoint_children`, `articles`, `images` and `xreports` are not read.
 - `GET /outings/{id}`
   - No `author` key (only list items carry one). `associations.users` (`document_id`, `name`; locales without title) are the accounts linked to the outing, printed in API order as `**Participants with a Camptocamp account**`; the first is not necessarily the author (outing 1757161).
-- `GET /outings?sort=-date_end&limit=10&offset=0&pl={lang}[&q={query}][&a={area_id}][&act={activity}][&{rating param}={min},{max}][&ocond=excellent,{condition}][&oalt={min},{max}][&odif={min},{max}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id}][&w={waypoint_id}][&u={user_id}]` (ranges as for `/routes`; rating params: only `trat lrat grat erat prat irat frat krat hrat wrat mbur mbdr`, the API ignores the others; `ocond=excellent,{v}` means `{v}` or better)
+- `GET /outings?sort=-date_end&limit=10&offset=0&pl={lang}[&q={query}][&a={area_id}][&act={activity}][&{rating param}={min},{max}][&ocond=excellent,{condition}][&oalt={min},{max}][&odif={min},{max}][&date={from},{to}][&period=2020-{MM-DD},2020-{MM-DD}][&r={route_id} or {route_ids, comma-separated}][&w={waypoint_id}][&u={user_id}]` (ranges as for `/routes`; rating params: only `trat lrat grat erat prat irat frat krat hrat wrat mbur mbdr`, the API ignores the others; `ocond=excellent,{v}` means `{v}` or better)
+  - `r=a,b` matches the outings of any of the routes, each outing once (`r=54513,1148298,54684` → 86, not 61 + 1 + 30). `search_outings` sends `route_ids` (1 to 10, deduplicated) this way and refuses it together with `route_id`.
   - `u` matches the outings the user is listed on (`associations.users`), not only those they wrote. `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).
   - `period` matches the same days in every year (2020 is a leap year, so `02-29` is valid); a range wrapping around the new year matches nothing, and boundary days can be missed.
 - `GET /areas?q={query}&limit=10&pl={lang}[&atyp={type}][&offset={n}]`
