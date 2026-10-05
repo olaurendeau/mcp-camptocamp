@@ -322,9 +322,41 @@ done
 # A ref the command does not name is not known to be a branch: updating or deleting it may move a tag
 check deny  coordinator 'gh api -X PATCH "repos/o/r/git/refs/$REF" -f sha=abc -F force=true'
 check deny  coordinator 'gh api -X DELETE "repos/o/r/git/refs/$REF"'
+
+# GraphQL: updateRef, updateRefs and deleteRef outside refs/heads/ move or delete a tag: nobody, coordinator included
+GQL_UPDATE_BODY='{"query":"mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { clientMutationId } }"}'
+GQL_BRANCH_BODY='{"query":"mutation { createRef(input: {repositoryId: \"R_1\", name: \"refs/heads/feat/x\", oid: \"abc\"}) { clientMutationId } }"}'
+REST_BRANCH_BODY='{"ref":"refs/heads/feat/x","sha":"abc"}'
+GQL_MOVE=(
+  "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { ref { name } } }'"
+  "gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+  "gh api graphql -f query='mutation { updateRefs(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }'"
+  "gh api graphql -f query='mutation { updateRefs(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/heads/feat/x\", afterOid: \"abc\"}, {name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }'"
+  "curl https://api.github.com/graphql -d '{\"query\":\"mutation { deleteRef(input: {refId: \\\"REF_1\\\"}) { clientMutationId } }\"}'"
+  "$(lines 'gh api graphql --input - <<EOF' "$GQL_UPDATE_BODY" 'EOF')"
+)
+for role in coordinator developer pr-reviewer ""; do
+  for cmd in "${GQL_MOVE[@]}"; do
+    check deny "$role" "$cmd"
+  done
+  check allow "$role" "gh api graphql -f query='mutation { updateRefs(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/heads/feat/x\", afterOid: \"abc\", force: true}]}) { clientMutationId } }'"
+  check allow "$role" "$(lines 'gh api graphql --input - <<EOF' "$GQL_BRANCH_BODY" 'EOF')"
+done
+
+# The refs/heads/ exemption covers its own command only: a branch push does not exempt the next API write
+BRANCH_THEN='git push origin HEAD:refs/heads/feat/x && '
+for role in coordinator developer pr-reviewer ""; do
+  check deny  "$role" "${BRANCH_THEN}gh api -X PATCH \"repos/o/r/git/refs/\$REF\" -f sha=abc -F force=true"
+  check deny  "$role" "${BRANCH_THEN}gh api -X DELETE \"repos/o/r/git/refs/\$REF\""
+  check deny  "$role" "${BRANCH_THEN}gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+  check allow "$role" "${BRANCH_THEN}gh api repos/o/r/git/refs -f ref=refs/heads/feat/y -f sha=abc"
+  check allow "$role" "$(lines 'gh api repos/o/r/git/refs --input - <<EOF' "$REST_BRANCH_BODY" 'EOF')"
+done
+check allow coordinator "${BRANCH_THEN}gh api repos/o/r/git/refs --input ref.json"
+check allow coordinator "${BRANCH_THEN}gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \$name, oid: \"abc\"}) { ref { name } } }' -f name=v1.0.5"
 for role in developer pr-reviewer ""; do
-  check deny "$role" "gh api graphql -f query='mutation { updateRef(input: {refId: \"REF_1\", oid: \"abc\", force: true}) { ref { name } } }'"
-  check deny "$role" "gh api graphql -f query='mutation { deleteRef(input: {refId: \"REF_1\"}) { clientMutationId } }'"
+  check deny "$role" "${BRANCH_THEN}gh api repos/o/r/git/refs --input ref.json"
+  check deny "$role" "${BRANCH_THEN}gh api graphql -f query='mutation { createRef(input: {repositoryId: \"R_1\", name: \$name, oid: \"abc\"}) { ref { name } } }' -f name=v1.0.5"
 done
 
 # make with options or other targets before publish
@@ -361,8 +393,15 @@ for role in coordinator developer pr-reviewer ""; do
   check deny  "$role" 'npm --tag next version patch'
   check deny  "$role" 'npm --tag next version 1.2.0'
   check deny  "$role" 'npm --otp 1 version patch'
+  # A read word taken as an option value, then version and an argument: a bump, not a read
+  check deny  "$role" 'npm --tag v version patch'
+  check deny  "$role" 'npm --tag run version patch'
+  check deny  "$role" 'npm --tag view version 1.2.0'
+  check deny  "$role" 'npm --tag v version --preid rc prerelease'
 done
 check allow developer   'npm --tag next version 1.2.0 --no-git-tag-version'
+check allow developer   'npm --tag v version patch --no-git-tag-version'
+check allow developer   'npm --tag run version --no-git-tag-version 1.2.0'
 check deny  developer   'npm --registry https://r.example version patch'
 check deny  developer   'npm --loglevel silent version 1.1.0'
 check deny  developer   'npm --json version patch'
