@@ -223,6 +223,7 @@ The result lines do not say which of the routes an outing is linked to: `get_out
 - **An unknown ID used as a filter returns no results, not an error.** An empty result after an `area_id`, `route_id`, `waypoint_id` or `user_id` filter can mean a wrong ID; for `route_ids` (v1.4.0 or later), see above. See [Unknown IDs](../using-with-llms.md#unknown-ids).
 - **Paging stops at 10,000 results.** A call where `offset + limit` exceeds 10,000 is refused before any request: narrow the filters instead.
 - **Outings are past reports, not a forecast.** Give each outing's date with what it says. The server has no weather forecast and no avalanche bulletin.
+- **No filter on partial trips.** Camptocamp neither indexes nor lists `partial_trip` ("Parcours partiel" on camptocamp.org): no search can filter on it, and the result lines cannot show it. It has no field for a failed attempt either, and attempts never written up are absent from the data. Measured on the live API on 2026-10-05, of the 61 outings of the Innominata (route 54513), 1 has `partial_trip` ticked (219347), 17 unticked and 43 unset. To read the flag, use [`get_outings`](get_outings.md) (v1.4.0 or later), which prints `**Partial trip**: yes` only when it is ticked. `false` is the form default, so no line does not mean the route was completed.
 
 ## Related tools
 
