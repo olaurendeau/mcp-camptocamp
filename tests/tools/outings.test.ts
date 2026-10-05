@@ -2224,13 +2224,26 @@ describe("outingToolDefinitions", () => {
       "All filters are optional and combine with AND",
       "most recent first",
       "An unknown area/route/waypoint/user ID yields no results, not an error",
-      "Call get_outing with an ID",
       "area_id (from search_areas)",
       "route_id (from search_routes)",
       "waypoint_id (from search_waypoints)",
     ]) {
       expect(description).toContain(phrase);
     }
+  });
+
+  // AC2.1 on #303: the list has no route associations, so the description says where an outing's routes are.
+  it("says search_outings lines carry no route ID and points to get_outings for them", () => {
+    const description = outingToolDefinitions.find((t) => t.name === "search_outings")?.description ?? "";
+
+    expect(description).toContain(
+      "Lines carry no route ID (Camptocamp's outing list has none): see '## Associated routes' in get_outings.",
+    );
+    for (const phrase of ["no route ID", "Camptocamp's outing list has none", "get_outings", "## Associated routes"]) {
+      expect(description).toContain(phrase);
+    }
+    expect(description).not.toContain("Call get_outing with an ID");
+    expect(description.length).toBeLessThan(2048);
   });
 
   // #211: the date and period details moved to the fields they are about.
