@@ -112,7 +112,7 @@ Counts of trip reports published on Camptocamp, not of ascents; a month with no 
 - **The `total` column** gives each row's count, which is the line `group_by` alone prints for it, and **the `total` row** each column's count. Its last cell is the number of outings in the table. Cells are counts only: no percentage, rate or average.
 - **`(no start date)` and `(unexpected format)`** count, below the table and after a blank line, the outings whose value is one of these on either axis. They are not in the table, so the table total and these lines add up to the header's total.
 - **No table is printed** when one axis is `year` and no outing has a readable start date, as no year line is printed without `split_by`.
-- **`split_by` equal to `group_by`** is refused before any request: `split_by must differ from group_by (<axis>): give another of month, year or condition, or leave it out`.
+- **`split_by` equal to `group_by`** is refused before any request: `split_by must differ from group_by (<axis>): give another of month, year, condition or route, or leave it out`.
 
 ## Example
 
