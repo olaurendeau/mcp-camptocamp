@@ -226,6 +226,35 @@ describe("readHttpConfig", () => {
       }
     });
 
+    it("refuses an allowed host that a Host header can never equal", () => {
+      for (const host of [
+        "https://mcp.example.org",
+        "mcp.example.org/mcp",
+        "mcp.example.org:",
+        "mcp.example.org:99999",
+        "user@mcp.example.org",
+        "mcp example.org",
+        "[::1",
+      ]) {
+        expect(configError(httpEnv({ MCP_ALLOWED_HOSTS: `ok.example,${host}` })).message).toBe(
+          `MCP_ALLOWED_HOSTS: "${host}" is not a host name with an optional port`,
+        );
+      }
+    });
+
+    it("accepts a host name, an IPv4 or bracketed IPv6 address, each with an optional port", () => {
+      const hosts = "mcp.example.org,mcp.example.org:80,10.0.0.2:3000,[::1],[::1]:3000";
+      expect(readHttpConfig(httpEnv({ MCP_ALLOWED_HOSTS: hosts })).allowedHosts).toEqual(hosts.split(","));
+    });
+
+    it("refuses an allowed host list left empty once empty entries are dropped", () => {
+      for (const hosts of [",", " , ,"]) {
+        expect(configError(httpEnv({ MCP_ALLOWED_HOSTS: hosts })).message).toBe(
+          "MCP_ALLOWED_HOSTS must list at least one host",
+        );
+      }
+    });
+
     it("throws a ConfigError, an Error subclass", () => {
       const error = configError({ MCP_TRANSPORT: "http" });
       expect(error).toBeInstanceOf(Error);

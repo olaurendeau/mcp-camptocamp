@@ -46,13 +46,11 @@ export function readHttpConfig(env: Env): HttpConfig {
   const port = readInteger(env, "MCP_HTTP_PORT", DEFAULT_PORT, 65535);
   const upstreamConcurrency = readInteger(env, "MCP_UPSTREAM_CONCURRENCY", DEFAULT_CONCURRENCY, MAX_CONCURRENCY);
   const operatorContact = readContact(env);
-  const hosts = read(env, "MCP_ALLOWED_HOSTS");
   return {
     host: read(env, "MCP_HTTP_HOST") ?? DEFAULT_HOST,
     port,
     tokens,
-    // Setting MCP_ALLOWED_HOSTS replaces the localhost list: a public name never comes on top of it.
-    allowedHosts: hosts === undefined ? LOCALHOST_NAMES.flatMap((name) => [name, `${name}:${port}`]) : list(hosts),
+    allowedHosts: readHosts(env, port),
     allowedOrigins: readOrigins(env),
     upstreamConcurrency,
     operatorContact,
@@ -106,6 +104,24 @@ function readContact(env: Env): string | undefined {
     );
   }
   return value;
+}
+
+// Setting MCP_ALLOWED_HOSTS replaces the localhost list: a public name never comes on top of it.
+// Each entry must be something a Host header can equal (a name or address, an optional port), and at least
+// one must be left: otherwise every request would be refused with no hint why.
+function readHosts(env: Env, port: number): string[] {
+  const value = read(env, "MCP_ALLOWED_HOSTS");
+  if (value === undefined) return LOCALHOST_NAMES.flatMap((name) => [name, `${name}:${port}`]);
+  const hosts = list(value);
+  if (hosts.length === 0) throw new ConfigError("MCP_ALLOWED_HOSTS must list at least one host");
+  for (const host of hosts) {
+    // A scheme without a default port keeps any port as written; a scheme, path or user part changes `host`.
+    const url = `x-host://${host}`;
+    if (!URL.canParse(url) || new URL(url).host !== host) {
+      throw new ConfigError(`MCP_ALLOWED_HOSTS: "${host}" is not a host name with an optional port`);
+    }
+  }
+  return hosts;
 }
 
 // Browsers send an Origin as scheme://host[:port], no path and no default port: anything else never matches.
