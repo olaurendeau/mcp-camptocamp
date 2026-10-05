@@ -96,7 +96,7 @@ Next page: offset=<N>
   With no filter at all, there is no `Filters:` line.
 
 - **The `Note:` line** is printed with every search that has `period_start` and `period_end`, even when nothing is found. See [Limits](#limits).
-- **Each result line** starts with the outing's ID in brackets, its title as its author wrote it, and its activities. The other parts follow in the order above, and each one is left out when the author gave no value:
+- **Each result line** starts with the outing's ID in brackets, its title as its author wrote it, and its activities. It carries no route ID, because Camptocamp's outing list has none: [`get_outings`](get_outings.md) lists an outing's routes, with their IDs, under `## Associated routes`. The other parts follow in the order above, and each one is left out when the author gave no value:
   - the date, or `<start> → <end>` for an outing over several days;
   - `Conditions:`, a code from `excellent`, `good`, `average`, `poor`, `awful`, copied verbatim;
   - `Max elevation:` and `Elevation gain:`, as the author reported them;
@@ -141,7 +141,7 @@ Filters: routes 54513 or 1148298 or 54684
 Next page: offset=3
 ```
 
-The result lines do not say which of the routes an outing is linked to: `get_outing` lists them under `## Associated routes`.
+The result lines do not say which of the routes an outing is linked to, because Camptocamp's outing list carries no route ID: [`get_outings`](get_outings.md) lists them under `## Associated routes`, for up to 10 outings in one call.
 
 ## Limits
 
