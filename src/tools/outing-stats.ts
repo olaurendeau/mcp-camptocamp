@@ -35,31 +35,62 @@ function assertComplete(documents: OutingListResponse["documents"], total: numbe
   if (documents.length !== total || ids.size + withoutId !== total) throw new Error(RESULTS_CHANGED);
 }
 
+// One page of a set's search, sorted with the ID tiebreak. In HTTP mode, getJson waits for an upstream slot.
+const readPage = (filters: OutingFilters, offset: number) =>
+  searchOutings({ ...filters, limit: PAGE_SIZE, offset, tiebreak_by_id: true });
+
+/**
+ * Every outing of each set of filters: one result per set, in the order given, each in its search's order (most
+ * recent first, ties by ID). Reads every set's first page, at most 3 at a time, then calls `checkTotals` with the
+ * sets' totals, which throws to refuse them before any other request. Then reads the other pages of every set, at
+ * most 3 at a time across all sets, and fails if a page fails or a set's pages disagree.
+ */
+export async function collectOutingSets(
+  sets: readonly OutingFilters[],
+  checkTotals: (totals: number[]) => void,
+): Promise<OutingListResponse[]> {
+  const collections = await mapWithConcurrency(sets, MAX_PARALLEL_REQUESTS, async (filters) => {
+    const { total, documents } = await readPage(filters, 0);
+    return { filters, total, pages: [documents] };
+  });
+  checkTotals(collections.map(({ total }) => total));
+
+  const reads = collections.flatMap((collection) => {
+    const offsets: number[] = [];
+    for (let offset = PAGE_SIZE; offset < collection.total; offset += PAGE_SIZE) offsets.push(offset);
+    return offsets.map((offset) => ({ collection, offset }));
+  });
+  await mapWithConcurrency(reads, MAX_PARALLEL_REQUESTS, async ({ collection, offset }) => {
+    const page = await readPage(collection.filters, offset);
+    if (page.total !== collection.total) throw new Error(RESULTS_CHANGED);
+    collection.pages[offset / PAGE_SIZE] = page.documents;
+  });
+
+  return collections.map(({ total, pages }) => {
+    const documents = pages.flat();
+    assertComplete(documents, total);
+    return { total, documents };
+  });
+}
+
 /**
  * Every outing matching `filters`, in the search's order (most recent first, ties by ID). Refuses a search
  * matching more than 2,000 outings after its first page, and fails if a page fails or the pages disagree.
  */
 export async function collectMatchingOutings(filters: OutingFilters): Promise<OutingListResponse> {
-  const read = (offset: number) => searchOutings({ ...filters, limit: PAGE_SIZE, offset, tiebreak_by_id: true });
-  const first = await read(0);
-  const { total } = first;
-  if (total > MAX_COLLECTED_OUTINGS) {
-    throw new Error(
-      `${total.toLocaleString("en-US")} outings match these filters, more than the ` +
-        `${MAX_COLLECTED_OUTINGS.toLocaleString("en-US")} that can be counted in one call: narrow the filters ` +
-        "(dates, area, activity, routes…) and call again.",
-    );
-  }
-  const offsets: number[] = [];
-  for (let offset = PAGE_SIZE; offset < total; offset += PAGE_SIZE) offsets.push(offset);
-  const others = await mapWithConcurrency(offsets, MAX_PARALLEL_REQUESTS, async (offset) => {
-    const page = await read(offset);
-    if (page.total !== total) throw new Error(RESULTS_CHANGED);
-    return page.documents;
+  const [result] = await collectOutingSets([filters], (totals) => {
+    for (const total of totals) {
+      if (total > MAX_COLLECTED_OUTINGS) {
+        throw new Error(
+          `${total.toLocaleString("en-US")} outings match these filters, more than the ` +
+            `${MAX_COLLECTED_OUTINGS.toLocaleString("en-US")} that can be counted in one call: narrow the filters ` +
+            "(dates, area, activity, routes…) and call again.",
+        );
+      }
+    }
   });
-  const documents = [first.documents, ...others].flat();
-  assertComplete(documents, total);
-  return { total, documents };
+  // One set of filters gives one result.
+  return result as OutingListResponse;
 }
 
 const AXES = ["month", "year", "condition"] as const;
