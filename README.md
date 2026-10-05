@@ -17,6 +17,27 @@ An MCP server that lets an LLM look up mountain routes, summits, huts and trip r
 
 Ask an LLM for the altitude of a summit or the rating of a ski tour and it may answer from memory, and get it wrong. This server gives it read-only access to Camptocamp.org, the collaborative mountaineering site: routes with their ratings and descriptions, summits and huts with their altitudes, trip reports with the conditions people found, areas, guidebooks and articles. Every tool output comes from the public Camptocamp API, with the camptocamp.org link to cite, and a value Camptocamp does not have is left out, never guessed. It needs no account and no API key.
 
+An example conversation from October 2026, run against the published server (v1.3.0); the answer's table is cut to its first 5 rows:
+
+> **Prompt:** Give me the top 10 of most climbed routes on l'aiguille verte. With a very concise response
+>
+> _Called camptocamp 20 times_
+>
+> Top 10 routes on the Aiguille Verte, ranked by the number of camptocamp outings logged since the site began:
+>
+> | #   | Route                    | Grade | Outings |
+> | --- | ------------------------ | ----- | ------- |
+> | 1   | Couloir Whymper          | AD+   | 241     |
+> | 2   | Couloir Couturier        | D     | 92      |
+> | 3   | Arête du Jardin          | D-    | 33*     |
+> | 4   | Arête des Grands Montets | D     | 24      |
+> | 5   | Arête du Moine           | AD+   | 22*     |
+> | …   | _5 more rows_            |       |         |
+>
+> \* Two counts are inflated. The Arête du Jardin figure includes traverses that stop at the Aiguille du Jardin without reaching the Verte. The Arête du Moine figure includes outings where it was only the descent route.
+>
+> These are camptocamp reports, not actual ascents.
+
 ## Quick start
 
 The server runs on your machine, started by your MCP client over stdio. Run it with npx, which needs [Node.js](https://nodejs.org/en/download) 22 or later, or with [Docker](https://docs.docker.com/get-started/get-docker/).
