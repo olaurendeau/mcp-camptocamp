@@ -175,6 +175,10 @@ export type SearchUserOutingsInput = z.infer<typeof searchUserOutingsSchema>;
 export type GetOutingsInput = z.infer<typeof getOutingsSchema>;
 export type GetOutingInput = z.infer<typeof getOutingSchema>;
 export type SearchOutingsInput = z.infer<typeof searchOutingsSchema>;
+// search_outings input without paging: the filters outing_stats shares (AC4.4 on #255).
+export type OutingFilterInput = Omit<SearchOutingsInput, "limit" | "offset">;
+// The searchOutings options those filters give: no page, no sort tiebreak.
+export type OutingFilters = Omit<OutingSearchParams, "limit" | "offset" | "tiebreak_by_id">;
 
 // An account in the inline participants line. A malformed one keeps the "(user ID: N)" of the others, since
 // "[N]" elsewhere is a document ID (review of #188); without a readable ID it is the bare placeholder.
@@ -225,7 +229,7 @@ function formatOutingDetail(outing: OutingDetail, lang?: Lang, cut?: TextCut): s
 }
 
 // The Filters line: `area 14409, activity skitouring, ski rating (Toponeige) 3.1 → 4.1, conditions good or better`.
-function describeFilters(params: OutingSearchParams): string[] {
+export function describeOutingFilters(params: OutingFilters): string[] {
   const filters: string[] = [];
   if (params.user_id !== undefined) filters.push(`user ${params.user_id}`);
   if (params.query !== undefined) filters.push(`query ${quote(params.query)}`);
@@ -263,7 +267,7 @@ function describeFilters(params: OutingSearchParams): string[] {
 
 // D1: the period is sent as given, so no outing outside it is shown, and the gap is stated.
 // Camptocamp computes it with a 365.2425-day year, so a boundary day can drop out depending on the year.
-const PERIOD_NOTE = "Note: Camptocamp's period filter can miss outings on the first or last day of the range.";
+export const PERIOD_NOTE = "Note: Camptocamp's period filter can miss outings on the first or last day of the range.";
 
 function formatOutingList(
   response: OutingListResponse,
@@ -276,7 +280,7 @@ function formatOutingList(
     offset,
     limit,
     lines: formatListItems(response.documents, (outing) => formatOutingLine(outing, params.lang)),
-    filters: describeFilters(params),
+    filters: describeOutingFilters(params),
     notes: params.period !== undefined ? [PERIOD_NOTE] : [],
     order: ", most recent first",
   });
@@ -296,8 +300,8 @@ function periodFilter(start: string | undefined, end: string | undefined): Outin
   return { start, end };
 }
 
-// The options for searchOutings, after every check that needs more than one field; only given filters are set.
-function outingSearchParams(input: SearchOutingsInput): OutingSearchParams {
+// The filters for searchOutings, after every check that needs more than one field; only given filters are set.
+export function outingFilterParams(input: OutingFilterInput): OutingFilters {
   const {
     query,
     rating_system,
@@ -312,6 +316,7 @@ function outingSearchParams(input: SearchOutingsInput): OutingSearchParams {
     route_ids,
     ...rest
   } = input;
+  // Here, not only in search_outings: searchOutings would quietly use route_id alone (review of #272).
   if (rest.route_id !== undefined && route_ids !== undefined) {
     throw new Error(
       `give route_id or route_ids, not both; put every route ID in route_ids (up to ${String(MAX_ROUTE_IDS)}).`,
@@ -328,7 +333,6 @@ function outingSearchParams(input: SearchOutingsInput): OutingSearchParams {
     "height_diff_up_min",
     "height_diff_up_max",
   ]);
-  assertResultWindow(rest.offset, rest.limit);
   return {
     // A blank query counts as missing: the API treats `q=` like no `q` and returns every outing.
     ...(query?.trim() ? { query } : {}),
@@ -340,6 +344,13 @@ function outingSearchParams(input: SearchOutingsInput): OutingSearchParams {
     // A repeated ID would change nothing in the results: it is sent and named once, in first-seen order.
     ...(route_ids !== undefined && { route_ids: [...new Set(route_ids)] }),
   };
+}
+
+// The options for searchOutings: the filters, then the page, checked last.
+function outingSearchParams({ limit, offset, ...filters }: SearchOutingsInput): OutingSearchParams {
+  const params = outingFilterParams(filters);
+  assertResultWindow(offset, limit);
+  return { ...params, limit, offset };
 }
 
 // The SDK has already validated `input` against searchOutingsSchema and applied its defaults.

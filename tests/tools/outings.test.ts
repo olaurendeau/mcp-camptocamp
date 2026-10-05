@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  PERIOD_NOTE as SHARED_PERIOD_NOTE,
+  describeOutingFilters,
+  outingFilterParams,
   handleSearchUserOutings,
   handleGetOuting,
   handleGetOutings,
@@ -2333,5 +2336,64 @@ describe("search_outings lang", () => {
 
     expect(mockSearchOutings).toHaveBeenCalledWith(expect.objectContaining({ query: "Benedetti", ...lang }));
     expect(result.split("\n").at(-1)).toBe(`${head} | ${details}`);
+  });
+});
+
+// The filter parsing search_outings shares with outing_stats (#263, AC4.4 on #255): every cross-field check, no page.
+describe("outingFilterParams", () => {
+  it("returns the filters without a page, as search_outings sends them", () => {
+    const params = outingFilterParams({
+      query: " ",
+      activity: "mountain_climbing",
+      route_ids: [54513, 1148298, 54513],
+      period_start: "06-01",
+      period_end: "09-30",
+      condition_at_least: "good",
+      max_elevation_min: 4000,
+      lang: "en",
+    });
+
+    expect(params).toEqual({
+      activity: "mountain_climbing",
+      route_ids: [54513, 1148298],
+      period: { start: "06-01", end: "09-30" },
+      condition_at_least: "good",
+      elevation_max: { min: 4000 },
+      lang: "en",
+    });
+    expect(describeOutingFilters(params)).toEqual([
+      "activity mountain_climbing",
+      "conditions good or better",
+      "max elevation from 4000m",
+      "period 06-01 → 09-30 of every year",
+      "routes 54513 or 1148298",
+    ]);
+  });
+
+  it("names the filters as the search_outings Filters line does, and gives its period note", async () => {
+    mockSearchOutings.mockResolvedValueOnce(listResponse([], 0));
+    const input = { route_id: 54513, period_start: "06-01", period_end: "06-30", date_from: "2020-01-01" };
+
+    const result = await search(input);
+
+    expect(result).toBe(
+      `No outings found matching ${describeOutingFilters(outingFilterParams(input)).join(", ")}.\n${SHARED_PERIOD_NOTE}`,
+    );
+  });
+
+  // Carried over from the review of #272: searchOutings alone would quietly use route_id.
+  it("refuses route_id together with route_ids", () => {
+    expect(() => outingFilterParams({ route_id: 54513, route_ids: [1148298] })).toThrow(
+      "give route_id or route_ids, not both; put every route ID in route_ids (up to 10).",
+    );
+  });
+
+  it.each([
+    [{ date_from: "2026-09-30", date_to: "2026-09-01" }, "date_from (2026-09-30) must be on or before date_to"],
+    [{ period_start: "06-01" }, "period_start and period_end must be given together"],
+    [{ period_start: "12-20", period_end: "01-10" }, "period cannot wrap around the new year"],
+    [{ max_elevation_min: 4000, max_elevation_max: 3000 }, "max_elevation_min"],
+  ])("makes every cross-field check: %j", (input, message) => {
+    expect(() => outingFilterParams(input)).toThrow(message);
   });
 });
