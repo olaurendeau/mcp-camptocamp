@@ -207,19 +207,22 @@ function countTable(
   label: string,
   columns: string[],
   rows: string[],
-  count: (row: string, column: number) => number,
+  count: (row: string, column: string) => number,
   totalColumn: boolean,
 ): string[] {
   const extra = totalColumn ? ["total"] : [];
   const line = (counts: number[]) => (totalColumn ? [...counts, sum(counts)] : counts).map(String);
-  const columnTotal = (column: number) => sum(rows.map((row) => count(row, column)));
+  const columnTotal = (column: string) => sum(rows.map((row) => count(row, column)));
   return [
     tableRow([label, ...columns.map(cell), ...extra]),
     tableRow(["---", ...[...columns, ...extra].map(() => "---:")]),
-    ...rows.map((row) => tableRow([cell(row), ...line(columns.map((_, column) => count(row, column)))])),
-    tableRow(["total", ...line(columns.map((_, column) => columnTotal(column)))]),
+    ...rows.map((row) => tableRow([cell(row), ...line(columns.map((column) => count(row, column)))])),
+    tableRow(["total", ...line(columns.map(columnTotal))]),
   ];
 }
+
+// The cell key of a row and a column.
+const cellKey = (row: string, column: string) => JSON.stringify([row, column]);
 
 // A blank line ends a table: a line right after it would be read as one more row.
 const withBelow = (table: string[], below: string[]) => (below.length > 0 ? [...table, "", ...below] : table);
@@ -240,7 +243,7 @@ function formatTable(documents: Outing[], rowAxis: Axis, columnAxis: Axis): stri
     } else {
       rowKeys.push(row);
       columnKeys.push(column);
-      increment(cells, JSON.stringify([row, column]));
+      increment(cells, cellKey(row, column));
     }
   }
   const rows = axisValues(rowAxis, rowKeys);
@@ -249,7 +252,7 @@ function formatTable(documents: Outing[], rowAxis: Axis, columnAxis: Axis): stri
   // Without a year with a start date there is no row or column to print, as there is no year line without split_by.
   if (rows.length === 0 || columns.length === 0) return below;
 
-  const count = (row: string, column: number) => cells.get(JSON.stringify([row, columns[column]])) ?? 0;
+  const count = (row: string, column: string) => cells.get(cellKey(row, column)) ?? 0;
   return withBelow(countTable(AXIS_LABELS[rowAxis], columns, rows, count, true), below);
 }
 
@@ -263,14 +266,19 @@ const idsOf = (documents: Outing[]) => documents.flatMap(({ document_id }) => do
 // cannot hold more outings than they add up to. Items without an ID cannot be matched, so they are not checked.
 async function collectRouteSets(others: Omit<OutingFilters, "route_ids">, routeIds: number[]) {
   const sets = [{ ...others, route_ids: routeIds }, ...routeIds.map((route_id) => ({ ...others, route_id }))];
-  const [union, ...routes] = await collectOutingSets(sets, ([unionTotal, ...routeTotals]) => {
+  // One total and one result per set: the union's first, then the routes', in route_ids order.
+  const results = await collectOutingSets(sets, (totals) => {
+    const [unionTotal, ...routeTotals] = totals as [number, ...number[]];
     const routeSum = sum(routeTotals);
     if (routeSum > MAX_COLLECTED_OUTINGS) {
-      const perRoute = routeIds.map((id, i) => `route ${String(id)}: ${formatCount(routeTotals[i])}`).join(", ");
-      throw tooManyOutings(`${formatCount(routeSum)} outings match these filters route by route (${perRoute})`);
+      const perRoute = routeTotals.map((total, i) => `route ${String(routeIds[i])}: ${formatCount(total)}`);
+      throw tooManyOutings(
+        `${formatCount(routeSum)} outings match these filters route by route (${perRoute.join(", ")})`,
+      );
     }
     if (unionTotal > routeSum) throw new Error(RESULTS_CHANGED);
   });
+  const [union, ...routes] = results as [OutingListResponse, ...OutingListResponse[]];
   // How many of the routes each outing is linked to; the union must hold exactly these outings.
   const linked = new Map<number, number>();
   for (const { documents } of routes) for (const id of new Set(idsOf(documents))) increment(linked, id);
@@ -279,24 +287,33 @@ async function collectRouteSets(others: Omit<OutingFilters, "route_ids">, routeI
     throw new Error(RESULTS_CHANGED);
   }
   const shared = [...linked.values()].filter((count) => count > 1).length;
-  return { union, routes, shared };
+  const columns = routes.map(({ documents }, i): [string, Outing[]] => [String(routeIds[i]), documents]);
+  return { union, columns, shared };
 }
+
+const ALL_ROUTES = "all routes";
 
 // Rows from group_by, one column per route, then `all routes`, counted from the union: an outing linked to several
 // routes counts in each of their columns, and once in `all routes`. The outings outside the rows are counted once,
 // from the union, below the table, so the `all routes` column and those lines add up to N.
-function formatRouteTable(rowAxis: Axis, routeIds: number[], columnSets: Outing[][]): string[] {
-  const columns = columnSets.map((documents) => {
-    const counts = new Map<string, number>();
-    for (const outing of documents) increment(counts, keyOf(outing, rowAxis));
-    return counts;
-  });
-  const below = outsideLines(columns[columns.length - 1]);
-  const rows = axisValues(rowAxis, columns.flatMap((counts) => [...counts.keys()]));
+function formatRouteTable(rowAxis: Axis, columns: [string, Outing[]][], union: Outing[]): string[] {
+  const cells = new Map<string, number>();
+  const rowKeys: string[] = [];
+  for (const [column, documents] of [...columns, [ALL_ROUTES, union] as const]) {
+    for (const outing of documents) {
+      const row = keyOf(outing, rowAxis);
+      rowKeys.push(row);
+      increment(cells, cellKey(row, column));
+    }
+  }
+  const outside = new Map<string, number>();
+  for (const outing of union) increment(outside, keyOf(outing, rowAxis));
+  const below = outsideLines(outside);
+  const rows = axisValues(rowAxis, rowKeys);
   if (rows.length === 0) return below;
-  const labels = [...routeIds.map(String), "all routes"];
-  const table = countTable(AXIS_LABELS[rowAxis], labels, rows, (row, column) => columns[column].get(row) ?? 0, false);
-  return withBelow(table, below);
+  const labels = [...columns.map(([column]) => column), ALL_ROUTES];
+  const count = (row: string, column: string) => cells.get(cellKey(row, column)) ?? 0;
+  return withBelow(countTable(AXIS_LABELS[rowAxis], labels, rows, count, false), below);
 }
 
 // The counts, and the lines printed before them, for the filters of a call. split_by route without route_ids is
@@ -305,12 +322,11 @@ async function countOutings(filters: OutingFilters, groupBy: Axis, splitBy: Spli
   if (splitBy === "route") {
     const { route_ids: routeIds, ...others } = filters;
     if (routeIds === undefined) throw new Error(ROUTE_SPLIT_NEEDS_ROUTE_IDS);
-    const { union, routes, shared } = await collectRouteSets(others, routeIds);
-    const columnSets = [...routes, union].map(({ documents }) => documents);
+    const { union, columns, shared } = await collectRouteSets(others, routeIds);
     return {
       total: union.total,
       notes: [`${String(shared)} outing(s) are linked to more than one of these routes and count under each.`],
-      lines: formatRouteTable(groupBy, routeIds, columnSets),
+      lines: formatRouteTable(groupBy, columns, union.documents),
     };
   }
   const { total, documents } = await collectMatchingOutings(filters);

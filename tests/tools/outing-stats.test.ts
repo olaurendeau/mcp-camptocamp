@@ -917,7 +917,10 @@ function serveRouteSets(sets: Record<string, unknown[]>) {
     tracker.inFlight--;
     const documents = sets[params?.route_ids?.join(",") ?? String(params?.route_id)] ?? [];
     const offset = params?.offset ?? 0;
-    return { total: documents.length, documents: documents.slice(offset, offset + 100) } as unknown as OutingListResponse;
+    return {
+      total: documents.length,
+      documents: documents.slice(offset, offset + 100),
+    } as unknown as OutingListResponse;
   });
   return tracker;
 }
@@ -930,7 +933,8 @@ const INNOMINATA_SETS = {
 };
 
 // The `r` value of each search sent, in order.
-const sentRoutes = () => mockSearchOutings.mock.calls.map(([params]) => params?.route_ids?.join(",") ?? params?.route_id);
+const sentRoutes = () =>
+  mockSearchOutings.mock.calls.map(([params]) => params?.route_ids?.join(",") ?? params?.route_id);
 
 const outings = (first: number, count: number) => Array.from({ length: count }, (_, i) => outing(first + i));
 
@@ -972,7 +976,12 @@ describe("handleOutingStats with split_by route", () => {
   it("sends 4 searches, the union first, then each route", async () => {
     serveRouteSets(INNOMINATA_SETS);
 
-    await stats({ route_ids: [54513, 54684, 1148298], activity: "mountain_climbing", group_by: "year", split_by: "route" });
+    await stats({
+      route_ids: [54513, 54684, 1148298],
+      activity: "mountain_climbing",
+      group_by: "year",
+      split_by: "route",
+    });
 
     const page0 = { activity: "mountain_climbing", limit: 100, offset: 0, tiebreak_by_id: true };
     expect(mockSearchOutings.mock.calls).toEqual([
@@ -1013,7 +1022,10 @@ describe("handleOutingStats with split_by route", () => {
   });
 
   it("sends and prints a repeated route once, in first-seen order", async () => {
-    serveRouteSets({ ...INNOMINATA_SETS, "54684,54513": THREE_ROUTES.filter(([id]) => id !== 1148311).map(innominata) });
+    serveRouteSets({
+      ...INNOMINATA_SETS,
+      "54684,54513": THREE_ROUTES.filter(([id]) => id !== 1148311).map(innominata),
+    });
 
     const result = await stats({ route_ids: [54684, 54513, 54684], group_by: "year", split_by: "route" });
 

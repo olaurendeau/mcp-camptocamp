@@ -7,7 +7,7 @@ import { runHttp, type HttpProcess } from "../../src/http/main.js";
 import type { RunningHttpServer } from "../../src/http/server.js";
 import { VERSION } from "../../src/version.js";
 import { z } from "zod";
-import { jsonResponse } from "../server/helpers.js";
+import { connect, jsonResponse } from "../server/helpers.js";
 import { HOST, MCP_HEADERS, TOKEN, callTool, freePort, postMcp, startTestServer } from "./helpers.js";
 
 // AC7.1–AC7.3 of #277 end to end: the HTTP mode as src/index.ts starts it (runHttp), real HTTP requests, and a
@@ -148,6 +148,61 @@ describe("HTTP mode upstream cap (AC7.1)", () => {
       expect(result.isError).toBeFalsy();
       expect(result.content[0].text).toContain(`# Voie ${String(100 + i)} (ID: ${String(100 + i)})`);
     });
+  });
+});
+
+// Shaped like the items of GET /outings?r=54513,54684&sort=-date_end,-id&limit=100&offset=0&pl=fr (2026-10-05),
+// trimmed to the fields outing_stats reads; unset conditions come as null.
+function outingItem(id: number, date: string, condition: string | null) {
+  return {
+    document_id: id,
+    locales: [{ lang: "fr", title: "Mont Blanc : Arête de l'Innominata" }],
+    activities: ["mountain_climbing"],
+    date_start: date,
+    date_end: date,
+    condition_rating: condition,
+  };
+}
+
+// S4 of #303: split_by route reads the union and each route, at most 3 requests at a time, under the upstream cap.
+describe("HTTP mode outing_stats split_by route", () => {
+  it("reads the union and each route under a cap of 1, with the in-memory output", async () => {
+    const shared = outingItem(1924138, "2026-07-03", "average");
+    const sets: Record<string, unknown[]> = {
+      "54513,54684": [shared, outingItem(1942744, "2026-07-03", "good"), outingItem(1917601, "2026-06-17", null)],
+      "54513": [shared, outingItem(1917601, "2026-06-17", null)],
+      "54684": [shared, outingItem(1942744, "2026-07-03", "good")],
+    };
+    let pending = 0;
+    let maxPending = 0;
+    const fetchMock = vi.fn<typeof fetch>(async (url) => {
+      pending++;
+      maxPending = Math.max(maxPending, pending);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      pending--;
+      const documents = sets[new URL(url as string).searchParams.get("r") ?? ""] ?? [];
+      return jsonResponse({ total: documents.length, documents });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const args = { route_ids: [54513, 54684], group_by: "month", split_by: "route" };
+
+    configureUpstream({ concurrency: 1 });
+    const { port } = await startTestServer();
+    const http = await callForResult(port, "outing_stats", args);
+    const httpMaxPending = maxPending;
+    configureUpstream(undefined);
+    maxPending = 0;
+    const memory = (await (await connect()).callTool({ name: "outing_stats", arguments: args })) as ToolResult;
+
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(httpMaxPending).toBe(1);
+    expect(maxPending).toBe(3); // without the cap, the tool's own 3 at a time
+    expect(http.isError).toBeFalsy();
+    expect(http.content[0].text).toContain("\n| 07 | 1 | 2 | 2 |\n");
+    expect(http.content[0].text).toContain(
+      "\n1 outing(s) are linked to more than one of these routes and count under each.\n",
+    );
+    expect(http).toEqual(memory);
   });
 });
 

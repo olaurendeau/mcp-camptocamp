@@ -176,6 +176,7 @@ const TOOL_ARGUMENTS: Record<string, Record<string, unknown>> = {
 const EXTRA_ARGUMENTS: [string, Record<string, unknown>][] = [
   ["outing_stats", { group_by: "month", split_by: "condition" }],
   ["get_book", { id: 853932, routes_offset: 50 }],
+  ["outing_stats", { route_ids: [54513, 54684], group_by: "year", split_by: "route" }],
 ];
 
 const API_500_CASES = [...Object.entries(TOOL_ARGUMENTS), ...EXTRA_ARGUMENTS];

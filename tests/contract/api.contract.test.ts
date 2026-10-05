@@ -272,6 +272,25 @@ describe("searches (AC8.2, AC8.3)", () => {
     expect(rows.map((row) => `${row[0]}: ${row.at(-1) ?? ""}`)).toEqual(byMonth);
   });
 
+  // S4 of #303: with two routes, the routes' totals less the shared outings give the union's total, the header's.
+  it("outing_stats counts the outings of routes 54513 and 54684 per route and in all", async () => {
+    const table = await handleOutingStats({ route_ids: [54513, 54684], group_by: "month", split_by: "route" });
+    const lines = table.split("\n");
+    const total = Number(/^(\d+) outing\(s\) counted \(all matches\), by start month and route$/.exec(lines[0])?.[1]);
+    const overlap = /^(\d+) outing\(s\) are linked to more than one of these routes and count under each\.$/;
+    const shared = Number(lines.map((line) => overlap.exec(line)).find(Boolean)?.[1]);
+    const rows = lines
+      .filter((line) => /^\| (\d{2}|total) \|/.test(line))
+      .map((line) => line.slice(2, -2).split(" | "));
+    const [, first, second, all] = (rows.at(-1) ?? []).map(Number);
+
+    expect(table).toContain("\n| start month | 54513 | 54684 | all routes |\n");
+    expect(rows.map((row) => row[0])).toEqual([...MONTHS, "total"]);
+    expect(total).toBeGreaterThan(0);
+    expect(all).toBe(total);
+    expect(first + second - shared).toBe(total);
+  });
+
   it("areas by keyword", async () => {
     expectNonEmptySearch(await searchAreas({ query: "Ecrins" }));
   });

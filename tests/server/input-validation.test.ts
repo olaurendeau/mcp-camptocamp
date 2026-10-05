@@ -332,9 +332,10 @@ describe("outing_stats inputs", () => {
     ["an unknown group_by", { group_by: "week" }, "must be one of: month, year, condition at group_by"],
     [
       "an unknown split_by",
-      { group_by: "month", split_by: "route" },
-      "must be one of: month, year, condition at split_by",
+      { group_by: "month", split_by: "week" },
+      "must be one of: month, year, condition, route at split_by",
     ],
+    ["group_by route", { group_by: "route" }, "must be one of: month, year, condition at group_by"],
     [
       "a filter of the wrong type",
       { group_by: "month", route_ids: 54513 },
@@ -377,6 +378,46 @@ describe("outing_stats inputs", () => {
     expect(result.isError).toBe(true);
     expect(resultText(result)).toMatch(/^Error: split_by must differ from group_by \(year\)/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // AC4.2 of #303.
+  it.each<[string, Record<string, unknown>, RegExp]>([
+    ["without route_ids", {}, /^Error: split_by "route" counts the routes of route_ids/],
+    ["with route_id alone", { route_id: 54513 }, /^Error: split_by "route" counts the routes of route_ids/],
+    ["with route_id and route_ids", { route_id: 54513, route_ids: [54684] }, /^Error: give route_id or route_ids/],
+  ])("refuses split_by route %s without calling Camptocamp", async (_label, args, message) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "outing_stats",
+      arguments: { ...args, group_by: "year", split_by: "route" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(message);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // AC4.2 of #303: the union in one `r=a,b,c` request, then one request per route.
+  it("sends the union, then one search per route, with split_by route", async () => {
+    const fetchMock = stubFetch(...Array.from({ length: 4 }, () => jsonResponse(EMPTY_SEARCH)));
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "outing_stats",
+      arguments: { route_ids: [54513, 54684, 1148298], group_by: "year", split_by: "route" },
+    });
+
+    expect(resultText(result)).toMatch(/^0 outing\(s\) counted \(all matches\), by start year and route\n/);
+    const sent = fetchMock.mock.calls.map(([url]) => Object.fromEntries(new URL(url as string).searchParams));
+    const page0 = { sort: "-date_end,-id", limit: "100", offset: "0", pl: "fr" };
+    expect(sent).toEqual([
+      { r: "54513,54684,1148298", ...page0 },
+      { r: "54513", ...page0 },
+      { r: "54684", ...page0 },
+      { r: "1148298", ...page0 },
+    ]);
   });
 
   it("sends the same request with split_by as without it", async () => {
