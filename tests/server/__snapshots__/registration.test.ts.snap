@@ -89,6 +89,11 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         ],
         "type": "string",
       },
+      "routes_offset": {
+        "description": "Number of associated routes to skip; they are listed 50 at a time (default 0)",
+        "minimum": 0,
+        "type": "integer",
+      },
     },
     "required": [
       "id",
@@ -381,6 +386,16 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "maxItems": 10,
         "minItems": 1,
         "type": "array",
+      },
+      "split_by": {
+        "description": "A second axis, another of month, year or condition: prints a Markdown table of counts instead, one row per group_by value and one column per split_by value, with a total row and column. route (with route_ids, not route_id): one column per route, then an 'all routes' column of distinct outings instead of the total column; an outing linked to several of these routes counts under each",
+        "enum": [
+          "month",
+          "year",
+          "condition",
+          "route",
+        ],
+        "type": "string",
       },
       "user_id": {
         "description": "Camptocamp user ID (the number in their profile URL): outings this user is listed on as a participant, not only those they wrote",

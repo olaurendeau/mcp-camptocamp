@@ -359,6 +359,12 @@ describe("outing_stats inputs", () => {
     ["a missing group_by", { route_id: 54513 }, "must be one of: month, year, condition at group_by"],
     ["an unknown group_by", { group_by: "week" }, "must be one of: month, year, condition at group_by"],
     [
+      "an unknown split_by",
+      { group_by: "month", split_by: "week" },
+      "must be one of: month, year, condition, route at split_by",
+    ],
+    ["group_by route", { group_by: "route" }, "must be one of: month, year, condition at group_by"],
+    [
       "a filter of the wrong type",
       { group_by: "month", route_ids: 54513 },
       "Expected array, received number at route_ids",
@@ -387,6 +393,83 @@ describe("outing_stats inputs", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  // AC3.4 of #303.
+  it("refuses split_by equal to group_by without calling Camptocamp", async () => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "outing_stats",
+      arguments: { route_id: 54513, group_by: "year", split_by: "year" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/^Error: split_by must differ from group_by \(year\)/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // AC4.2 of #303.
+  it.each<[string, Record<string, unknown>, RegExp]>([
+    ["without route_ids", {}, /^Error: split_by "route" counts the routes of route_ids/],
+    ["with route_id alone", { route_id: 54513 }, /^Error: split_by "route" counts the routes of route_ids/],
+    ["with route_id and route_ids", { route_id: 54513, route_ids: [54684] }, /^Error: give route_id or route_ids/],
+  ])("refuses split_by route %s without calling Camptocamp", async (_label, args, message) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "outing_stats",
+      arguments: { ...args, group_by: "year", split_by: "route" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(message);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // AC4.2 of #303: the union in one `r=a,b,c` request, then one request per route.
+  it("sends the union, then one search per route, with split_by route", async () => {
+    const fetchMock = stubFetch(...Array.from({ length: 4 }, () => jsonResponse(EMPTY_SEARCH)));
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "outing_stats",
+      arguments: { route_ids: [54513, 54684, 1148298], group_by: "year", split_by: "route" },
+    });
+
+    expect(resultText(result)).toMatch(/^0 outing\(s\) counted \(all matches\), by start year and route\n/);
+    const sent = fetchMock.mock.calls.map(([url]) => Object.fromEntries(new URL(url as string).searchParams));
+    const page0 = { sort: "-date_end,-id", limit: "100", offset: "0", pl: "fr" };
+    expect(sent).toEqual([
+      { r: "54513,54684,1148298", ...page0 },
+      { r: "54513", ...page0 },
+      { r: "54684", ...page0 },
+      { r: "1148298", ...page0 },
+    ]);
+  });
+
+  it("sends the same request with split_by as without it", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "outing_stats",
+      arguments: { route_id: 54513, group_by: "month", split_by: "condition" },
+    });
+
+    expect(resultText(result)).toMatch(/^0 outing\(s\) counted \(all matches\), by start month and condition\n/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.pathname).toBe("/outings");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      r: "54513",
+      sort: "-date_end,-id",
+      limit: "100",
+      offset: "0",
+      pl: "fr",
+    });
+  });
+
   it("reads pages of 100 sorted by end date then ID", async () => {
     const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
     const client = await connect();
@@ -402,6 +485,40 @@ describe("outing_stats inputs", () => {
       offset: "0",
       pl: "fr",
     });
+  });
+});
+
+// AC5.4 of #303: get_book takes an optional routes_offset, checked before any request and never sent to Camptocamp.
+describe("get_book routes_offset", () => {
+  it.each<[string, unknown, string]>([
+    ["a negative routes_offset", -1, "Number must be greater than or equal to 0 at routes_offset"],
+    ["a non-integer routes_offset", 1.5, "Expected integer, received float at routes_offset"],
+    ["a routes_offset that is not a number", "50", "Expected number, received string at routes_offset"],
+  ])("rejects %s naming the field without calling Camptocamp", async (_label, routes_offset, issue) => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_book", arguments: { id: ACCEPTED_ID, routes_offset } });
+
+    expect(validationIssues(result, "get_book")).toEqual([issue]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends the same single detail request with routes_offset as without it", async () => {
+    const book = {
+      ...BOOK,
+      associations: { routes: [{ document_id: 53834, locales: fr("Toit de Garrigou de droite") }] },
+    };
+    const fetchMock = stubFetch(jsonResponse(book));
+    const client = await connect();
+
+    const result = await client.callTool({ name: "get_book", arguments: { id: ACCEPTED_ID, routes_offset: 50 } });
+
+    expect(resultText(result)).toContain("\n## Associated routes (none from routes_offset 50; 1 in total)");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.pathname).toBe(`/books/${String(ACCEPTED_ID)}`);
+    expect(url.search).toBe("");
   });
 });
 

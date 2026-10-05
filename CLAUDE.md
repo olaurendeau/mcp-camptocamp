@@ -37,7 +37,7 @@ src/
     ├── routes.ts         # Tools: search_routes, get_route
     ├── waypoints.ts      # Tools: search_waypoints, get_waypoint
     ├── outings.ts        # Tools: search_user_outings, get_outing, search_outings, get_outings
-    ├── outing-stats.ts   # Tool: outing_stats; collectMatchingOutings reads every matching outing (at most 2,000, pages of 100)
+    ├── outing-stats.ts   # Tool: outing_stats; collectOutingSets reads every outing of one or more searches (at most 2,000, pages of 100)
     ├── areas.ts          # Tools: search_areas, get_area
     ├── books.ts          # Tools: search_books, get_book
     └── articles.ts       # Tools: search_articles, get_article
@@ -200,11 +200,11 @@ The user-facing reference of each tool (purpose, generated inputs, output format
 | `get_outing`          | Outing by ID (ratings, conditions, partial trip, weather, participants, accounts, routes; no author, see search) |
 | `search_outings`      | Outings by keyword, area, activity, reported rating/conditions/elevation, dates, period, routes, waypoint, user  |
 | `get_outings`         | Up to 10 outings by ID in `get_outing` format, 3 requests at a time, sections cut at 2000; an error is a block   |
-| `outing_stats`        | Count outings of `search_outings` filters by start month, start year or condition; at most 2,000 per call        |
+| `outing_stats`        | Count outings of `search_outings` filters by start month, year or condition, on two axes or per route; ≤ 2,000   |
 | `search_areas`        | Search areas (ranges, admin limits, countries) by name; the ID is reusable as `area_id`; paged with `offset`     |
 | `get_area`            | Get area detail by ID (type, summary, description)                                                               |
 | `search_books`        | Search books by title only (author/ISBN unreliable), by `book_type` and `activity`; paged with `offset`          |
-| `get_book`            | Get book detail by ID (author, editor, date, ISBN, pages, languages, routes, waypoints, articles)                |
+| `get_book`            | Book by ID (author, editor, date, ISBN, pages, languages, waypoints, articles; 50 routes/call, `routes_offset`)  |
 | `search_articles`     | Search articles by keyword and/or `category`, `article_type`, `activity` (any one suffices); paged with `offset` |
 | `get_article`         | Get article detail by ID (text, author, type, routes, waypoints, articles, outings, books)                       |
 
@@ -252,11 +252,11 @@ Locale: every search function takes `lang?` and sends `pl={lang}` (default `fr`)
   - `r=a,b` matches the outings of any of the routes, each outing once (`r=54513,1148298,54684` → 86, not 61 + 1 + 30). `search_outings` sends `route_ids` (1 to 10, deduplicated) this way and refuses it together with `route_id`.
   - `u` matches the outings the user is listed on (`associations.users`), not only those they wrote. `search_user_outings` sends only `u`, `limit` and `offset` (plus `sort` and `pl`).
   - `sort=-date_end` leaves outings ending the same day in arbitrary order, which may change between pages. `searchOutings({tiebreak_by_id: true})` sends `sort=-date_end,-id` instead, a strict order for exact paging; only `outing_stats` sets it, so `search_outings` and `search_user_outings` keep `-date_end`.
-  - `outing_stats` sends the filters of `search_outings` with `sort=-date_end,-id&limit=100`, reads offset 0, refuses a total above 2,000, then reads the other pages 3 at a time (`collectMatchingOutings`); it fails if a page reports another total or the pages do not hold `total` distinct outings. It counts from the list items' `date_start` and `condition_rating`, never from separate per-month queries.
+  - `outing_stats` sends the filters of `search_outings` with `sort=-date_end,-id&limit=100`, reads offset 0, refuses a total above 2,000, then reads the other pages 3 at a time (`collectMatchingOutings`); it fails if a page reports another total or the pages do not hold `total` distinct outings. It counts from the list items' `date_start` and `condition_rating`, never from separate per-month queries. `split_by` counts the same items on a second of these axes, in a Markdown table with a `total` row and column, with no extra request. `split_by: "route"` (with `route_ids` only) reads instead the union `r=a,b,c` first, then `r=a`, `r=b`, `r=c`, all through `collectOutingSets` (3 requests at a time across them); it refuses route totals adding up to more than 2,000 after their first pages, fails if the union's IDs differ from the routes' IDs together, and prints one column per route plus an `all routes` column counted from the union, with a line giving how many outings are linked to more than one route.
   - `period` matches the same days in every year. The API places each bound on a 365.2425-day year, so bounds are sent as `2020-{MM-DD}` (a leap year, so `02-29` is valid), except a `01-01` start as `1970-01-01` and a `01-01` end as `2021-01-01` (`2020-01-01` lands after `12-31` and matches nothing); outing dates are reduced the same way, so an outing dated on 1 January alone of a leap year matches no period starting on `01-01`, and `01-01 → 01-01` misses some years (#271); a range wrapping around the new year matches nothing, and boundary days can be missed.
 - `GET /areas?q={query}&limit=10&pl={lang}[&atyp={type}][&offset={n}]`
 - `GET /areas/{id}`
 - `GET /books?q={query}&limit=10&pl={lang}[&btyp={book_type}][&act={activity}][&offset={n}]`
-- `GET /books/{id}`
+- `GET /books/{id}`: `associations.routes` holds every linked route in ascending `document_id` (804 for book 853932). `get_book` prints 50 of them from `routes_offset` (default 0, applied in the handler) under `## Associated routes (<first>–<last> of <total>)`, then `More: get_book {id: <id>, routes_offset: <next>}` while routes remain (S5 of #303).
 - `GET /articles?limit=10&pl={lang}[&q={query}][&acat={category}][&atyp={article_type}][&act={activity}][&offset={n}]` (at least one of `q`, `acat`, `atyp` and `act`)
 - `GET /articles/{id}`

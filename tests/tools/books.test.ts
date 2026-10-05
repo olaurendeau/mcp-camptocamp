@@ -426,8 +426,42 @@ describe("book tool definitions", () => {
   });
 });
 
-// Trimmed from the live GET /books/373877?lang=fr response (2026-10-03): 1 of 28 routes kept, with only
-// document_id and each locale's lang, title and title_prefix; the 3 images removed.
+// The 28 routes of the live GET /books/373877?lang=fr response (2026-10-05), in API order: document_id and the fr
+// title_prefix and title, as [id, prefix, title]. Route 53781 keeps all 5 of its locales in the fixture below.
+const BOOK_373877_ROUTES: [number, string, string][] = [
+  [45882, "Mont Dolent", "Face S (voie normale), depuis le Val Ferret suisse"],
+  [53781, "Mont Blanc", "Arête des Bosses"],
+  [53783, "Petite Aiguille Verte", "Voie Normale"],
+  [53788, "Mont Blanc", "Traversée des 3 Monts"],
+  [53806, "Aiguille du Chardonnet", "Arête Forbes"],
+  [53886, "", "Dômes de Miage : Traversée classique"],
+  [53896, "Mont Blanc du Tacul", "Face N (Voie Normale)"],
+  [54092, "Mont Blanc", "Traversée Dômes de Miage → Aiguille de Bionnassay → Mont Blanc (voie royale)"],
+  [54115, "Aiguille d'Orny", "La Moquette (arête S)"],
+  [54122, "Tour Ronde", "Arête SE"],
+  [54159, "Triangle du Tacul", "Goulotte Chéré"],
+  [54229, "Aiguille du Peigne", "Éperon des Minettes "],
+  [54837, "Petite Aiguille Verte", "Couloir Chevalier"],
+  [54940, "Aiguille du Chardonnet", "Éperon Migot"],
+  [55094, "Aiguille d'Entrèves", "Traversée SW → NE"],
+  [55219, "Petit Mont Blanc", "Arête SE (voie normale)"],
+  [55233, "Aiguille de l'M", "Arête NNE"],
+  [55258, "Aiguille de Rochefort", "Arêtes de Rochefort en AR "],
+  [55840, "Aiguille des Glaciers", "Face NW et arête N"],
+  [55842, "Dôme des Glaciers", "Arête des Lanchettes"],
+  [56028, "Aiguilles Rouges de Triolet - 2ème Pointe centrale", "Éperon SW, voie des Chamois Volants"],
+  [56241, "Aiguille Sans Nom (Dorées)", "Arête S"],
+  [56285, "Mont Dolent", "Face S (voie normale), depuis le Val Ferret italien"],
+  [57739, "Dômes de Miage - Sommet E", "Arête Mettrier"],
+  [58022, "Lames Fontaine", "Voie Abert"],
+  [133097, "Aiguilles de Tré la Tête", "Par le Petit Mont Blanc et l'Arête ENE de l'Aiguille Orientale (voie normale)"],
+  [181855, "Mont Blanc", "Traversée Aiguille de Bionnassay → Mont Blanc depuis le refuge Durier"],
+  [232863, "Aiguille Croux", "Arête SW - via Cheney"],
+];
+
+// Trimmed from the live GET /books/373877?lang=fr response (2026-10-03): the 28 routes kept, with only document_id
+// and each locale's lang, title and title_prefix (route 53781 with all its locales, the others with their fr
+// locale, as listed above); the 3 images removed.
 const BOOK_373877 = {
   document_id: 373877,
   version: 2,
@@ -474,18 +508,20 @@ const BOOK_373877 = {
   protected: false,
   type: "b",
   associations: {
-    routes: [
-      {
-        document_id: 53781,
-        locales: [
-          { lang: "it", title: "Monte Bianco via Bossesgrat", title_prefix: "Monte Bianco" },
-          { lang: "fr", title: "Arête des Bosses", title_prefix: "Mont Blanc" },
-          { lang: "es", title: "Por la arista de las Bosses", title_prefix: "Mont Blanc" },
-          { lang: "de", title: "Bossesgrat", title_prefix: "Mont Blanc" },
-          { lang: "en", title: "Arête des Bosses", title_prefix: "Mont Blanc" },
-        ],
-      },
-    ],
+    routes: BOOK_373877_ROUTES.map(([document_id, title_prefix, title]) =>
+      document_id === 53781
+        ? {
+            document_id,
+            locales: [
+              { lang: "it", title: "Monte Bianco via Bossesgrat", title_prefix: "Monte Bianco" },
+              { lang: "fr", title: "Arête des Bosses", title_prefix: "Mont Blanc" },
+              { lang: "es", title: "Por la arista de las Bosses", title_prefix: "Mont Blanc" },
+              { lang: "de", title: "Bossesgrat", title_prefix: "Mont Blanc" },
+              { lang: "en", title: "Arête des Bosses", title_prefix: "Mont Blanc" },
+            ],
+          }
+        : { document_id, locales: [{ lang: "fr", title, title_prefix }] },
+    ),
     waypoints: [],
     articles: [],
     images: [],
@@ -905,7 +941,7 @@ describe("handleGetBook", () => {
     const result = await handleGetBook({ id: 1925012 });
 
     expect(result).toContain(
-      "## Associated routes\n- [46381] Traversée Brévent - Aiguillette des Houches\n- [46657] Aiguillette des Houches : Depuis le Bettey",
+      "## Associated routes (2 of 2)\n- [46381] Traversée Brévent - Aiguillette des Houches\n- [46657] Aiguillette des Houches : Depuis le Bettey",
     );
   });
 
@@ -929,7 +965,7 @@ describe("handleGetBook", () => {
     const result = await handleGetBook({ id: 1925012 });
 
     expect(result).toContain(
-      "## Associated routes\n" +
+      "## Associated routes (2 of 2)\n" +
         "- [46381] Traversée Brévent - Aiguillette des Houches | Ski rating (Toponeige): 2.3 | Ski exposure: E1 | Labande: S3 / PD\n" +
         "- [46657] Aiguillette des Houches : Depuis le Bettey | Ski rating (Toponeige): 2.3 | Ski exposure: E1 | " +
         "Labande: S3 / PD+ | Hiking rating: T2 | Snowshoe rating: R4",
@@ -1004,7 +1040,7 @@ describe("handleGetBook", () => {
 
     expect(result).toContain("\n## Description\n[begin user-written text: description]\n1<sup>re</sup> édition 1947,");
     expect(result).toContain("3<sup>e</sup> édition en 19736,");
-    expect(result).toContain("\n## Associated routes\n- [53781] Mont Blanc : Arête des Bosses\n");
+    expect(result).toContain("\n## Associated routes (1 of 1)\n- [53781] Mont Blanc : Arête des Bosses\n");
     expect(result).toContain(
       "\n## Associated waypoints\n- [37295] Dômes de Miage - Sommet W (summit) | 3670m\n- [37586] Aiguille des Glaciers (summit) | 3817m",
     );
@@ -1079,7 +1115,7 @@ describe("handleGetBook", () => {
     expect(result).not.toContain("Monte Bianco");
   });
 
-  it("lists all 143 routes", async () => {
+  it("lists the first 50 of 143 routes", async () => {
     const routes = BOOK_194348_ROUTE_IDS.map((document_id) => ({
       document_id,
       locales: [{ lang: "fr", title: `Route ${document_id}`, title_prefix: "Sommet" }],
@@ -1093,9 +1129,12 @@ describe("handleGetBook", () => {
     const result = await handleGetBook({ id: 194348 });
 
     const routeLines = result.split("\n").filter((line) => line.startsWith("- ["));
-    expect(routeLines).toHaveLength(143);
-    expect(routeLines[0]).toBe("- [45632] Sommet : Route 45632");
-    expect(routeLines[142]).toBe("- [1765387] Sommet : Route 1765387");
+    expect(result).toContain("\n## Associated routes (1–50 of 143)\n- [45632] Sommet : Route 45632\n");
+    expect(routeLines).toHaveLength(50);
+    expect(routeLines[49]).toBe("- [54374] Sommet : Route 54374");
+    expect(result.endsWith("- [54374] Sommet : Route 54374\nMore: get_book {id: 194348, routes_offset: 50}")).toBe(
+      true,
+    );
   });
 
   it("leaves out every association heading when lists are empty or missing", async () => {
@@ -1116,7 +1155,7 @@ describe("handleGetBook", () => {
     const result = await handleGetBook({ id: 14592 });
 
     expect(result).toContain(
-      "\n## Associated routes\n- [45528] Les Courtes : Face NE\n\n## Associated articles\n- [108642] 100 plus belles : la liste des titres et la cote en occasion",
+      "\n## Associated routes (1 of 1)\n- [45528] Les Courtes : Face NE\n\n## Associated articles\n- [108642] 100 plus belles : la liste des titres et la cote en occasion",
     );
     expect(result.endsWith("- [108642] 100 plus belles : la liste des titres et la cote en occasion")).toBe(true);
     expect(result).not.toContain("## Associated waypoints");
@@ -1129,7 +1168,7 @@ describe("handleGetBook", () => {
 
     expect(result).toContain(
       [
-        "## Associated routes",
+        "## Associated routes (1 of 1)",
         "- [46071] Aneto : Par le refuge de la Rencluse (Voie Normale)",
         "",
         "## Associated waypoints",
@@ -1173,6 +1212,203 @@ describe("handleGetBook", () => {
     mockGetBook.mockRejectedValueOnce(new Error("Camptocamp API error: 404 Not Found"));
 
     await expect(handleGetBook({ id: 999999999 })).rejects.toThrow("Camptocamp API error: 404 Not Found");
+  });
+});
+
+// The live GET /books/853932?lang=fr response (2026-10-05) lists 804 routes, in ascending document_id. These are its
+// real first 50 and last 4 route IDs.
+const BOOK_853932_FIRST_ROUTE_IDS = [
+  53834, 54347, 54348, 54349, 54350, 54351, 54770, 54771, 54772, 54773, 54884, 54885, 54913, 55441, 55463, 55466, 55467,
+  55471, 55482, 55483, 55484, 55485, 55508, 55543, 55550, 55573, 55574, 55575, 55678, 55683, 55688, 55689, 55692, 55694,
+  55699, 55701, 55712, 55714, 55718, 56205, 56211, 56329, 56335, 56344, 56447, 56511, 56514, 56559, 56560, 56562,
+];
+const BOOK_853932_LAST_ROUTE_IDS = [1777069, 1815213, 1865114, 1895427];
+
+// Derived from the live 853932 response: its 804 routes, each one route 53834 trimmed to document_id and its fr and es
+// locales' lang, title and title_prefix, with the real first 50 and last 4 IDs above and 750 placeholder IDs in
+// between (1000000 to 1000749, ascending like the API order); its first 2 of 30 waypoints, trimmed to document_id,
+// the fr locale's lang and title, waypoint_type and elevation. The book has no article: the 1 article of the 14592
+// fixture is added, so that every association list is printed.
+function book853932Routes(ids: number[]) {
+  return ids.map((document_id) => ({
+    document_id,
+    locales: [
+      {
+        lang: "fr",
+        title: "Toit de Garrigou de droite",
+        title_prefix: "Calanques - Saint Michel d'Eau Douce - Face S",
+      },
+      { lang: "es", title: "Toit de Garrigou", title_prefix: "Calanques - Saint Michel d'Eau Douce - Face S" },
+    ],
+  }));
+}
+const BOOK_853932_ROUTE_IDS = [
+  ...BOOK_853932_FIRST_ROUTE_IDS,
+  ...Array.from({ length: 750 }, (_, i) => 1_000_000 + i),
+  ...BOOK_853932_LAST_ROUTE_IDS,
+];
+const BOOK_853932 = {
+  document_id: 853932,
+  locales: [{ lang: "fr", title: "Les Calanques" }],
+  associations: {
+    routes: book853932Routes(BOOK_853932_ROUTE_IDS),
+    waypoints: [
+      {
+        document_id: 39782,
+        locales: [{ lang: "fr", title: "La Grande Candelle" }],
+        waypoint_type: "summit",
+        elevation: 465,
+      },
+      {
+        document_id: 40500,
+        locales: [{ lang: "fr", title: "Calanque de l'Eissadon" }],
+        waypoint_type: "climbing_outdoor",
+        elevation: 200,
+      },
+    ],
+    articles: BOOK_14592.associations.articles,
+  },
+};
+
+const routeLine = (id: number) =>
+  `- [${String(id)}] Calanques - Saint Michel d'Eau Douce - Face S : Toit de Garrigou de droite`;
+
+// The lines of the routes section, from its heading to the line before the next section.
+function routesSection(result: string): string[] {
+  const lines = result.split("\n");
+  const start = lines.findIndex((line) => line.startsWith("## Associated routes"));
+  const end = lines.indexOf("", start);
+  return lines.slice(start, end === -1 ? undefined : end);
+}
+
+// The sections after the routes, from the waypoints on.
+function afterRoutes(result: string): string {
+  return result.slice(result.indexOf("\n## Associated waypoints"));
+}
+
+// S5 of #303: the route list is printed 50 at a time, from routes_offset.
+describe("get_book route paging", () => {
+  it("prints all 28 routes of book 373877 under (28 of 28), with no More line (AC5.1)", async () => {
+    mockGetBook.mockResolvedValueOnce(BOOK_373877);
+
+    const result = await handleGetBook({ id: 373877 });
+
+    expect(routesSection(result)).toEqual([
+      "## Associated routes (28 of 28)",
+      "- [45882] Mont Dolent : Face S (voie normale), depuis le Val Ferret suisse",
+      // A title's trailing space ("Éperon des Minettes ") is not printed.
+      ...BOOK_373877_ROUTES.slice(1).map(([id, prefix, title]) =>
+        `- [${String(id)}] ${prefix ? `${prefix} : ` : ""}${title}`.trimEnd(),
+      ),
+    ]);
+    expect(result).not.toContain("More:");
+  });
+
+  it("prints the first 50 of book 853932's 804 routes in API order, then the More line (AC5.2)", async () => {
+    mockGetBook.mockResolvedValueOnce(BOOK_853932);
+
+    const result = await handleGetBook({ id: 853932 });
+
+    expect(routesSection(result)).toEqual([
+      "## Associated routes (1–50 of 804)",
+      ...BOOK_853932_FIRST_ROUTE_IDS.map(routeLine),
+      "More: get_book {id: 853932, routes_offset: 50}",
+    ]);
+    expect(routeLine(53834)).toBe(
+      "- [53834] Calanques - Saint Michel d'Eau Douce - Face S : Toit de Garrigou de droite",
+    );
+  });
+
+  it("prints the next page from routes_offset 50, and adds lang to the More line only when it was given", async () => {
+    mockGetBook.mockResolvedValueOnce(BOOK_853932).mockResolvedValueOnce(BOOK_853932);
+
+    const fromFifty = routesSection(await handleGetBook({ id: 853932, routes_offset: 50 }));
+    const inItalian = routesSection(await handleGetBook({ id: 853932, lang: "it" }));
+
+    expect(fromFifty[0]).toBe("## Associated routes (51–100 of 804)");
+    expect(fromFifty.slice(1, -1)).toEqual(BOOK_853932_ROUTE_IDS.slice(50, 100).map(routeLine));
+    expect(fromFifty.at(-1)).toBe("More: get_book {id: 853932, routes_offset: 100}");
+    expect(inItalian.at(-1)).toBe('More: get_book {id: 853932, routes_offset: 50, lang: "it"}');
+  });
+
+  it("prints the last 4 routes from routes_offset 800, with no More line (AC5.3)", async () => {
+    mockGetBook.mockResolvedValueOnce(BOOK_853932);
+
+    const result = await handleGetBook({ id: 853932, routes_offset: 800 });
+
+    expect(routesSection(result)).toEqual([
+      "## Associated routes (801–804 of 804)",
+      ...BOOK_853932_LAST_ROUTE_IDS.map(routeLine),
+    ]);
+    expect(result).not.toContain("More:");
+  });
+
+  it.each([804, 900])("prints the total and no route from routes_offset %i (AC5.3)", async (routes_offset) => {
+    mockGetBook.mockResolvedValueOnce(BOOK_853932);
+
+    const result = await handleGetBook({ id: 853932, routes_offset });
+
+    expect(routesSection(result)).toEqual([
+      `## Associated routes (none from routes_offset ${String(routes_offset)}; 804 in total)`,
+    ]);
+    expect(result).not.toContain("More:");
+  });
+
+  it("prints the same waypoints and articles at every routes_offset (AC5.4)", async () => {
+    const outputs: string[] = [];
+    for (const routes_offset of [undefined, 0, 50, 800, 900]) {
+      mockGetBook.mockResolvedValueOnce(BOOK_853932);
+      outputs.push(await handleGetBook({ id: 853932, routes_offset }));
+    }
+
+    const expected = [
+      "\n## Associated waypoints",
+      "- [39782] La Grande Candelle (summit) | 465m",
+      "- [40500] Calanque de l'Eissadon (climbing_outdoor) | 200m",
+      "",
+      "## Associated articles",
+      "- [108642] 100 plus belles : la liste des titres et la cote en occasion",
+    ].join("\n");
+    for (const output of outputs) expect(afterRoutes(output)).toBe(expected);
+  });
+
+  it("prints a short list from an offset as a range, and exactly 50 routes as (50 of 50)", async () => {
+    mockGetBook.mockResolvedValueOnce(BOOK_373877);
+    const fromTwenty = routesSection(await handleGetBook({ id: 373877, routes_offset: 20 }));
+    expect(fromTwenty[0]).toBe("## Associated routes (21–28 of 28)");
+    expect(fromTwenty).toHaveLength(9);
+
+    // Derived: the 853932 fixture cut to its first 50 routes, then to its first 51.
+    for (const [count, heading, more] of [
+      [50, "## Associated routes (50 of 50)", undefined],
+      [51, "## Associated routes (1–50 of 51)", "More: get_book {id: 853932, routes_offset: 50}"],
+    ] as const) {
+      const routes = book853932Routes(BOOK_853932_ROUTE_IDS.slice(0, count));
+      mockGetBook.mockResolvedValueOnce({ ...BOOK_853932, associations: { routes } });
+      const section = routesSection(await handleGetBook({ id: 853932 }));
+      expect(section[0]).toBe(heading);
+      expect(section.filter((line) => line.startsWith("- ["))).toHaveLength(50);
+      expect(section.at(-1)).toBe(more ?? routeLine(56562));
+    }
+  });
+
+  it("takes an optional non-negative integer routes_offset, with no default (AC5.4)", () => {
+    expect(getBookSchema.parse({ id: 853932 })).toEqual({ id: 853932 });
+    expect(getBookSchema.parse({ id: 853932, routes_offset: 0 })).toEqual({ id: 853932, routes_offset: 0 });
+    expect(getBookSchema.parse({ id: 853932, routes_offset: 800 })).toEqual({ id: 853932, routes_offset: 800 });
+    for (const routes_offset of [-1, 1.5, "50"]) {
+      expect(getBookSchema.safeParse({ id: 853932, routes_offset }).success).toBe(false);
+    }
+  });
+
+  it("describes the paging and points to get_route to check one route (AC5.4)", () => {
+    const description = bookToolDefinitions[1].description;
+    expect(description).toContain("routes_offset");
+    expect(description).toContain("'More: get_book {id: N, routes_offset: M}'");
+    expect(description).toContain(
+      "To check whether one route is in a book, call get_route: it lists the route's books.",
+    );
+    expect(description.length).toBeLessThanOrEqual(2048);
   });
 });
 
@@ -1228,7 +1464,7 @@ describe("get_book lang", () => {
       "",
     ]);
     expect(result).toContain("Con prefazione di Patrick Gabarrou.");
-    expect(result).toContain("\n## Associated routes\n- [53781] Monte Bianco : Monte Bianco via Bossesgrat");
+    expect(result).toContain("\n- [53781] Monte Bianco : Monte Bianco via Bossesgrat");
     expect(result).not.toContain("**Language**:");
   });
 
@@ -1242,7 +1478,7 @@ describe("get_book lang", () => {
       "**URL**: https://www.camptocamp.org/books/373877",
       "**Language**: fr (no de version; available: it, fr, en)",
     ]);
-    expect(result).toContain("\n## Associated routes\n- [53781] Mont Blanc : Bossesgrat");
+    expect(result).toContain("\n- [53781] Mont Blanc : Bossesgrat");
   });
 });
 

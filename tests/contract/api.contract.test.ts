@@ -258,6 +258,39 @@ describe("searches (AC8.2, AC8.3)", () => {
     expect(counts.reduce((sum, match) => sum + Number(match?.[2]), 0)).toBe(total);
   });
 
+  // S3 of #303: the month × condition table's total column gives the group_by month lines.
+  it("outing_stats counts the outings of route 54513 by start month and condition", async () => {
+    const byMonth = (await handleOutingStats({ route_id: 54513, group_by: "month" })).split("\n").slice(4);
+    const table = await handleOutingStats({ route_id: 54513, group_by: "month", split_by: "condition" });
+    const rows = table
+      .split("\n")
+      .filter((line) => /^\| \d{2} \|/.test(line))
+      .map((line) => line.slice(2, -2).split(" | "));
+
+    expect(table.split("\n")[0]).toMatch(/^\d+ outing\(s\) counted \(all matches\), by start month and condition$/);
+    expect(table).toContain("| start month | excellent | good | average | poor | awful |");
+    expect(rows.map((row) => `${row[0]}: ${row.at(-1) ?? ""}`)).toEqual(byMonth);
+  });
+
+  // S4 of #303: with two routes, the routes' totals less the shared outings give the union's total, the header's.
+  it("outing_stats counts the outings of routes 54513 and 54684 per route and in all", async () => {
+    const table = await handleOutingStats({ route_ids: [54513, 54684], group_by: "month", split_by: "route" });
+    const lines = table.split("\n");
+    const total = Number(/^(\d+) outing\(s\) counted \(all matches\), by start month and route$/.exec(lines[0])?.[1]);
+    const overlap = /^(\d+) outing\(s\) are linked to more than one of these routes and count under each\.$/;
+    const shared = Number(lines.map((line) => overlap.exec(line)).find(Boolean)?.[1]);
+    const rows = lines
+      .filter((line) => /^\| (\d{2}|total) \|/.test(line))
+      .map((line) => line.slice(2, -2).split(" | "));
+    const [, first, second, all] = (rows.at(-1) ?? []).map(Number);
+
+    expect(table).toContain("\n| start month | 54513 | 54684 | all routes |\n");
+    expect(rows.map((row) => row[0])).toEqual([...MONTHS, "total"]);
+    expect(total).toBeGreaterThan(0);
+    expect(all).toBe(total);
+    expect(first + second - shared).toBe(total);
+  });
+
   it("areas by keyword", async () => {
     expectNonEmptySearch(await searchAreas({ query: "Ecrins" }));
   });
@@ -647,6 +680,19 @@ describe("association lists keep every item (AC4.5)", () => {
     const { routes, waypoints } = book.associations ?? {};
     expectListsWellFormed({ routes, waypoints });
     expect(await handleGetBook({ id: 14643 })).not.toContain("not shown:");
+  });
+
+  // S5 of #303: get_book pages the route list in API order, which it relies on being ascending document_id.
+  it("book 853932: more than 50 routes, in ascending document_id order", async () => {
+    const routes = (await getBook(853932)).associations?.routes ?? [];
+    const ids = routes.map((route) => (isMalformed(route) ? Number.NaN : route.document_id));
+
+    expectListsWellFormed({ routes });
+    expect(ids.length).toBeGreaterThan(50);
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+    const page = await handleGetBook({ id: 853932 });
+    expect(page).toMatch(/\n## Associated routes \(1–50 of \d+\)\n/);
+    expect(page).toContain("\nMore: get_book {id: 853932, routes_offset: 50}");
   });
 
   it("article 469577: routes, waypoints, articles, books", async () => {

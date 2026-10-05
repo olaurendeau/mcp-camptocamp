@@ -26,7 +26,7 @@ Each page gives the tool's purpose, its inputs and the tools to call before or a
 | [`search_user_outings`](search_user_outings.md) | The outings a Camptocamp user is listed on, by user ID; an alias of `search_outings`.                            |
 | [`get_outing`](get_outing.md)                   | One outing by ID: reported ratings and conditions, weather, report text, participants and routes.                |
 | [`get_outings`](get_outings.md)                 | Up to 10 outings by ID in one call, in `get_outing` format, each section cut at 2,000 characters; from v1.4.0.   |
-| [`outing_stats`](outing_stats.md)               | Count the outings matching `search_outings` filters by start month, start year or condition; from v1.4.0.        |
+| [`outing_stats`](outing_stats.md)               | Count `search_outings` matches by month, year, condition (from v1.4.0), two of them or per route (not in v1.4.0) |
 
 ## Areas
 
@@ -40,7 +40,7 @@ Each page gives the tool's purpose, its inputs and the tools to call before or a
 | Tool                              | What it does                                                                                                 |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | [`search_books`](search_books.md) | Search guidebooks and other books by title, book type and activity; author and ISBN searches are unreliable. |
-| [`get_book`](get_book.md)         | One book by ID: author, editor, date, ISBN, languages, and the routes, waypoints and articles it covers.     |
+| [`get_book`](get_book.md)         | One book by ID: author, editor, date, ISBN, languages, waypoints, articles; 50 routes/call (not in v1.4.0).  |
 
 ## Articles
 
