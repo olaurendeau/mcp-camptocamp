@@ -30,7 +30,7 @@ const PROPERTY_KEYWORDS = new Set([
   "minItems",
   "maxItems",
 ]);
-const ITEMS_KEYWORDS = new Set(["type", "enum"]);
+const ITEMS_KEYWORDS = new Set(["type", "enum", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"]);
 const SCALAR_TYPES = new Set(["integer", "string", "boolean", "number"]);
 
 type Schema = Record<string, unknown>;
@@ -122,7 +122,8 @@ function typeOf(schema: Schema, where: string): string {
   return type;
 }
 
-function constraintsOf(schema: Schema, where: string): string[] {
+/** The numeric bounds of a value: "1 to 50", "≥ 0", "≤ 4810", "> 0", "< 1". */
+function boundsOf(schema: Schema, where: string): string[] {
   const constraints: string[] = [];
   const minimum = numberOf(schema, "minimum", where);
   const rawMaximum = numberOf(schema, "maximum", where);
@@ -139,7 +140,11 @@ function constraintsOf(schema: Schema, where: string): string[] {
   }
   if (exclusiveMinimum !== undefined) constraints.push(`> ${exclusiveMinimum}`);
   if (exclusiveMaximum !== undefined) constraints.push(`< ${exclusiveMaximum}`);
+  return constraints;
+}
 
+function constraintsOf(schema: Schema, where: string): string[] {
+  const constraints = boundsOf(schema, where);
   const minLength = numberOf(schema, "minLength", where);
   const maxLength = numberOf(schema, "maxLength", where);
   if (minLength !== undefined) constraints.push(`at least ${count(minLength, "character")}`);
@@ -151,6 +156,10 @@ function constraintsOf(schema: Schema, where: string): string[] {
   const maxItems = numberOf(schema, "maxItems", where);
   if (minItems !== undefined) constraints.push(`at least ${count(minItems, "item")}`);
   if (maxItems !== undefined) constraints.push(`at most ${count(maxItems, "item")}`);
+  if (schema.type === "array") {
+    const items = `${where}.items`;
+    constraints.push(...boundsOf(asSchema(schema.items, items), items).map((bound) => `each ${bound}`));
+  }
   return constraints;
 }
 
