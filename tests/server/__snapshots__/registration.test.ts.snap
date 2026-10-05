@@ -376,6 +376,15 @@ exports[`tool registration > keeps the input JSON Schema of every tool 1`] = `
         "minItems": 1,
         "type": "array",
       },
+      "split_by": {
+        "description": "A second axis, another of month, year or condition: prints a Markdown table of counts instead, one row per group_by value and one column per split_by value, with a total row and column",
+        "enum": [
+          "month",
+          "year",
+          "condition",
+        ],
+        "type": "string",
+      },
       "user_id": {
         "description": "Camptocamp user ID (the number in their profile URL): outings this user is listed on as a participant, not only those they wrote",
         "exclusiveMinimum": 0,

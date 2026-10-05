@@ -258,6 +258,20 @@ describe("searches (AC8.2, AC8.3)", () => {
     expect(counts.reduce((sum, match) => sum + Number(match?.[2]), 0)).toBe(total);
   });
 
+  // S3 of #303: the month × condition table's total column gives the group_by month lines.
+  it("outing_stats counts the outings of route 54513 by start month and condition", async () => {
+    const byMonth = (await handleOutingStats({ route_id: 54513, group_by: "month" })).split("\n").slice(4);
+    const table = await handleOutingStats({ route_id: 54513, group_by: "month", split_by: "condition" });
+    const rows = table
+      .split("\n")
+      .filter((line) => /^\| \d{2} \|/.test(line))
+      .map((line) => line.slice(2, -2).split(" | "));
+
+    expect(table.split("\n")[0]).toMatch(/^\d+ outing\(s\) counted \(all matches\), by start month and condition$/);
+    expect(table).toContain("| start month | excellent | good | average | poor | awful |");
+    expect(rows.map((row) => `${row[0]}: ${row.at(-1) ?? ""}`)).toEqual(byMonth);
+  });
+
   it("areas by keyword", async () => {
     expectNonEmptySearch(await searchAreas({ query: "Ecrins" }));
   });

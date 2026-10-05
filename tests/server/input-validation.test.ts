@@ -331,6 +331,11 @@ describe("outing_stats inputs", () => {
     ["a missing group_by", { route_id: 54513 }, "must be one of: month, year, condition at group_by"],
     ["an unknown group_by", { group_by: "week" }, "must be one of: month, year, condition at group_by"],
     [
+      "an unknown split_by",
+      { group_by: "month", split_by: "route" },
+      "must be one of: month, year, condition at split_by",
+    ],
+    [
       "a filter of the wrong type",
       { group_by: "month", route_ids: 54513 },
       "Expected array, received number at route_ids",
@@ -357,6 +362,43 @@ describe("outing_stats inputs", () => {
     expect(result.isError).toBe(true);
     expect(resultText(result)).toMatch(/^Error: give route_id or route_ids, not both/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // AC3.4 of #303.
+  it("refuses split_by equal to group_by without calling Camptocamp", async () => {
+    const fetchMock = stubFetch();
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "outing_stats",
+      arguments: { route_id: 54513, group_by: "year", split_by: "year" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/^Error: split_by must differ from group_by \(year\)/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends the same request with split_by as without it", async () => {
+    const fetchMock = stubFetch(jsonResponse(EMPTY_SEARCH));
+    const client = await connect();
+
+    const result = await client.callTool({
+      name: "outing_stats",
+      arguments: { route_id: 54513, group_by: "month", split_by: "condition" },
+    });
+
+    expect(resultText(result)).toMatch(/^0 outing\(s\) counted \(all matches\), by start month and condition\n/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.pathname).toBe("/outings");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      r: "54513",
+      sort: "-date_end,-id",
+      limit: "100",
+      offset: "0",
+      pl: "fr",
+    });
   });
 
   it("reads pages of 100 sorted by end date then ID", async () => {

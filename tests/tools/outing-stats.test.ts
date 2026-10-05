@@ -294,6 +294,18 @@ function sum(lines: string[]): number {
   return lines.reduce((total, line) => total + Number(line.slice(line.lastIndexOf(" ") + 1)), 0);
 }
 
+// The lines always add up to the total: a missing start date, an unknown condition code and an unreadable item
+// each get their own line, never a month or (not given). A start date not in YYYY-MM-DD form is unreadable too.
+const ODD = [
+  innominata([1, "2026-07-03", "2026-07-05", "good"]),
+  { ...innominata([2, "", "2026-07-05", "good"]), date_start: null },
+  { ...innominata([3, "", "2026-07-03", "superb"]), date_start: undefined },
+  innominata([4, "2026-7-3", "2026-07-03", "superb"]),
+  innominata([5, "2024-07-14", "2024-07-14", "dreadful"]),
+  { document_id: 6, locales: null },
+  { title: "no ID" },
+];
+
 const MONTH_ZEROS = Array.from({ length: 12 }, (_, i) => `${String(i + 1).padStart(2, "0")}: 0`);
 
 // AC4.6 on #255, word for word.
@@ -363,8 +375,8 @@ describe("handleOutingStats", () => {
 
     const result = await stats({ group_by: "year" });
 
-    const lines = ["0998: 1", "0999: 0", "1000: 0", "1001: 1"];
-    expect(result.split("\n\n")[1]).toBe(lines.join("\n"));
+    const lines = result.split("\n\n")[1].split("\n");
+    expect(lines).toEqual(["0998: 1", "0999: 0", "1000: 0", "1001: 1"]);
     expect(sum(lines)).toBe(2);
   });
 
@@ -377,8 +389,8 @@ describe("handleOutingStats", () => {
     expect(head).toBe(
       ["61 outing(s) counted (all matches), by condition", "Filters: route 54513", COUNTS_NOTE].join("\n"),
     );
-    const lines = ["excellent: 12", "good: 24", "average: 7", "poor: 0", "awful: 1", "(not given): 17"];
-    expect(body).toBe(lines.join("\n"));
+    const lines = body.split("\n");
+    expect(lines).toEqual(["excellent: 12", "good: 24", "average: 7", "poor: 0", "awful: 1", "(not given): 17"]);
     expect(sum(lines)).toBe(61);
   });
 
@@ -496,18 +508,6 @@ describe("handleOutingStats", () => {
     expect(mockSearchOutings).toHaveBeenCalledTimes(1);
   });
 
-  // The lines always add up to the total: a missing start date, an unknown condition code and an unreadable item
-  // each get their own line, never a month or (not given). A start date not in YYYY-MM-DD form is unreadable too.
-  const ODD = [
-    innominata([1, "2026-07-03", "2026-07-05", "good"]),
-    { ...innominata([2, "", "2026-07-05", "good"]), date_start: null },
-    { ...innominata([3, "", "2026-07-03", "superb"]), date_start: undefined },
-    innominata([4, "2026-7-3", "2026-07-03", "superb"]),
-    innominata([5, "2024-07-14", "2024-07-14", "dreadful"]),
-    { document_id: 6, locales: null },
-    { title: "no ID" },
-  ];
-
   it.each<[z.infer<typeof outingStatsSchema>["group_by"], string[]]>([
     [
       "month",
@@ -532,8 +532,158 @@ describe("handleOutingStats", () => {
 
     const result = await stats({ group_by });
 
-    expect(result.split("\n\n")[1].split("\n")).toEqual(lines);
-    expect(sum(lines)).toBe(7);
+    const printed = result.split("\n\n")[1].split("\n");
+    expect(printed).toEqual(lines);
+    expect(sum(printed)).toBe(7);
+  });
+});
+
+// The cells of the Markdown table rows of `output`, header first, without the separator row.
+function tableOf(output: string): string[][] {
+  return output
+    .split("\n")
+    .filter((line) => line.startsWith("| ") && !line.startsWith("| ---"))
+    .map((line) => line.slice(2, -2).split(" | "));
+}
+
+// The `<group>: N` lines printed below the table, after the blank line that ends it.
+const belowTable = (output: string) => output.split("\n\n").slice(2).join("\n").split("\n").filter(Boolean);
+
+// Checks that each row and each column of `rows` (a table with its total row and column) adds up to its total,
+// and returns the table's total.
+function expectTotalsAddUp(rows: string[][]): number {
+  const counts = rows.slice(1).map((row) => row.slice(1).map(Number));
+  for (const row of counts) expect(sum0(row.slice(0, -1))).toBe(row.at(-1));
+  const totals = counts.at(-1) ?? [];
+  totals.forEach((total, column) => {
+    expect(sum0(counts.slice(0, -1).map((row) => row[column]))).toBe(total);
+  });
+  return totals.at(-1) ?? 0;
+}
+
+const sum0 = (values: number[]) => values.reduce((total, value) => total + value, 0);
+
+const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+
+// S3 of #303: a second axis gives a table of counts, rows from group_by and columns from split_by.
+describe("handleOutingStats with split_by", () => {
+  // AC3.1, AC3.5 of #303.
+  it("counts the 61 Innominata outings by start month and condition in one request", async () => {
+    serveDocuments(INNOMINATA.map(innominata));
+
+    const result = await stats({ route_id: 54513, group_by: "month", split_by: "condition" });
+
+    expect(mockSearchOutings.mock.calls).toEqual([[{ route_id: 54513, limit: 100, offset: 0, tiebreak_by_id: true }]]);
+    const counted: Record<string, string> = {
+      "06": "3 | 6 | 2 | 0 | 0 | 2 | 13",
+      "07": "3 | 7 | 5 | 0 | 1 | 8 | 24",
+      "08": "5 | 9 | 0 | 0 | 0 | 4 | 18",
+      "09": "1 | 1 | 0 | 0 | 0 | 3 | 5",
+      "10": "0 | 1 | 0 | 0 | 0 | 0 | 1",
+    };
+    expect(result).toBe(
+      [
+        "61 outing(s) counted (all matches), by start month and condition",
+        "Filters: route 54513",
+        COUNTS_NOTE,
+        "",
+        "| start month | excellent | good | average | poor | awful | (not given) | total |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ...MONTHS.map((month) => `| ${month} | ${counted[month] ?? "0 | 0 | 0 | 0 | 0 | 0 | 0"} |`),
+        "| total | 12 | 24 | 7 | 0 | 1 | 17 | 61 |",
+      ].join("\n"),
+    );
+  });
+
+  // AC3.1 of #303: the row totals are the group_by counts, the column totals the split_by ones.
+  it("gives the one-axis counts as its totals", async () => {
+    serveDocuments(INNOMINATA.map(innominata));
+
+    const rows = tableOf(await stats({ route_id: 54513, group_by: "month", split_by: "condition" }));
+    const byMonth = (await stats({ route_id: 54513, group_by: "month" })).split("\n\n")[1].split("\n");
+    const byCondition = (await stats({ route_id: 54513, group_by: "condition" })).split("\n\n")[1].split("\n");
+
+    expect(rows.slice(1, -1).map((row) => `${row[0]}: ${row.at(-1) ?? ""}`)).toEqual(byMonth);
+    expect(rows[0].slice(1, -1).map((condition, i) => `${condition}: ${rows.at(-1)?.[i + 1] ?? ""}`)).toEqual(
+      byCondition,
+    );
+  });
+
+  // AC3.2 of #303.
+  it("counts them by start year and month, every year from 1994 to 2026", async () => {
+    serveDocuments(INNOMINATA.map(innominata));
+
+    const result = await stats({ route_id: 54513, group_by: "year", split_by: "month" });
+
+    const rows = tableOf(result);
+    expect(result.split("\n")[0]).toBe("61 outing(s) counted (all matches), by start year and start month");
+    expect(rows[0]).toEqual(["start year", ...MONTHS, "total"]);
+    expect(rows.slice(1, -1).map((row) => row[0])).toEqual(Array.from({ length: 33 }, (_, i) => String(1994 + i)));
+    expect(rows.find((row) => row[0] === "2016")).toEqual(["2016", ..."000000521100".split(""), "9"]);
+    expect(rows.find((row) => row[0] === "2019")).toEqual(["2019", ...Array<string>(13).fill("0")]);
+    expect(rows.at(-1)).toEqual(["total", "0", "0", "0", "0", "0", "13", "24", "18", "5", "1", "0", "0", "61"]);
+    expect(expectTotalsAddUp(rows)).toBe(61);
+  });
+
+  // AC3.3 of #303: counts only, adding up to N with the outings counted below the table.
+  it.each<[z.infer<typeof outingStatsSchema>["group_by"], z.infer<typeof outingStatsSchema>["group_by"], string[]]>([
+    ["month", "condition", ["start month", "excellent", "good", "average", "poor", "awful", "dreadful", "(not given)"]],
+    ["condition", "year", ["condition", "2024", "2025", "2026"]],
+    ["year", "month", ["start year", ...MONTHS]],
+  ])("counts odd outings by %s and %s below the table, adding up to N", async (group_by, split_by, header) => {
+    serveDocuments(ODD);
+
+    const result = await stats({ group_by, split_by });
+
+    const rows = tableOf(result);
+    expect(rows[0]).toEqual([...header, "total"]);
+    expect(result).not.toContain("%");
+    expect(result).toContain(COUNTS_NOTE);
+    const below = belowTable(result);
+    expect(below).toEqual(["(no start date): 2", "(unexpected format): 3"]);
+    expect(expectTotalsAddUp(rows) + sum(below)).toBe(7);
+  });
+
+  it("escapes a | in a condition code Camptocamp sends, as a column and as a row", async () => {
+    serveDocuments([innominata([1, "2026-07-03", "2026-07-05", "so|so"])]);
+
+    const columns = tableOf(await stats({ group_by: "month", split_by: "condition" }))[0];
+    const rows = tableOf(await stats({ group_by: "condition", split_by: "month" }));
+
+    expect(columns).toContain("so\\|so");
+    expect(rows.map((row) => row[0])).toContain("so\\|so");
+  });
+
+  it("prints no table when no outing has a start year, and the period Note", async () => {
+    serveDocuments([{ ...innominata([1, "", "2026-07-05", "good"]), date_start: null }]);
+
+    const result = await stats({ period_start: "06-01", period_end: "06-30", group_by: "year", split_by: "month" });
+
+    expect(result).toBe(
+      [
+        "1 outing(s) counted (all matches), by start year and start month",
+        "Filters: period 06-01 → 06-30 of every year",
+        PERIOD_NOTE,
+        COUNTS_NOTE,
+        "",
+        "(no start date): 1",
+      ].join("\n"),
+    );
+  });
+
+  // AC3.4 of #303: refused before any request, and before the filters are checked.
+  it.each(["month", "year", "condition"] as const)("refuses split_by %s equal to group_by", async (axis) => {
+    await expect(stats({ route_id: 54513, route_ids: [1148298], group_by: axis, split_by: axis })).rejects.toThrow(
+      `split_by must differ from group_by (${axis}): give another of month, year or condition, or leave it out`,
+    );
+    expect(mockSearchOutings).not.toHaveBeenCalled();
+  });
+
+  it("checks the filters before any request", async () => {
+    await expect(
+      stats({ period_start: "12-20", period_end: "01-10", group_by: "month", split_by: "year" }),
+    ).rejects.toThrow("period cannot wrap around the new year");
+    expect(mockSearchOutings).not.toHaveBeenCalled();
   });
 });
 
@@ -554,6 +704,20 @@ describe("outing_stats definition", () => {
     expect(outingStatsSchema.safeParse({ group_by: "week" }).error?.issues[0].message).toBe(
       "must be one of: month, year, condition",
     );
+  });
+
+  it("takes an optional split_by, one of month, year or condition", () => {
+    expect(outingStatsSchema.parse({ group_by: "month" })).toEqual({ group_by: "month" });
+    expect(outingStatsSchema.parse({ group_by: "month", split_by: "year" }).split_by).toBe("year");
+    expect(outingStatsSchema.safeParse({ group_by: "month", split_by: "route" }).error?.issues[0].message).toBe(
+      "must be one of: month, year, condition",
+    );
+  });
+
+  it("describes split_by and the table, counts only", () => {
+    expect(definition.description).toContain("split_by");
+    expect(definition.description).toContain("total row and column");
+    expect(definition.description).not.toContain("%");
   });
 
   it("keeps its description under 2,048 characters, with lang, the limit and how to read the reports", () => {
