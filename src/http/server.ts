@@ -56,8 +56,9 @@ interface LogFields {
 type Outcome = "ok" | "tool_error" | "rejected";
 
 const RPC_NAME = /^[A-Za-z_/]{1,64}$/;
+const LOGGED_PATHS = new Set([MCP_PATH, `${MCP_PATH}/`, HEALTH_PATH]);
 const MAX_LOGGED_LENGTH = 200;
-// Logged when the client went away before any response was sent (nginx's "client closed request").
+// Logged when the response never fully reached the client (nginx's "client closed request").
 const CLIENT_CLOSED = 499;
 
 type HeaderMap = Record<string, string>;
@@ -180,16 +181,26 @@ export function startHttpServer(config: HttpConfig, log: (line: string) => void)
     const entry: InFlight = { res, abort: new AbortController(), log: fields };
     const context = { upstreamRequests: 0, signal: entry.abort.signal };
     inFlight.add(entry);
-    // Counted from arrival, so the body may still be on its way: the 504 closes the connection.
+    // Counted from arrival, so the body may still be on its way: the 504 closes the connection. A response already
+    // started but still unsent at 90 s is one its client stopped reading: cut it, freeing its connection and buffer.
     const timer = setTimeout(() => {
-      refuse(res, 504, JSON_TYPE, rpcError(-32000, `Request timed out after ${REQUEST_TIMEOUT_MS / 1000} s`));
+      if (res.headersSent) res.destroy();
+      else refuse(res, 504, JSON_TYPE, rpcError(-32000, `Request timed out after ${REQUEST_TIMEOUT_MS / 1000} s`));
       entry.abort.abort();
     }, REQUEST_TIMEOUT_MS);
+    // Whether the whole response reached the socket. Neither res.writableFinished nor a plain 'finish' tells: once
+    // the socket is destroyed, Node still emits 'finish' from the failed write. A socket already destroyed when
+    // 'finish' comes means the response was cut; this listener runs before Node's own, which destroys the socket
+    // of a delivered Connection: close response.
+    let delivered = false;
+    res.prependOnceListener("finish", () => {
+      delivered = res.socket?.destroyed === false;
+    });
     res.once("close", () => {
       clearTimeout(timer);
       inFlight.delete(entry);
-      if (!res.writableFinished) entry.abort.abort(); // closed before its response: the client went away
-      log(logLine(req, res, fields, context.upstreamRequests, performance.now() - started));
+      if (!delivered) entry.abort.abort(); // closed before its whole response: the client went away, or was cut
+      log(logLine(req, res, delivered, fields, context.upstreamRequests, performance.now() - started));
     });
     runInRequestContext(context, () => handle(req, entry)).catch(() => {
       respond(res, 500, JSON_TYPE, rpcError(-32603, "Internal error"));
@@ -283,16 +294,20 @@ function responseOutcome(text: string): Outcome {
 function logLine(
   req: IncomingMessage,
   res: ServerResponse,
+  delivered: boolean,
   fields: LogFields,
   upstreamRequests: number,
   durationMs: number,
 ): string {
-  const status = res.headersSent ? res.statusCode : CLIENT_CLOSED;
+  // A response cut before its last byte left (the client went away, the 90 s timeout or shutdown cut the
+  // connection) was never delivered, whatever status its headers carried.
+  const status = delivered ? res.statusCode : CLIENT_CLOSED;
   const { rejected } = fields;
+  const path = pathOf(req);
   return JSON.stringify({
     time: new Date().toISOString(),
     method: req.method,
-    path: pathOf(req).slice(0, MAX_LOGGED_LENGTH),
+    path: LOGGED_PATHS.has(path) ? path : "other", // any other path could hold a secret (e.g. /mcp/<token>)
     status,
     duration_ms: Math.round(durationMs),
     rpc: fields.rpc,

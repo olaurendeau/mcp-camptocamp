@@ -1,5 +1,5 @@
 import { request as httpRequest, type IncomingHttpHeaders, type OutgoingHttpHeaders } from "node:http";
-import { createServer as createNetServer } from "node:net";
+import { connect as netConnect, createServer as createNetServer, type Socket } from "node:net";
 import { afterEach, vi } from "vitest";
 import type { HttpConfig } from "../../src/http/config.js";
 import { startHttpServer, type RunningHttpServer } from "../../src/http/server.js";
@@ -120,6 +120,28 @@ export function rpc(method: string, params: Record<string, unknown> = {}, id: nu
 
 export function callTool(name: string, args: Record<string, unknown>, id: number | string = 1) {
   return rpc("tools/call", { name, arguments: args }, id);
+}
+
+/** 99 tools/list in one batch: about 5 MB of response, more than the socket buffers hold for a client not reading. */
+export const TOOLS_LIST_BATCH = Array.from({ length: 99 }, (_, i) => rpc("tools/list", {}, i));
+
+/**
+ * A raw connection that POSTs `messages` as one batch to /mcp, and stops reading at the first chunk of the
+ * response, when `stalled` resolves: the rest of a large response stays stuck on the server's side.
+ */
+export async function slowReader(
+  port: number,
+  messages: unknown[],
+): Promise<{ socket: Socket; stalled: Promise<unknown> }> {
+  const body = JSON.stringify(messages);
+  const socket = netConnect(port, "127.0.0.1");
+  await new Promise((resolve) => socket.once("connect", resolve));
+  const head = Object.entries({ ...MCP_HEADERS, "content-length": String(Buffer.byteLength(body)) })
+    .map(([name, value]) => `${name}: ${value}\r\n`)
+    .join("");
+  socket.write(`POST /mcp HTTP/1.1\r\n${head}\r\n${body}`);
+  const stalled = new Promise((resolve) => socket.once("data", resolve)).then(() => socket.pause());
+  return { socket, stalled };
 }
 
 export const INITIALIZE = rpc("initialize", {

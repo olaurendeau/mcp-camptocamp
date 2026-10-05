@@ -181,14 +181,20 @@ describe("HTTP request log", () => {
     });
     const refused = await postMcp(server.port, rpc("tools/list"), { authorization: `Bearer ${wrongToken}` });
     expect(refused.status).toBe(401);
+    // A client configured with the token in the URL path, as some put it in a secret URL.
+    const inPath = await send(server.port, { method: "GET", path: `/mcp/${token}`, headers: { host: HOST } });
+    expect(inPath.status).toBe(404);
 
-    const lines = await requestLines(server.logs, 2);
+    const lines = await requestLines(server.logs, 3);
     expect(lines[0]).toMatchObject({ path: "/mcp", status: 200, rpc: "tools/call", tool: "search_routes", token: 1 });
     expect(lines[1]).toMatchObject({ status: 401, result: "rejected", token: null });
+    expect(lines[2]).toMatchObject({ path: "other", status: 404, result: "rejected" });
     const responseText = (JSON.parse(call.body) as { result: { content: { text: string }[] } }).result.content[0].text;
     expect(responseText).toContain("Voie Gamma");
 
-    const written = [...server.logs.slice(1), ...stderr].join("\n");
+    // Every line, the startup one included; only the bind host is left out, being this test's client address too.
+    const startup = { ...(JSON.parse(server.logs[0]) as Record<string, unknown>), host: undefined };
+    const written = [JSON.stringify(startup), ...server.logs.slice(1), ...stderr].join("\n");
     const forbidden = ["SECRET-ARG-7f3a", "SECRET-QS", responseText, "Voie Gamma", "127.0.0.1"];
     for (const secret of [token, wrongToken]) {
       for (let start = 0; start + 8 <= secret.length; start++) forbidden.push(secret.slice(start, start + 8));

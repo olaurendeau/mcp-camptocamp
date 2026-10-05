@@ -1,7 +1,16 @@
 import { connect as netConnect, type Socket } from "node:net";
 import { describe, it, expect, vi } from "vitest";
 import { jsonResponse } from "../server/helpers.js";
-import { HOST, MCP_HEADERS, areaDocument, callTool, postMcp, rpc, send, startTestServer } from "./helpers.js";
+import {
+  HOST,
+  TOOLS_LIST_BATCH,
+  areaDocument,
+  callTool,
+  postMcp,
+  send,
+  slowReader,
+  startTestServer,
+} from "./helpers.js";
 
 /** A fetch stub whose calls stay pending until the test resolves them, in call order. */
 function pendingFetch() {
@@ -34,23 +43,6 @@ async function startedHealthCheck(port: number): Promise<{ socket: Socket; finis
       return response;
     },
   };
-}
-
-/**
- * A raw connection that POSTs a batch of 99 tools/list and one get_area: about 5 MB of response, written only once
- * the get_area fetch answers. `stalled` resolves at its first chunk, after which the client stops reading.
- */
-async function slowReader(port: number): Promise<{ socket: Socket; stalled: Promise<unknown> }> {
-  const messages = Array.from({ length: 99 }, (_, i) => rpc("tools/list", {}, i));
-  const body = JSON.stringify([...messages, callTool("get_area", { id: 14403 }, 99)]);
-  const socket = netConnect(port, "127.0.0.1");
-  await new Promise((resolve) => socket.once("connect", resolve));
-  const head = Object.entries({ ...MCP_HEADERS, "content-length": String(Buffer.byteLength(body)) })
-    .map(([name, value]) => `${name}: ${value}\r\n`)
-    .join("");
-  socket.write(`POST /mcp HTTP/1.1\r\n${head}\r\n${body}`);
-  const stalled = new Promise((resolve) => socket.once("data", resolve)).then(() => socket.pause());
-  return { socket, stalled };
 }
 
 describe("HTTP server shutdown", () => {
@@ -118,7 +110,8 @@ describe("HTTP server shutdown", () => {
   it("stops waiting 1 s after the deadline for a client that stopped reading, once the 503s are sent", async () => {
     const { fetchMock, resolvers } = pendingFetch();
     const server = await startTestServer();
-    const reader = await slowReader(server.port);
+    // About 5 MB of response, written only once the get_area fetch answers.
+    const reader = await slowReader(server.port, [...TOOLS_LIST_BATCH, callTool("get_area", { id: 14403 }, 99)]);
     await vi.waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
@@ -142,5 +135,8 @@ describe("HTTP server shutdown", () => {
     await shutdown; // resolves once the server has closed, so the slow reader's connection too
     expect(stopped).toBe(true);
     reader.socket.destroy();
+    // The batch's response was cut mid-write: logged as never delivered, not as a 200.
+    const batch = server.logs.map((line) => JSON.parse(line) as Record<string, unknown>).find((l) => l.rpc === "batch");
+    expect(batch).toMatchObject({ status: 499, result: "rejected" });
   });
 });

@@ -3,13 +3,15 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { jsonResponse } from "../server/helpers.js";
-import { callTool, postMcp, rpc, startTestServer } from "./helpers.js";
+import { configureUpstream, queuedUpstreamRequests } from "../../src/api/upstream.js";
+import { TOOLS_LIST_BATCH, callTool, postMcp, rpc, slowReader, startTestServer } from "./helpers.js";
 
 // AC5.2 on #277: a POST that has not finished within 90 s gets a 504, and whatever it was waiting for is cancelled.
 
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  configureUpstream(undefined);
 });
 
 const TIMED_OUT = { jsonrpc: "2.0", error: { code: -32000, message: "Request timed out after 90 s" }, id: null };
@@ -84,6 +86,42 @@ describe("HTTP request timeout (AC5.2)", () => {
     } finally {
       process.off("unhandledRejection", unhandled);
     }
+  });
+
+  it("drops the request's queued Camptocamp requests at the 504", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { fetched } = neverSettlingFetch();
+    configureUpstream({ concurrency: 1 });
+    const server = await startTestServer();
+    // The first ID holds the only slot for good; the others queue in pairs (3 at a time), each pair busy after
+    // 20 s, so the 10th ID is still queued at 90 s.
+    const ids = Array.from({ length: 10 }, (_, i) => 1924131 + i);
+    const call = postMcp(server.port, callTool("get_outings", { ids }));
+    await fetched;
+
+    await vi.advanceTimersByTimeAsync(89_999);
+    expect(queuedUpstreamRequests()).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await call).status).toBe(504);
+    expect(queuedUpstreamRequests()).toBe(0);
+  });
+
+  it("cuts a response its client stopped reading at 90 s, and logs it as 499", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const server = await startTestServer();
+    const reader = await slowReader(server.port, TOOLS_LIST_BATCH);
+    await reader.stalled;
+
+    await vi.advanceTimersByTimeAsync(89_999);
+    expect(server.logs).toHaveLength(1); // the response is still being written
+    await vi.advanceTimersByTimeAsync(1);
+    await vi.waitFor(() => {
+      expect(server.logs).toHaveLength(2);
+    });
+    expect(requestLines(server.logs)).toEqual([
+      expect.objectContaining({ status: 499, rpc: "batch", result: "rejected" }),
+    ]);
+    reader.socket.destroy();
   });
 
   it("never hands the SDK a request that timed out while its MCP server was connecting", async () => {
