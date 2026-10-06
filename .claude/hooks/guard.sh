@@ -167,8 +167,10 @@ method='(-X|--method|--request)[[:space:]=]*'
 # gh api writes with -f/-F/--input, curl with -d/--data/--json/--form: both default to POST.
 write='[[:space:]](-f|-F|--field|--raw-field|--input|-d|--data[-a-z]*|--json|--form)([[:space:]=@"'\'']|$)|'"$method"'(POST|PUT|PATCH)'
 get="${method}GET"
-# A git/ path followed by a variable or a substitution (git/$REF, git/"${REF}", git/$(…)) may be a ref too.
+# The endpoint or URL of a gh api or curl call targets a ref under git/refs, or under a git/ path followed by
+# a variable or a substitution (git/$REF, git/"${REF}", git/$(…)). Any other command needs the literal git/refs.
 api_refs='git/(["'\'']*\$|refs([/"'\''[:space:]?$]|$))'
+literal_refs='git/refs([/"'\''[:space:]?]|$)'
 # Any ref path other than a branch one: PATCH/DELETE on it may move a tag, whatever else the command names.
 other_ref='git/(?:["\x27]*\$|refs(?!/heads/)(?:[/"\x27\s?\$]|$))'
 api_releases='/releases([/"'\''[:space:]?]|$)'
@@ -194,15 +196,66 @@ sends() {
   n=$(perl -ne 'print $1 if /<<HEREDOC_(\d+)/' <<<"$1")
   [ -n "$n" ] && printf '%s\n%s\n' "$1" "${heredocs[$n]:-}"
 }
+# The endpoint and URLs of a gh api or curl call: its words that are neither options nor option values.
+# Fails for any other command. An unknown option's value counts as a URL, which can only refuse more.
+api_targets() {
+  perl -e '
+    my @w = $ARGV[0] =~ /((?:"(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27|\\.|[^\s"\x27\\])+)/g;
+    my $bare = sub { (my $x = $_[0]) =~ s/["\x27\\]//g; $x =~ s{.*/}{}; $x };
+    my ($i, $kind);
+    for my $j (0 .. $#w) {
+      if ($bare->($w[$j]) eq "curl") { ($i, $kind) = ($j + 1, "curl"); last }
+      if ($bare->($w[$j]) eq "gh" && ($w[$j + 1] // "") eq "api") { ($i, $kind) = ($j + 2, "gh"); last }
+    }
+    exit 1 unless $kind;
+    my ($long, $short) = $kind eq "gh"
+      ? (qr/^--(?:field|raw-field|header|input|method|jq|template|hostname|preview|cache)$/, "fFHXqtp")
+      : (qr/^--(?:data[-a-z]*|json|form[-a-z]*|header|request|output|user|user-agent|referer|cookie|cookie-jar|write-out|upload-file|config|max-time|connect-timeout|retry|proxy|cacert|cert|key|range|oauth2-bearer|variable)$/,
+         "dFHXouAebcwTKmxrEzyYCQtP");
+    my @out;
+    while ($i <= $#w) {
+      (my $b = $w[$i]) =~ s/["\x27]//g;
+      if ($b eq "--url") { push @out, $w[$i + 1] // ""; $i += 2 }
+      elsif ($b =~ /^--url=(.*)/) { push @out, $1; $i++ }
+      elsif ($b =~ /^--/) { $i += $b =~ $long ? 2 : 1 }
+      elsif ($b =~ /^-(.+)/) {
+        # In a cluster (-sSX, -XDELETE), the first option taking a value takes the rest, or else the next word.
+        my ($flags, $step) = ($1, 1);
+        for my $k (0 .. length($flags) - 1) {
+          next if index($short, substr($flags, $k, 1)) < 0;
+          $step = 2 if $k == length($flags) - 1;
+          last;
+        }
+        $i += $step;
+      }
+      else { push @out, $w[$i]; $i++ }
+    }
+    print join(" ", @out), "\n";
+  ' -- "$1"
+}
+# Variables the line sets to a git/ path (U=…/git/refs/tags/v1, P=git/refs/…, B=…/git): a call reading one targets that path.
+ref_vars=$(perl -ne 'print "$1\n" while /(?:^|[\s;&|(])([A-Za-z_]\w*)=["\x27]?(?:[^\s;&|]*[\/.])?git(?:\/|["\x27]?(?:[\s;&|)]|$))/gm' <<<"$joined")
+uses_ref_var() { local v; for v in $ref_vars; do has "$1" "\\\$\\{?${v}([^A-Za-z0-9_]|$)" && return 0; done; return 1; }
 # The API call names only branches, in a field, the path or its own stdin body; another command's refs/heads/ does not count.
 # A tag named anywhere in the line voids the exemption: a variable set by another command may carry it.
 branch_only() { local text; text=$(sends "$1") || return 1; has "$text" 'refs/heads/' && ! has "$joined" 'refs/tags'; }
-# PATCH/DELETE on a …/git/refs/heads/… path targets that branch, whatever the body says, if it names no other ref path.
+# PATCH/DELETE on a …/git/refs/heads/… path ($2: the call's endpoint and URLs) targets that branch, whatever the body says,
+# if it names no other ref path.
 branch_path() {
-  has "$1" "${method}(PATCH|PUT|DELETE)" && has "$1" 'git/refs/heads/' && ! has_p "$1" "$other_ref" && ! has "$joined" 'refs/tags'
+  has "$1" "${method}(PATCH|PUT|DELETE)" && has "$2" 'git/refs/heads/' && ! has_p "$2" "$other_ref" && ! uses_ref_var "$2" \
+    && ! has "$joined" 'refs/tags'
 }
 # PATCH/DELETE target their path, so only a branch path exempts them, not a refs/heads/ field; a creation (POST) names its ref.
-branch_target() { if has "$1" "${method}(PATCH|PUT|DELETE)"; then branch_path "$1"; else branch_only "$1"; fi; }
+branch_target() { if has "$1" "${method}(PATCH|PUT|DELETE)"; then branch_path "$1" "$2"; else branch_only "$1"; fi; }
+# The command writes a ref through the API: a gh api or curl call by its endpoint or URLs, any other by its literal git/refs.
+writes_ref() {
+  if targets=$(api_targets "$1"); then
+    { has "$targets" "$api_refs" || uses_ref_var "$targets"; } && api_writes "$1"
+  else
+    targets=$1
+    has "$1" "$literal_refs" && api_writes "$1"
+  fi
+}
 
 while IFS= read -r seg; do
   case $seg in $'\x01'*) continue ;; esac
@@ -212,8 +265,8 @@ while IFS= read -r seg; do
 
   # Any ref write through the API that is not known to target a branch (refs/heads/) may be a tag.
   # Creating one (POST …/git/refs) is a tag push; updating or deleting one (PATCH/DELETE …/git/refs/…) moves it.
-  if has "$seg" "$api_refs" && api_writes "$seg" && ! branch_target "$seg"; then
-    if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$seg" 'git/refs/tags/'; then
+  if writes_ref "$seg" && ! branch_target "$seg" "$targets"; then
+    if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$targets" 'git/refs/tags/'; then
       deny "No agent moves or deletes a tag through the API (PATCH/DELETE on …/git/refs/… or a git/\$REF path, other than refs/heads/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
     fi
     if [ "$agent" != "coordinator" ]; then

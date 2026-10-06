@@ -419,6 +419,14 @@ HIDDEN_MOVE_FORMS=(
   "$(lines "gh api graphql -f query='mutation {" '  deleteRef' '  (input: {refId: "REF_1"}) { clientMutationId }' "}'")"
   "$(lines "gh api graphql -f query='mutation { updateRefs" "(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }' -f b=refs/heads/x")"
   "curl https://api.github.com/graphql -d '{\"query\":\"mutation { updateRef\\n(input: {refId: \\\"REF_1\\\", oid: \\\"abc\\\", force: true}) { clientMutationId } }\"}'"
+  # The variable may hold the git/ part itself, set anywhere in the line
+  'U=https://api.github.com/repos/o/r/git/refs/tags/v1.0.4; curl -X DELETE "$U"'
+  "U=https://api.github.com/repos/o/r/git/refs/tags/v1.0.4; curl -X PATCH \"\$U\" -d '{\"sha\":\"abc\",\"force\":true}'"
+  'P=git/refs/tags/v1.0.4; gh api -X DELETE "repos/o/r/$P"'
+  'B=repos/o/r/git; gh api -X DELETE "$B/refs/tags/v1.0.4"'
+  "$(lines 'export U="$API/repos/o/r/git/refs/tags/v1.0.4"' 'curl -sS -H "Authorization: Bearer $T" -X DELETE "${U}"')"
+  'curl -XDELETE "https://api.github.com/repos/o/r/git/$REF"'
+  'curl -X DELETE --url "https://api.github.com/repos/o/r/git/$REF"'
 )
 HIDDEN_CREATE_FORMS=(
   "P=refs; gh api \"repos/o/r/git/\$P\" -f ref=refs/tags/v1.0.5 -f sha=abc"
@@ -428,6 +436,7 @@ HIDDEN_CREATE_FORMS=(
   "$(lines 'gh api graphql --input - <<EOF' "$GQL_SPLIT_CREATE_BODY" 'EOF')"
   "$(lines "Q='mutation { createRef" "(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { clientMutationId } }'" 'gh api graphql -f query="$Q"')"
   "curl https://api.github.com/graphql -d '{\"query\":\"mutation { createRef\\n(input: {repositoryId: \\\"R_1\\\", name: \\\"refs/tags/v1.0.5\\\", oid: \\\"abc\\\"}) { clientMutationId } }\"}'"
+  'B=repos/o/r/git; gh api "$B/refs" -f ref=refs/tags/v1.0.5 -f sha=abc'
 )
 for role in coordinator developer pr-reviewer ""; do
   for cmd in "${HIDDEN_MOVE_FORMS[@]}"; do
@@ -441,6 +450,14 @@ for role in coordinator developer pr-reviewer ""; do
   check allow "$role" 'gh api repos/o/r/git/commits -f tree=abc -f parents[]=def'
   check allow "$role" 'gh api -X PATCH "repos/o/r/pulls/$PR" -f title=x'
   check allow "$role" "$(lines 'gh api graphql -F query=@- <<EOF' 'mutation {' '  createRef' '  (input: {repositoryId: "R_1", name: "refs/heads/feat/x", oid: "abc"}) { clientMutationId }' '}' 'EOF')"
+  # Only a gh api or curl call's endpoint or URL is a ref path: not other commands, not the call's fields
+  check allow "$role" 'rm -f "$WT/.git/$LOCK"'
+  check allow "$role" 'cp -f hook.sh .git/$HOOK'
+  check allow "$role" 'ls -d .git/$X'
+  check allow "$role" 'G=/repo/.git; rm -f "$G/index.lock"'
+  check allow "$role" 'gh api -X PATCH "repos/o/r/pulls/$PR" -f body="see git/$REF"'
+  check allow "$role" 'gh api -X PATCH repos/o/r/git/refs/heads/feat/x -f sha=abc -f note=git/$REF'
+  check allow "$role" 'curl -X DELETE -o "$OUT/.git/$LOG" https://api.github.com/repos/o/r/git/refs/heads/feat/x'
 done
 for cmd in "${HIDDEN_CREATE_FORMS[@]}"; do
   check allow coordinator "$cmd"
