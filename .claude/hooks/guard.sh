@@ -190,12 +190,12 @@ has_i() { grep -Eiq -- "$2" <<<"$1"; }
 has_p() { perl -e 'exit($ARGV[0] =~ /$ARGV[1]/ ? 0 : 1)' -- "$1" "$2"; }
 # An API call that changes something: POST/PUT/PATCH/DELETE, and not forced back to GET.
 api_writes() { { has "$1" "$write" || has "$1" "${method}DELETE"; } && ! forced_get "$1"; }
-# A GET method cancels the write only when the call gives no other method. A quoted text with a space is a field
-# value, not an option (-f note='curl -sSX GET'), so it is blanked first; a quoted single word ("GET") is kept.
+# A GET method cancels the write only when it is the method the call sends. For a gh api or curl call, that is read
+# from its words (api_call); for any other command, a GET option word counts unless another method is also given.
 forced_get() {
-  local opts
-  opts=$(perl -pe 's{"((?:[^"\\]|\\.)*)"|\x27([^\x27]*)\x27}{my $s = $1 // $2; $s =~ /\s/ ? "\x27\x27" : $s}ge' <<<"$1")
-  has "$opts" "$get" && ! has "$1" "${method}(POST|PUT|PATCH|DELETE)"
+  local call
+  if call=$(api_call "$1"); then [ "${call%%$'\n'*}" = GET ]; return; fi
+  has "$1" "$get" && ! has "$1" "${method}(POST|PUT|PATCH|DELETE)"
 }
 # What an API call sends: its own command, with its own heredoc body or here-string when it reads stdin.
 # Fails when stdin comes from a file or a pipe, which the hook cannot read.
@@ -205,43 +205,54 @@ sends() {
   n=$(perl -ne 'print $1 if /<<HEREDOC_(\d+)/' <<<"$1")
   [ -n "$n" ] && printf '%s\n%s\n' "$1" "${heredocs[$n]:-}"
 }
-# The endpoint and URLs of a gh api or curl call: its words that are neither options nor option values.
-# Fails for any other command. An unknown option's value counts as a URL, which can only refuse more.
-api_targets() {
+# A gh api or curl call read from its words: first line, the method it sends (the last -X/--method/--request value,
+# empty if none); second line, its endpoint and URLs (the words that are neither options nor option values).
+# A word another option takes as its value is neither. Fails for any other command.
+# An unknown option's value counts as a URL, which can only refuse more.
+api_call() {
   perl -e '
-    my @w = $ARGV[0] =~ /((?:"(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27|\\.|[^\s"\x27\\])+)/g;
-    my $bare = sub { (my $x = $_[0]) =~ s/["\x27\\]//g; $x =~ s{.*/}{}; $x };
+    # Words as the shell splits them: double quotes, ANSI-C quotes (a backslash escapes their closing quote),
+    # single quotes, backslash escapes.
+    my @w = $ARGV[0] =~ /((?:"(?:[^"\\]|\\.)*"|\$\x27(?:[^\x27\\]|\\.)*\x27|\x27[^\x27]*\x27|\\.|[^\s"\x27\\])+)/g;
+    my $bare = sub { (my $x = $_[0] // "") =~ s/["\x27\\]//g; $x };
     my ($i, $kind);
     for my $j (0 .. $#w) {
-      if ($bare->($w[$j]) eq "curl") { ($i, $kind) = ($j + 1, "curl"); last }
-      if ($bare->($w[$j]) eq "gh" && ($w[$j + 1] // "") eq "api") { ($i, $kind) = ($j + 2, "gh"); last }
+      (my $c = $bare->($w[$j])) =~ s{.*/}{};
+      if ($c eq "curl") { ($i, $kind) = ($j + 1, "curl"); last }
+      if ($c eq "gh" && ($w[$j + 1] // "") eq "api") { ($i, $kind) = ($j + 2, "gh"); last }
     }
     exit 1 unless $kind;
     my ($long, $short) = $kind eq "gh"
-      ? (qr/^--(?:field|raw-field|header|input|method|jq|template|hostname|preview|cache)$/, "fFHXqtp")
-      : (qr/^--(?:data[-a-z]*|json|form(?:-string)?|header|request|output|user|user-agent|referer|cookie|cookie-jar|write-out|upload-file|config|max-time|connect-timeout|retry|proxy|cacert|cert|key|range|oauth2-bearer|variable)$/,
+      ? (qr/^--(?:field|raw-field|header|input|jq|template|hostname|preview|cache)$/, "fFHXqtp")
+      : (qr/^--(?:data[-a-z]*|json|form(?:-string)?|header|output|user|user-agent|referer|cookie|cookie-jar|write-out|upload-file|config|max-time|connect-timeout|retry|proxy|cacert|cert|key|range|oauth2-bearer|variable)$/,
          "dFHXouAebcwTKmxrEzyYCQtP");
-    my @out;
+    my ($m, @out) = ("");
     while ($i <= $#w) {
       (my $b = $w[$i]) =~ s/["\x27]//g;
       if ($b eq "--url") { push @out, $w[$i + 1] // ""; $i += 2 }
-      elsif ($b =~ /^--url=(.*)/) { push @out, $1; $i++ }
+      elsif ($b =~ /^--url=(.*)/s) { push @out, $1; $i++ }
+      elsif ($b =~ /^--(?:method|request)=(.*)/s) { $m = $bare->($1); $i++ }
+      elsif ($b =~ /^--(?:method|request)$/) { $m = $bare->($w[$i + 1]); $i += 2 }
       elsif ($b =~ /^--/) { $i += $b =~ $long ? 2 : 1 }
-      elsif ($b =~ /^-(.+)/) {
+      elsif ($b =~ /^-(.+)/s) {
         # In a cluster (-sSX, -XDELETE), the first option taking a value takes the rest, or else the next word.
         my ($flags, $step) = ($1, 1);
         for my $k (0 .. length($flags) - 1) {
-          next if index($short, substr($flags, $k, 1)) < 0;
-          $step = 2 if $k == length($flags) - 1;
+          my $c = substr($flags, $k, 1);
+          next if index($short, $c) < 0;
+          if ($k == length($flags) - 1) { $step = 2; $m = $bare->($w[$i + 1]) if $c eq "X" }
+          elsif ($c eq "X") { $m = $bare->(substr($flags, $k + 1)) }
           last;
         }
         $i += $step;
       }
       else { push @out, $w[$i]; $i++ }
     }
-    print join(" ", @out), "\n";
+    print "$m\n", join(" ", @out), "\n";
   ' -- "$1"
 }
+# The endpoint and URLs of a gh api or curl call. Fails for any other command.
+api_targets() { local call; call=$(api_call "$1") || return 1; printf '%s\n' "${call#*$'\n'}"; }
 # Variables the line sets to a git/ path (U=…/git/refs/tags/v1, P=git/refs/…, B=…/git): a call reading one targets that path.
 ref_vars=$(perl -ne 'print "$1\n" while /(?:^|[\s;&|(])([A-Za-z_]\w*)=["\x27]?(?:[^\s;&|]*[\/.])?git(?:\/|["\x27]?(?:[\s;&|)]|$))/gm' <<<"$joined")
 uses_ref_var() { local v; for v in $ref_vars; do has "$1" "\\\$\\{?${v}([^A-Za-z0-9_]|$)" && return 0; done; return 1; }
