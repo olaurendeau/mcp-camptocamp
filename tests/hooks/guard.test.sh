@@ -427,6 +427,16 @@ HIDDEN_MOVE_FORMS=(
   "$(lines 'export U="$API/repos/o/r/git/refs/tags/v1.0.4"' 'curl -sS -H "Authorization: Bearer $T" -X DELETE "${U}"')"
   'curl -XDELETE "https://api.github.com/repos/o/r/git/$REF"'
   'curl -X DELETE --url "https://api.github.com/repos/o/r/git/$REF"'
+  # --form-escape takes no value: the URL after it is still the target
+  'curl -X DELETE --form-escape https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
+  # -X inside an option group, its value separate or attached
+  'curl -sSX DELETE https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
+  'curl -sSXDELETE https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
+  'gh api -iX DELETE repos/o/r/git/refs/tags/v1.0.4'
+  'gh api -iXPATCH repos/o/r/git/refs/tags/v1.0.4 -f sha=abc -F force=true'
+  # GitHub takes POST for PATCH: a POST on a tag path set by a variable of the line moves it, like the literal path
+  'P=git/refs/tags/v1.0.4; gh api "repos/o/r/$P" -f sha=abc -F force=true'
+  "U=https://api.github.com/repos/o/r/git/refs/tags/v1.0.4; curl -d '{\"sha\":\"abc\",\"force\":true}' \"\$U\""
 )
 HIDDEN_CREATE_FORMS=(
   "P=refs; gh api \"repos/o/r/git/\$P\" -f ref=refs/tags/v1.0.5 -f sha=abc"
@@ -437,6 +447,8 @@ HIDDEN_CREATE_FORMS=(
   "$(lines "Q='mutation { createRef" "(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { clientMutationId } }'" 'gh api graphql -f query="$Q"')"
   "curl https://api.github.com/graphql -d '{\"query\":\"mutation { createRef\\n(input: {repositoryId: \\\"R_1\\\", name: \\\"refs/tags/v1.0.5\\\", oid: \\\"abc\\\"}) { clientMutationId } }\"}'"
   'B=repos/o/r/git; gh api "$B/refs" -f ref=refs/tags/v1.0.5 -f sha=abc'
+  'P=git/refs; gh api "repos/o/r/$P" -f ref=refs/tags/v1.0.5 -f sha=abc'
+  "curl --form-escape https://api.github.com/repos/o/r/git/refs -d '{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}'"
 )
 for role in coordinator developer pr-reviewer ""; do
   for cmd in "${HIDDEN_MOVE_FORMS[@]}"; do
@@ -458,6 +470,8 @@ for role in coordinator developer pr-reviewer ""; do
   check allow "$role" 'gh api -X PATCH "repos/o/r/pulls/$PR" -f body="see git/$REF"'
   check allow "$role" 'gh api -X PATCH repos/o/r/git/refs/heads/feat/x -f sha=abc -f note=git/$REF'
   check allow "$role" 'curl -X DELETE -o "$OUT/.git/$LOG" https://api.github.com/repos/o/r/git/refs/heads/feat/x'
+  check allow "$role" 'curl -sSX DELETE https://api.github.com/repos/o/r/git/refs/heads/feat/x'
+  check allow "$role" 'gh api -iX GET repos/o/r/git/refs/tags -f per_page=100'
 done
 for cmd in "${HIDDEN_CREATE_FORMS[@]}"; do
   check allow coordinator "$cmd"

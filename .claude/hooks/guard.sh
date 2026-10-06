@@ -163,7 +163,8 @@ push_force='[[:space:]](-[a-zA-Z]*[fd][a-zA-Z]*|--force|--force-with-lease|--for
 push_force+='|[[:space:]]["'\'']?[:+]'
 merge='gh[[:space:]].*pr[[:space:]]+merge'
 api_merge='pulls/[^[:space:]/]+/merge'
-method='(-X|--method|--request)[[:space:]=]*'
+# -X may end an option group (curl -sSX DELETE, gh api -iX DELETE), its value separate or attached (-sSXDELETE).
+method='(-[a-zA-Z]*X|--method|--request)[[:space:]=]*'
 # gh api writes with -f/-F/--input, curl with -d/--data/--json/--form: both default to POST.
 write='[[:space:]](-f|-F|--field|--raw-field|--input|-d|--data[-a-z]*|--json|--form)([[:space:]=@"'\'']|$)|'"$method"'(POST|PUT|PATCH)'
 get="${method}GET"
@@ -210,7 +211,7 @@ api_targets() {
     exit 1 unless $kind;
     my ($long, $short) = $kind eq "gh"
       ? (qr/^--(?:field|raw-field|header|input|method|jq|template|hostname|preview|cache)$/, "fFHXqtp")
-      : (qr/^--(?:data[-a-z]*|json|form[-a-z]*|header|request|output|user|user-agent|referer|cookie|cookie-jar|write-out|upload-file|config|max-time|connect-timeout|retry|proxy|cacert|cert|key|range|oauth2-bearer|variable)$/,
+      : (qr/^--(?:data[-a-z]*|json|form(?:-string)?|header|request|output|user|user-agent|referer|cookie|cookie-jar|write-out|upload-file|config|max-time|connect-timeout|retry|proxy|cacert|cert|key|range|oauth2-bearer|variable)$/,
          "dFHXouAebcwTKmxrEzyYCQtP");
     my @out;
     while ($i <= $#w) {
@@ -236,6 +237,21 @@ api_targets() {
 # Variables the line sets to a git/ path (U=…/git/refs/tags/v1, P=git/refs/…, B=…/git): a call reading one targets that path.
 ref_vars=$(perl -ne 'print "$1\n" while /(?:^|[\s;&|(])([A-Za-z_]\w*)=["\x27]?(?:[^\s;&|]*[\/.])?git(?:\/|["\x27]?(?:[\s;&|)]|$))/gm' <<<"$joined")
 uses_ref_var() { local v; for v in $ref_vars; do has "$1" "\\\$\\{?${v}([^A-Za-z0-9_]|$)" && return 0; done; return 1; }
+# The call's endpoint and URLs with each such variable replaced by every value the line gives it, so the rules
+# for a literal path (git/refs/tags/…) apply to it too.
+expand_ref_vars() {
+  [ -n "$ref_vars" ] || { printf '%s\n' "$1"; return 0; }
+  perl -e '
+    my ($t, $line, @names) = @ARGV;
+    for my $n (@names) {
+      my @vals;
+      while ($line =~ /(?:^|[\s;&|(])\Q$n\E=("[^"]*"|\x27[^\x27]*\x27|[^\s;&|)]*)/gm) { push @vals, $1 =~ s/^["\x27]|["\x27]$//gr }
+      my $all = join " ", @vals;
+      $t =~ s/\$\{?\Q$n\E(?![A-Za-z0-9_])\}?/$all/g;
+    }
+    print "$t\n";
+  ' -- "$1" "$joined" $ref_vars
+}
 # The API call names only branches, in a field, the path or its own stdin body; another command's refs/heads/ does not count.
 # A tag named anywhere in the line voids the exemption: a variable set by another command may carry it.
 branch_only() { local text; text=$(sends "$1") || return 1; has "$text" 'refs/heads/' && ! has "$joined" 'refs/tags'; }
@@ -266,7 +282,7 @@ while IFS= read -r seg; do
   # Any ref write through the API that is not known to target a branch (refs/heads/) may be a tag.
   # Creating one (POST …/git/refs) is a tag push; updating or deleting one (PATCH/DELETE …/git/refs/…) moves it.
   if writes_ref "$seg" && ! branch_target "$seg" "$targets"; then
-    if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$targets" 'git/refs/tags/'; then
+    if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$(expand_ref_vars "$targets")" 'git/refs/tags/'; then
       deny "No agent moves or deletes a tag through the API (PATCH/DELETE on …/git/refs/… or a git/\$REF path, other than refs/heads/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
     fi
     if [ "$agent" != "coordinator" ]; then
