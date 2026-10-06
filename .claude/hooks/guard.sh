@@ -167,7 +167,8 @@ api_merge='pulls/[^[:space:]/]+/merge'
 method='(-[a-zA-Z]*X|--method|--request)[[:space:]=]*'
 # gh api writes with -f/-F/--input, curl with -d/--data/--json/--form: both default to POST.
 write='[[:space:]](-f|-F|--field|--raw-field|--input|-d|--data[-a-z]*|--json|--form)([[:space:]=@"'\'']|$)|'"$method"'(POST|PUT|PATCH)'
-get="${method}GET"
+# A GET method option: a word of its own (not text inside a field), as -X GET, -XGET, -iX GET, --method=GET.
+get='(^|[[:space:]])(-[a-zA-Z]*X|--method|--request)([[:space:]]+|=)?GET([[:space:]]|$)'
 # The endpoint or URL of a gh api or curl call targets a ref under git/refs, or under a git/ path followed by
 # a variable or a substitution (git/$REF, git/"${REF}", git/$(…)). Any other command needs the literal git/refs.
 api_refs='git/(["'\'']*\$|refs([/"'\''[:space:]?$]|$))'
@@ -188,7 +189,14 @@ has() { grep -Eq -- "$2" <<<"$1"; }
 has_i() { grep -Eiq -- "$2" <<<"$1"; }
 has_p() { perl -e 'exit($ARGV[0] =~ /$ARGV[1]/ ? 0 : 1)' -- "$1" "$2"; }
 # An API call that changes something: POST/PUT/PATCH/DELETE, and not forced back to GET.
-api_writes() { { has "$1" "$write" || has "$1" "${method}DELETE"; } && ! has "$1" "$get"; }
+api_writes() { { has "$1" "$write" || has "$1" "${method}DELETE"; } && ! forced_get "$1"; }
+# A GET method cancels the write only when the call gives no other method. A quoted text with a space is a field
+# value, not an option (-f note='curl -sSX GET'), so it is blanked first; a quoted single word ("GET") is kept.
+forced_get() {
+  local opts
+  opts=$(perl -pe 's{"((?:[^"\\]|\\.)*)"|\x27([^\x27]*)\x27}{my $s = $1 // $2; $s =~ /\s/ ? "\x27\x27" : $s}ge' <<<"$1")
+  has "$opts" "$get" && ! has "$1" "${method}(POST|PUT|PATCH|DELETE)"
+}
 # What an API call sends: its own command, with its own heredoc body or here-string when it reads stdin.
 # Fails when stdin comes from a file or a pipe, which the hook cannot read.
 sends() {
@@ -237,20 +245,21 @@ api_targets() {
 # Variables the line sets to a git/ path (U=…/git/refs/tags/v1, P=git/refs/…, B=…/git): a call reading one targets that path.
 ref_vars=$(perl -ne 'print "$1\n" while /(?:^|[\s;&|(])([A-Za-z_]\w*)=["\x27]?(?:[^\s;&|]*[\/.])?git(?:\/|["\x27]?(?:[\s;&|)]|$))/gm' <<<"$joined")
 uses_ref_var() { local v; for v in $ref_vars; do has "$1" "\\\$\\{?${v}([^A-Za-z0-9_]|$)" && return 0; done; return 1; }
-# The call's endpoint and URLs with each such variable replaced by every value the line gives it, so the rules
-# for a literal path (git/refs/tags/…) apply to it too.
-expand_ref_vars() {
-  [ -n "$ref_vars" ] || { printf '%s\n' "$1"; return 0; }
+# The call's endpoint and URLs with every variable the line assigns replaced by every value the line gives it,
+# so the rules for a literal path (git/refs/tags/…) apply to it too, whichever part the variable holds.
+expand_vars() {
   perl -e '
-    my ($t, $line, @names) = @ARGV;
-    for my $n (@names) {
-      my @vals;
-      while ($line =~ /(?:^|[\s;&|(])\Q$n\E=("[^"]*"|\x27[^\x27]*\x27|[^\s;&|)]*)/gm) { push @vals, $1 =~ s/^["\x27]|["\x27]$//gr }
-      my $all = join " ", @vals;
+    my ($t, $line) = @ARGV;
+    my %vals;
+    while ($line =~ /(?:^|[\s;&|(])([A-Za-z_]\w*)=("[^"]*"|\x27[^\x27]*\x27|[^\s;&|)]*)/gm) {
+      push @{$vals{$1}}, $2 =~ s/^["\x27]|["\x27]$//gr;
+    }
+    for my $n (keys %vals) {
+      my $all = join " ", @{$vals{$n}};
       $t =~ s/\$\{?\Q$n\E(?![A-Za-z0-9_])\}?/$all/g;
     }
     print "$t\n";
-  ' -- "$1" "$joined" $ref_vars
+  ' -- "$1" "$joined"
 }
 # The API call names only branches, in a field, the path or its own stdin body; another command's refs/heads/ does not count.
 # A tag named anywhere in the line voids the exemption: a variable set by another command may carry it.
@@ -282,7 +291,7 @@ while IFS= read -r seg; do
   # Any ref write through the API that is not known to target a branch (refs/heads/) may be a tag.
   # Creating one (POST …/git/refs) is a tag push; updating or deleting one (PATCH/DELETE …/git/refs/…) moves it.
   if writes_ref "$seg" && ! branch_target "$seg" "$targets"; then
-    if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$(expand_ref_vars "$targets")" 'git/refs/tags/'; then
+    if has "$seg" "${method}(PATCH|PUT|DELETE)" || has "$(expand_vars "$targets")" 'git/refs/tags/'; then
       deny "No agent moves or deletes a tag through the API (PATCH/DELETE on …/git/refs/… or a git/\$REF path, other than refs/heads/…): re-pointing a tag republishes an already-released version through publish.yml. Report it to the human."
     fi
     if [ "$agent" != "coordinator" ]; then
@@ -327,7 +336,7 @@ while IFS= read -r seg; do
   fi
 
   # The context may sit in a quoted field or a JSON heredoc (--input -), so look for it in the raw command.
-  if [ "$agent" != "pr-reviewer" ] && has "$seg" 'statuses' && has "$seg" "$write" && ! has "$seg" "$get" \
+  if [ "$agent" != "pr-reviewer" ] && has "$seg" 'statuses' && has "$seg" "$write" && ! forced_get "$seg" \
     && grep -q 'agent-review' <<<"$raw"; then
     deny "Only the pr-reviewer agent sets the agent-review status. Ask the coordinator to dispatch pr-reviewer."
   fi

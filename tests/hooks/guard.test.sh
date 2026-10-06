@@ -53,6 +53,12 @@ check deny  developer   "$(lines 'gh api repos/o/r/statuses/abc --input - <<EOF'
 check allow coordinator "$READ"
 check allow coordinator 'gh api repos/o/r/commits/abc/statuses -F per_page=100 --method GET --jq ".[] | select(.context==\"agent-review\")"'
 check allow developer   'gh api repos/o/r/statuses/abc -f state=success -f context=ci'
+# A GET quoted in a field does not turn the status write into a read
+GET_IN_FIELD="gh api repos/o/r/statuses/abc -f state=success -f context=agent-review -f description='curl -sSX GET ok'"
+check allow pr-reviewer "$GET_IN_FIELD"
+for role in coordinator developer ""; do
+  check deny "$role" "$GET_IN_FIELD"
+done
 
 # Version bump: developer only, and only without the git tag npm version creates by default
 check allow developer   'npm version 1.1.0 --no-git-tag-version'
@@ -437,6 +443,14 @@ HIDDEN_MOVE_FORMS=(
   # GitHub takes POST for PATCH: a POST on a tag path set by a variable of the line moves it, like the literal path
   'P=git/refs/tags/v1.0.4; gh api "repos/o/r/$P" -f sha=abc -F force=true'
   "U=https://api.github.com/repos/o/r/git/refs/tags/v1.0.4; curl -d '{\"sha\":\"abc\",\"force\":true}' \"\$U\""
+  # Same when only the tag part is in the variable
+  'REF=refs/tags/v1.0.4; gh api "repos/o/r/git/$REF" -f sha=abc -F force=true'
+  'TAG=tags/v1.0.4; gh api "repos/o/r/git/refs/$TAG" -f sha=abc -F force=true'
+  'P=git/refs; TAG=tags/v1.0.4; gh api "repos/o/r/$P/$TAG" -f sha=abc -F force=true'
+  "REF=refs/tags/v1.0.4; curl -d '{\"sha\":\"abc\",\"force\":true}' \"https://api.github.com/repos/o/r/git/\$REF\""
+  # A GET elsewhere in the call does not cancel the method it gives
+  'curl -sSXGET -X DELETE https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
+  "gh api -X DELETE repos/o/r/git/refs/tags/v1.0.4 -f note='curl -sSX GET'"
 )
 HIDDEN_CREATE_FORMS=(
   "P=refs; gh api \"repos/o/r/git/\$P\" -f ref=refs/tags/v1.0.5 -f sha=abc"
@@ -449,6 +463,7 @@ HIDDEN_CREATE_FORMS=(
   'B=repos/o/r/git; gh api "$B/refs" -f ref=refs/tags/v1.0.5 -f sha=abc'
   'P=git/refs; gh api "repos/o/r/$P" -f ref=refs/tags/v1.0.5 -f sha=abc'
   "curl --form-escape https://api.github.com/repos/o/r/git/refs -d '{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}'"
+  "gh api repos/o/r/git/refs -f ref=refs/tags/v1.0.5 -f sha=abc -f note='curl -sSX GET'"
 )
 for role in coordinator developer pr-reviewer ""; do
   for cmd in "${HIDDEN_MOVE_FORMS[@]}"; do
@@ -472,6 +487,8 @@ for role in coordinator developer pr-reviewer ""; do
   check allow "$role" 'curl -X DELETE -o "$OUT/.git/$LOG" https://api.github.com/repos/o/r/git/refs/heads/feat/x'
   check allow "$role" 'curl -sSX DELETE https://api.github.com/repos/o/r/git/refs/heads/feat/x'
   check allow "$role" 'gh api -iX GET repos/o/r/git/refs/tags -f per_page=100'
+  check allow "$role" 'gh api -X "GET" repos/o/r/git/refs/tags -f per_page=100'
+  check allow "$role" 'gh api --method=GET repos/o/r/git/refs/tags -F per_page=100'
 done
 for cmd in "${HIDDEN_CREATE_FORMS[@]}"; do
   check allow coordinator "$cmd"
