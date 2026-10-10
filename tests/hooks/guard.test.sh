@@ -56,11 +56,16 @@ check allow developer   'gh api repos/o/r/statuses/abc -f state=success -f conte
 # A GET quoted in a field, or taken as another option's value, does not turn the status write into a read
 GET_IN_FIELD="gh api repos/o/r/statuses/abc -f state=success -f context=agent-review -f description='curl -sSX GET ok'"
 GET_AS_VALUE='gh api repos/o/r/statuses/abc -f state=success -f context=agent-review -t -iXGET'
-for cmd in "$GET_IN_FIELD" "$GET_AS_VALUE"; do
+GET_IN_ESCAPED_FIELD='gh api repos/o/r/statuses/abc -f state=success -f context=agent-review -f description=Checks\ pass\ -iXGET'
+for cmd in "$GET_IN_FIELD" "$GET_AS_VALUE" "$GET_IN_ESCAPED_FIELD"; do
   check allow pr-reviewer "$cmd"
   for role in coordinator developer ""; do
     check deny "$role" "$cmd"
   done
+done
+# A quoted GET is still the method sent: the status call is a read
+for role in pr-reviewer coordinator developer ""; do
+  check allow "$role" 'gh api -X "GET" repos/o/r/statuses/abc -f state=success -f context=agent-review'
 done
 
 # Version bump: developer only, and only without the git tag npm version creates by default
@@ -500,6 +505,8 @@ for role in coordinator developer pr-reviewer ""; do
   check allow "$role" 'gh api -iX GET repos/o/r/git/refs/tags -f per_page=100'
   check allow "$role" 'gh api -X "GET" repos/o/r/git/refs/tags -f per_page=100'
   check allow "$role" 'gh api --method=GET repos/o/r/git/refs/tags -F per_page=100'
+  check allow "$role" "gh api --method='GET' repos/o/r/git/refs/tags/v1.0.4 -f sha=abc"
+  check allow "$role" "curl -X\"GET\" -d '{\"sha\":\"abc\",\"force\":true}' https://api.github.com/repos/o/r/git/refs/tags/v1.0.4"
   check allow "$role" 'gh api -X GET repos/o/r/git/refs/tags -f per_page=100'
   check allow "$role" 'gh api --method GET repos/o/r/git/refs/tags -f per_page=100'
   check allow "$role" "gh api -X GET repos/o/r/git/refs/tags -f q='curl -X DELETE'"
