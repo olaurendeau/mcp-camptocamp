@@ -53,6 +53,15 @@ check deny  developer   "$(lines 'gh api repos/o/r/statuses/abc --input - <<EOF'
 check allow coordinator "$READ"
 check allow coordinator 'gh api repos/o/r/commits/abc/statuses -F per_page=100 --method GET --jq ".[] | select(.context==\"agent-review\")"'
 check allow developer   'gh api repos/o/r/statuses/abc -f state=success -f context=ci'
+# A GET quoted in a field, or taken as another option's value, does not turn the status write into a read
+GET_IN_FIELD="gh api repos/o/r/statuses/abc -f state=success -f context=agent-review -f description='curl -sSX GET ok'"
+GET_AS_VALUE='gh api repos/o/r/statuses/abc -f state=success -f context=agent-review -t -iXGET'
+for cmd in "$GET_IN_FIELD" "$GET_AS_VALUE"; do
+  check allow pr-reviewer "$cmd"
+  for role in coordinator developer ""; do
+    check deny "$role" "$cmd"
+  done
+done
 
 # Version bump: developer only, and only without the git tag npm version creates by default
 check allow developer   'npm version 1.1.0 --no-git-tag-version'
@@ -392,6 +401,111 @@ for role in coordinator developer pr-reviewer ""; do
   check allow "$role" 'curl -X PATCH https://api.github.com/repos/o/r/git/refs/heads/feat/x -d @- < b.json'
 done
 for cmd in "${CREATE_FORMS[@]}"; do
+  check allow coordinator "$cmd"
+  for role in developer pr-reviewer ""; do
+    check deny "$role" "$cmd"
+  done
+done
+
+# A ref path from a variable (git/$REF) may be a tag: the text git/refs is not needed to refuse the write.
+# PATCH/DELETE target their path: only a git/refs/heads/… path exempts them, not a field or another path.
+# A mutation split over lines (or with a JSON \n before its () and a refs/tags split by \⏎ still count.
+SPLIT_TAG="$(lines 'gh api repos/o/r/git/refs -f ref=refs/ta\' 'gs/v1.0.5 -f sha=abc -f note=refs/heads/x')"
+GQL_SPLIT_CREATE_BODY="$(lines '{"query":"mutation { createRef' '(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { clientMutationId } }"}')"
+HIDDEN_MOVE_FORMS=(
+  "REF=refs/tags/v1.0.4; gh api -X PATCH \"repos/o/r/git/\$REF\" -f sha=abc -F force=true"
+  "$(lines 'REF=refs/tags/v1.0.4' 'gh api -X DELETE "repos/o/r/git/$REF"')"
+  'gh api -X PATCH "repos/o/r/git/$REF" -f sha=abc -F force=true'
+  'gh api --method DELETE repos/o/r/git/"${REF}"'
+  'curl -X DELETE "https://api.github.com/repos/o/r/git/$REF"'
+  'gh api -X DELETE "repos/o/r/git/$(cat ref.txt)"'
+  'gh api -X PATCH "repos/o/r/git/$REF" -f sha=abc -F force=true -f note=git/refs/heads/x'
+  'gh api -X PATCH "repos/o/r/git/refs/$REF" -f sha=abc -F force=true -f note=git/refs/heads/x'
+  'gh api -X PATCH "repos/o/r/git/refs/$REF" -f sha=abc -F force=true -f note=refs/heads/x'
+  "curl -X DELETE https://api.github.com/repos/o/r/git/refs/heads/feat/x \"https://api.github.com/repos/o/r/git/\$REF\""
+  "$(lines 'U=https://api.github.com/repos/o/r/git/refs/ta\' 'gs/v1.0.4; curl -X DELETE https://api.github.com/repos/o/r/git/refs/heads/feat/x "$U"')"
+  "$(lines 'gh api graphql -F query=@- <<EOF' 'mutation {' '  updateRef' '  (input: {refId: "REF_1", oid: "abc", force: true}) { clientMutationId }' '}' 'EOF')"
+  "$(lines "gh api graphql -f query='mutation {" '  deleteRef' '  (input: {refId: "REF_1"}) { clientMutationId }' "}'")"
+  "$(lines "gh api graphql -f query='mutation { updateRefs" "(input: {repositoryId: \"R_1\", refUpdates: [{name: \"refs/tags/v1.0.4\", afterOid: \"abc\", force: true}]}) { clientMutationId } }' -f b=refs/heads/x")"
+  "curl https://api.github.com/graphql -d '{\"query\":\"mutation { updateRef\\n(input: {refId: \\\"REF_1\\\", oid: \\\"abc\\\", force: true}) { clientMutationId } }\"}'"
+  # The variable may hold the git/ part itself, set anywhere in the line
+  'U=https://api.github.com/repos/o/r/git/refs/tags/v1.0.4; curl -X DELETE "$U"'
+  "U=https://api.github.com/repos/o/r/git/refs/tags/v1.0.4; curl -X PATCH \"\$U\" -d '{\"sha\":\"abc\",\"force\":true}'"
+  'P=git/refs/tags/v1.0.4; gh api -X DELETE "repos/o/r/$P"'
+  'B=repos/o/r/git; gh api -X DELETE "$B/refs/tags/v1.0.4"'
+  "$(lines 'export U="$API/repos/o/r/git/refs/tags/v1.0.4"' 'curl -sS -H "Authorization: Bearer $T" -X DELETE "${U}"')"
+  'curl -XDELETE "https://api.github.com/repos/o/r/git/$REF"'
+  'curl -X DELETE --url "https://api.github.com/repos/o/r/git/$REF"'
+  # --form-escape takes no value: the URL after it is still the target
+  'curl -X DELETE --form-escape https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
+  # -X inside an option group, its value separate or attached
+  'curl -sSX DELETE https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
+  'curl -sSXDELETE https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
+  'gh api -iX DELETE repos/o/r/git/refs/tags/v1.0.4'
+  'gh api -iXPATCH repos/o/r/git/refs/tags/v1.0.4 -f sha=abc -F force=true'
+  # GitHub takes POST for PATCH: a POST on a tag path set by a variable of the line moves it, like the literal path
+  'P=git/refs/tags/v1.0.4; gh api "repos/o/r/$P" -f sha=abc -F force=true'
+  "U=https://api.github.com/repos/o/r/git/refs/tags/v1.0.4; curl -d '{\"sha\":\"abc\",\"force\":true}' \"\$U\""
+  # Same when only the tag part is in the variable
+  'REF=refs/tags/v1.0.4; gh api "repos/o/r/git/$REF" -f sha=abc -F force=true'
+  'TAG=tags/v1.0.4; gh api "repos/o/r/git/refs/$TAG" -f sha=abc -F force=true'
+  'P=git/refs; TAG=tags/v1.0.4; gh api "repos/o/r/$P/$TAG" -f sha=abc -F force=true'
+  "REF=refs/tags/v1.0.4; curl -d '{\"sha\":\"abc\",\"force\":true}' \"https://api.github.com/repos/o/r/git/\$REF\""
+  # A GET elsewhere in the call does not cancel the method it gives
+  'curl -sSXGET -X DELETE https://api.github.com/repos/o/r/git/refs/tags/v1.0.4'
+  "gh api -X DELETE repos/o/r/git/refs/tags/v1.0.4 -f note='curl -sSX GET'"
+  # A word that looks like a GET option but is another option's value does not make the call a read
+  'gh api repos/o/r/git/refs/tags/v1.0.4 -f sha=abc -F force=true -t -iXGET'
+  'gh api repos/o/r/git/refs/tags/v1.0.4 -f sha=abc -F force=true -t -XGET'
+  'gh api repos/o/r/git/refs/tags/v1.0.4 -f sha=abc -F force=true -t -X""GET'
+  'gh api repos/o/r/git/refs/tags/v1.0.4 -f sha=abc -F force=true -f note=x\ -sSXGET'
+  "gh api repos/o/r/git/refs/tags/v1.0.4 -f sha=abc -F force=true -f note=\$'a\\' -sSX GET '"
+  "curl -d '{\"sha\":\"abc\",\"force\":true}' -o -sXGET https://api.github.com/repos/o/r/git/refs/tags/v1.0.4"
+)
+HIDDEN_CREATE_FORMS=(
+  "P=refs; gh api \"repos/o/r/git/\$P\" -f ref=refs/tags/v1.0.5 -f sha=abc"
+  "$SPLIT_TAG"
+  "$(lines 'R=refs/ta\' 'gs/v1.0.5; gh api repos/o/r/git/refs -f ref="$R" -f sha=abc -f note=refs/heads/x')"
+  "$(lines 'gh api graphql -F query=@- -f b=refs/heads/x <<EOF' 'mutation {' '  createRef' '  (input: {repositoryId: "R_1", name: "refs/tags/v1.0.5", oid: "abc"}) { clientMutationId }' '}' 'EOF')"
+  "$(lines 'gh api graphql --input - <<EOF' "$GQL_SPLIT_CREATE_BODY" 'EOF')"
+  "$(lines "Q='mutation { createRef" "(input: {repositoryId: \"R_1\", name: \"refs/tags/v1.0.5\", oid: \"abc\"}) { clientMutationId } }'" 'gh api graphql -f query="$Q"')"
+  "curl https://api.github.com/graphql -d '{\"query\":\"mutation { createRef\\n(input: {repositoryId: \\\"R_1\\\", name: \\\"refs/tags/v1.0.5\\\", oid: \\\"abc\\\"}) { clientMutationId } }\"}'"
+  'B=repos/o/r/git; gh api "$B/refs" -f ref=refs/tags/v1.0.5 -f sha=abc'
+  'P=git/refs; gh api "repos/o/r/$P" -f ref=refs/tags/v1.0.5 -f sha=abc'
+  "curl --form-escape https://api.github.com/repos/o/r/git/refs -d '{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}'"
+  "gh api repos/o/r/git/refs -f ref=refs/tags/v1.0.5 -f sha=abc -f note='curl -sSX GET'"
+  "curl -w -sXGET -d '{\"ref\":\"refs/tags/v1.0.5\",\"sha\":\"abc\"}' https://api.github.com/repos/o/r/git/refs"
+)
+for role in coordinator developer pr-reviewer ""; do
+  for cmd in "${HIDDEN_MOVE_FORMS[@]}"; do
+    check deny "$role" "$cmd"
+  done
+  # Branches and other git endpoints stay free
+  check allow "$role" 'B=feat/x; gh api -X DELETE "repos/o/r/git/refs/heads/$B"'
+  check allow "$role" 'gh api -X PATCH "repos/o/r/git/refs/heads/${B}" -f sha=abc -F force=true'
+  check allow "$role" 'gh api "repos/o/r/git/trees/$SHA?recursive=1"'
+  check allow "$role" 'gh api "repos/o/r/git/$KIND/$SHA"'
+  check allow "$role" 'gh api repos/o/r/git/commits -f tree=abc -f parents[]=def'
+  check allow "$role" 'gh api -X PATCH "repos/o/r/pulls/$PR" -f title=x'
+  check allow "$role" "$(lines 'gh api graphql -F query=@- <<EOF' 'mutation {' '  createRef' '  (input: {repositoryId: "R_1", name: "refs/heads/feat/x", oid: "abc"}) { clientMutationId }' '}' 'EOF')"
+  # Only a gh api or curl call's endpoint or URL is a ref path: not other commands, not the call's fields
+  check allow "$role" 'rm -f "$WT/.git/$LOCK"'
+  check allow "$role" 'cp -f hook.sh .git/$HOOK'
+  check allow "$role" 'ls -d .git/$X'
+  check allow "$role" 'G=/repo/.git; rm -f "$G/index.lock"'
+  check allow "$role" 'gh api -X PATCH "repos/o/r/pulls/$PR" -f body="see git/$REF"'
+  check allow "$role" 'gh api -X PATCH repos/o/r/git/refs/heads/feat/x -f sha=abc -f note=git/$REF'
+  check allow "$role" 'curl -X DELETE -o "$OUT/.git/$LOG" https://api.github.com/repos/o/r/git/refs/heads/feat/x'
+  check allow "$role" 'curl -sSX DELETE https://api.github.com/repos/o/r/git/refs/heads/feat/x'
+  check allow "$role" 'gh api -iX GET repos/o/r/git/refs/tags -f per_page=100'
+  check allow "$role" 'gh api -X "GET" repos/o/r/git/refs/tags -f per_page=100'
+  check allow "$role" 'gh api --method=GET repos/o/r/git/refs/tags -F per_page=100'
+  check allow "$role" 'gh api -X GET repos/o/r/git/refs/tags -f per_page=100'
+  check allow "$role" 'gh api --method GET repos/o/r/git/refs/tags -f per_page=100'
+  check allow "$role" "gh api -X GET repos/o/r/git/refs/tags -f q='curl -X DELETE'"
+  check allow "$role" "curl -X GET https://api.github.com/repos/o/r/git/refs/tags -d 'note=-X PATCH'"
+done
+for cmd in "${HIDDEN_CREATE_FORMS[@]}"; do
   check allow coordinator "$cmd"
   for role in developer pr-reviewer ""; do
     check deny "$role" "$cmd"
